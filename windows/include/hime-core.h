@@ -293,12 +293,41 @@ HIME_API int hime_get_bopomofo_string(
 /* ========== Configuration ========== */
 
 /**
+ * Keyboard layout types for phonetic input
+ */
+typedef enum {
+    HIME_KB_STANDARD = 0,   /* Standard Zhuyin (default) */
+    HIME_KB_HSU = 1,        /* HSU (許氏) layout */
+    HIME_KB_ETEN = 2,       /* ETen (倚天) layout */
+    HIME_KB_ETEN26 = 3,     /* ETen 26-key layout */
+    HIME_KB_IBM = 4,        /* IBM layout */
+    HIME_KB_PINYIN = 5,     /* Hanyu Pinyin layout */
+    HIME_KB_DVORAK = 6,     /* Dvorak-based Zhuyin */
+    HIME_KB_COUNT           /* Number of layouts */
+} HimeKeyboardLayout;
+
+/**
  * Set keyboard layout for phonetic input
  * @param ctx Context handle
- * @param layout_name Layout name ("zo", "et", "hsu", "pinyin", etc.)
- * @return 0 on success
+ * @param layout Keyboard layout type
+ * @return 0 on success, -1 on error
  */
-HIME_API int hime_set_keyboard_layout(HimeContext *ctx, const char *layout_name);
+HIME_API int hime_set_keyboard_layout(HimeContext *ctx, HimeKeyboardLayout layout);
+
+/**
+ * Get current keyboard layout
+ * @param ctx Context handle
+ * @return Current keyboard layout
+ */
+HIME_API HimeKeyboardLayout hime_get_keyboard_layout(HimeContext *ctx);
+
+/**
+ * Set keyboard layout by name (for compatibility)
+ * @param ctx Context handle
+ * @param layout_name Layout name ("standard", "hsu", "eten", "eten26", "ibm", "pinyin", "dvorak")
+ * @return 0 on success, -1 if layout not found
+ */
+HIME_API int hime_set_keyboard_layout_by_name(HimeContext *ctx, const char *layout_name);
 
 /**
  * Set selection keys string (e.g., "1234567890")

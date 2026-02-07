@@ -417,3 +417,28 @@ Java_org_hime_android_core_HimeEngine_nativeSetVibrationDuration(JNIEnv *env, jo
         hime_set_vibration_duration(g_context, durationMs);
     }
 }
+
+/* ========== Keyboard Layout ========== */
+
+JNIEXPORT jint JNICALL
+Java_org_hime_android_core_HimeEngine_nativeGetKeyboardLayout(JNIEnv *env, jobject thiz) {
+    if (g_context == NULL) return 0;
+    return (jint)hime_get_keyboard_layout(g_context);
+}
+
+JNIEXPORT jint JNICALL
+Java_org_hime_android_core_HimeEngine_nativeSetKeyboardLayout(JNIEnv *env, jobject thiz, jint layout) {
+    if (g_context == NULL) return -1;
+    return hime_set_keyboard_layout(g_context, (HimeKeyboardLayout)layout);
+}
+
+JNIEXPORT jint JNICALL
+Java_org_hime_android_core_HimeEngine_nativeSetKeyboardLayoutByName(JNIEnv *env, jobject thiz, jstring layoutName) {
+    if (g_context == NULL || layoutName == NULL) return -1;
+
+    char *name = jstring_to_cstr(env, layoutName);
+    int result = hime_set_keyboard_layout_by_name(g_context, name);
+    free(name);
+
+    return result;
+}

@@ -50,6 +50,15 @@ public class HimeEngine {
     public static final int COLOR_SCHEME_DARK = 1;
     public static final int COLOR_SCHEME_SYSTEM = 2;
 
+    /* Keyboard layout constants */
+    public static final int KB_STANDARD = 0;
+    public static final int KB_HSU = 1;
+    public static final int KB_ETEN = 2;
+    public static final int KB_ETEN26 = 3;
+    public static final int KB_IBM = 4;
+    public static final int KB_PINYIN = 5;
+    public static final int KB_DVORAK = 6;
+
     /* Feedback type constants */
     public static final int FEEDBACK_KEY_PRESS = 0;
     public static final int FEEDBACK_KEY_DELETE = 1;
@@ -353,6 +362,36 @@ public class HimeEngine {
         }
     }
 
+    /* ========== Keyboard Layout ========== */
+
+    /**
+     * Get current keyboard layout.
+     */
+    public int getKeyboardLayout() {
+        if (!initialized) return KB_STANDARD;
+        return nativeGetKeyboardLayout();
+    }
+
+    /**
+     * Set keyboard layout.
+     * @param layout One of KB_STANDARD, KB_HSU, KB_ETEN, KB_ETEN26, KB_IBM, KB_PINYIN, KB_DVORAK
+     * @return 0 on success, -1 on error
+     */
+    public int setKeyboardLayout(int layout) {
+        if (!initialized) return -1;
+        return nativeSetKeyboardLayout(layout);
+    }
+
+    /**
+     * Set keyboard layout by name.
+     * @param layoutName Layout name ("standard", "hsu", "eten", "eten26", "ibm", "pinyin", "dvorak")
+     * @return 0 on success, -1 if layout not found
+     */
+    public int setKeyboardLayoutByName(String layoutName) {
+        if (!initialized || layoutName == null) return -1;
+        return nativeSetKeyboardLayoutByName(layoutName);
+    }
+
     /* ========== Feedback ========== */
 
     /**
@@ -517,4 +556,9 @@ public class HimeEngine {
     private native void nativeSetVibrationEnabled(boolean enabled);
     private native int nativeGetVibrationDuration();
     private native void nativeSetVibrationDuration(int durationMs);
+
+    /* Keyboard layout native methods */
+    private native int nativeGetKeyboardLayout();
+    private native int nativeSetKeyboardLayout(int layout);
+    private native int nativeSetKeyboardLayoutByName(String layoutName);
 }
