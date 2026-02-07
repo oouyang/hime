@@ -274,6 +274,8 @@ void save_gtablist_conf () {
     }
     tt[ttN] = 0;
     hime_str_im_cycle = strdup (tt);
+    if (!hime_str_im_cycle)
+        return;
     save_hime_conf_str (HIME_STR_IM_CYCLE, hime_str_im_cycle);
     dbg ("hime_str_im_cycle ttN:%d '%s' '%s'\n", ttN, hime_str_im_cycle, tt);
 
@@ -378,6 +380,8 @@ static gboolean toggled_default_inmd (GtkCellRendererToggle *cell, gchar *path_s
     snprintf (tt, sizeof (tt), "%s %s", key, file);
     free (default_input_method_str);
     default_input_method_str = strdup (tt);
+    if (!default_input_method_str)
+        return TRUE;
     dbg ("default_input_method_str %s\n", default_input_method_str);
     //  default_input_method = hime_switch_keys_lookup(key[0]);
 

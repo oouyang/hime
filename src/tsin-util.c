@@ -78,6 +78,8 @@ void load_tsin_db0 (char *infname, gboolean is_gtab_i) {
 
     free (current_tsin_fname);
     current_tsin_fname = strdup (infname);
+    if (!current_tsin_fname)
+        p_err ("strdup failed for %s", infname);
 
     if (is_gtab_i) {
         TSIN_GTAB_HEAD head;

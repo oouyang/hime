@@ -134,6 +134,8 @@ void get_hime_conf_str (char *name, char **rstr, char *default_str) {
 
     if ((fp = fopen (fname, "rb")) == NULL) {
         *rstr = strdup (default_str);
+        if (!*rstr)
+            *rstr = (char *) default_str;
         return;
     }
 
@@ -145,6 +147,8 @@ void get_hime_conf_str (char *name, char **rstr, char *default_str) {
     fclose (fp);
 
     *rstr = strdup (out);
+    if (!*rstr)
+        *rstr = (char *) default_str;
 }
 
 void get_hime_conf_fstr (char *name, char rstr[], char *default_str) {

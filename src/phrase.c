@@ -208,10 +208,13 @@ void load_phrase (char *fname, time_t *modtime, struct keystruc *tr, int trN) {
             continue;
         }
 
+        char *dup = strdup (str);
+        if (!dup)
+            continue;
         if (is_upper)
-            tr[i].str_caps = strdup (str);
+            tr[i].str_caps = dup;
         else
-            tr[i].str = strdup (str);
+            tr[i].str = dup;
     }
 }
 

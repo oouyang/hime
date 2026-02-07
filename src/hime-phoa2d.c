@@ -182,6 +182,8 @@ int main (int argc, char **argv) {
         p_err ("file name should be *.tab2.src");
 
     tp = strstr (fname, ".src");
+    if (!tp)
+        p_err ("file name should contain .src extension");
     *tp = 0;
 
     char *fname_out = fname;

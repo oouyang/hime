@@ -178,6 +178,8 @@ void init_gtab (int inmdno) {
             mtime = mtime_append_gtab;
             free (inmd[inmdno].filename_append);
             inmd[inmdno].filename_append = strdup (append_user_gtab);
+            if (!inmd[inmdno].filename_append)
+                return;
         }
     }
 
@@ -234,6 +236,8 @@ void init_gtab (int inmdno) {
 
     free (inp->endkey);
     inp->endkey = strdup (th.endkey);
+    if (!inp->endkey)
+        p_err ("strdup failed for endkey");
 
     if (th.flag & FLAG_GTAB_SYM_KBM)
         dbg ("symbol kbm\n");
@@ -305,6 +309,8 @@ void init_gtab (int inmdno) {
         inp->selkey = strdup (tt);
     } else
         inp->selkey = strdup (th.selkey);
+    if (!inp->selkey)
+        p_err ("strdup failed for selkey");
 
     dbg ("selkey %s\n", inp->selkey);
 
@@ -313,6 +319,8 @@ void init_gtab (int inmdno) {
     inp->flag = th.flag;
     free (inp->cname);
     inp->cname = strdup (th.cname);
+    if (!inp->cname)
+        p_err ("strdup failed for cname");
 
     //  dbg("MaxPress:%d  M_DUP_SEL:%d\n", th.MaxPress, th.M_DUP_SEL);
 

@@ -152,7 +152,9 @@ static gboolean read_syms () {
             *n = 0;
 
             psym->sym = trealloc (psym->sym, char *, psym->symN + 1);
-            psym->sym[psym->symN++] = strdup (p);
+            char *dup = strdup (p);
+            if (dup)
+                psym->sym[psym->symN++] = dup;
 
             p = n + 1;
         }
