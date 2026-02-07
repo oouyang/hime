@@ -618,8 +618,11 @@ static bool g_initialized = false;
 
 /* ========== Internal Functions ========== */
 
-/* Forward declaration for feedback trigger */
+/* Forward declarations */
 static void trigger_feedback(HimeContext *ctx, HimeFeedbackType type);
+static int gtab_lookup(HimeContext *ctx);
+static HimeKeyResult gtab_process_key(HimeContext *ctx, char key);
+static HimeKeyResult intcode_process_key(HimeContext *ctx, char key);
 
 static hime_phokey_t pho2key(int typ_pho[4]) {
     hime_phokey_t key = typ_pho[0];
