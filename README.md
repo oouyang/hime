@@ -39,13 +39,30 @@ Hime 是一個極好用的輸入法框架，輕巧、穩定、功能強大且支
 | macOS | [macos/README.md](macos/README.md) |
 | iOS | [ios/README.md](ios/README.md) |
 | Android | [android/README.md](android/README.md) |
+| **Input Methods** | [docs/INPUT_METHODS.md](docs/INPUT_METHODS.md) |
 
-#### 特色
+#### 特色 / Features
 
-- 支援多種輸入法, 使用者選擇多
-- 支援多種智慧型注音輸入法
-- 支援多種拆字型輸入法
-- 支援內碼輸入
+**支援 21+ 種輸入法表格 / 21+ Input Method Tables:**
+
+| 類型 Category | 輸入法 Input Methods |
+|---------------|---------------------|
+| 倉頡系列 Cangjie | 倉頡、倉五、五四三倉頡、標點倉頡 |
+| 速成系列 Simplex | 速成(簡易)、標點簡易 |
+| 大易 DaYi | 大易三碼 |
+| 行列系列 Array | 行列30、行列40、行列大字集 |
+| 嘸蝦米 Boshiamy | 嘸蝦米 |
+| 拼音系列 Phonetic | 拼音、粵拼(Jyutping) |
+| 韓文 Korean | 韓諺(Hangul)、韓羅(Romanization) |
+| 越南文 Vietnamese | 越南文 VIMS |
+| 符號 Symbols | 符號、希臘文、俄文、世界文、拉丁字母 |
+
+**核心功能 / Core Features:**
+- 支援多種智慧型注音輸入法 / Multiple phonetic input layouts
+- 支援多種拆字型輸入法 / Multiple shape-based input methods
+- 支援內碼輸入 (Unicode/Big5) / Internal code input
+- 支援詞音輸入與學習 / Phrase input with learning
+- 跨平台共用核心引擎 / Cross-platform core engine
 
 #### 授權
 
