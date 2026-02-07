@@ -844,6 +844,278 @@ TEST(null_context_safety) {
     TEST_PASS();
 }
 
+/* ========== Input Method Search Tests ========== */
+
+TEST(search_methods_all) {
+    hime_init("../../data");
+
+    HimeSearchResult results[50];
+    int count = hime_get_all_methods(results, 50);
+
+    /* Should return at least built-in methods + GTAB tables */
+    ASSERT_TRUE(count >= HIME_IM_COUNT);
+
+    /* First results should be built-in methods */
+    bool found_pho = false;
+    bool found_tsin = false;
+    for (int i = 0; i < count; i++) {
+        if (results[i].method_type == HIME_IM_PHO) found_pho = true;
+        if (results[i].method_type == HIME_IM_TSIN) found_tsin = true;
+    }
+    ASSERT_TRUE(found_pho);
+    ASSERT_TRUE(found_tsin);
+
+    hime_cleanup();
+    TEST_PASS();
+}
+
+TEST(search_methods_with_query) {
+    hime_init("../../data");
+
+    HimeSearchFilter filter;
+    filter.query = "倉";  /* Search for Cangjie */
+    filter.method_type = (HimeInputMethod)-1;
+    filter.include_disabled = false;
+
+    HimeSearchResult results[20];
+    int count = hime_search_methods(&filter, results, 20);
+
+    /* Should find Cangjie tables */
+    ASSERT_TRUE(count > 0);
+    /* First result should have highest score */
+    if (count > 1) {
+        ASSERT_TRUE(results[0].match_score >= results[1].match_score);
+    }
+
+    hime_cleanup();
+    TEST_PASS();
+}
+
+TEST(search_methods_filter_by_type) {
+    hime_init("../../data");
+
+    HimeSearchFilter filter;
+    filter.query = NULL;
+    filter.method_type = HIME_IM_GTAB;
+    filter.include_disabled = false;
+
+    HimeSearchResult results[50];
+    int count = hime_search_methods(&filter, results, 50);
+
+    /* All results should be GTAB type */
+    for (int i = 0; i < count; i++) {
+        ASSERT_EQ(HIME_IM_GTAB, results[i].method_type);
+    }
+
+    hime_cleanup();
+    TEST_PASS();
+}
+
+TEST(gtab_search_tables) {
+    hime_init("../../data");
+
+    HimeGtabInfo results[20];
+    int count = hime_gtab_search_tables("行列", results, 20);
+
+    /* Should find Array tables */
+    ASSERT_TRUE(count > 0);
+    ASSERT_TRUE(strlen(results[0].name) > 0);
+
+    hime_cleanup();
+    TEST_PASS();
+}
+
+TEST(gtab_search_tables_empty_query) {
+    hime_init("../../data");
+
+    HimeGtabInfo results[50];
+    int count = hime_gtab_search_tables(NULL, results, 50);
+
+    /* Empty query should return all tables */
+    ASSERT_TRUE(count > 0);
+
+    hime_cleanup();
+    TEST_PASS();
+}
+
+TEST(find_method_by_name) {
+    hime_init("../../data");
+
+    /* Find built-in method */
+    int idx = hime_find_method_by_name("注音 (Phonetic)");
+    ASSERT_EQ(HIME_IM_PHO, idx);
+
+    /* Find GTAB table */
+    idx = hime_find_method_by_name("倉頡");
+    ASSERT_TRUE(idx >= HIME_IM_COUNT);
+
+    /* Not found */
+    idx = hime_find_method_by_name("不存在的輸入法");
+    ASSERT_EQ(-1, idx);
+
+    hime_cleanup();
+    TEST_PASS();
+}
+
+/* ========== Simplified/Traditional Conversion Tests ========== */
+
+TEST(convert_simp_to_trad) {
+    char output[256];
+    int len;
+
+    /* Test single character conversion */
+    len = hime_convert_simp_to_trad("国", output, sizeof(output));
+    ASSERT_TRUE(len > 0);
+    ASSERT_STR_EQ("國", output);
+
+    /* Test multiple characters */
+    len = hime_convert_simp_to_trad("国家", output, sizeof(output));
+    ASSERT_TRUE(len > 0);
+    ASSERT_STR_EQ("國家", output);
+
+    /* Test string with no conversion needed */
+    len = hime_convert_simp_to_trad("你好", output, sizeof(output));
+    ASSERT_TRUE(len > 0);
+    ASSERT_STR_EQ("你好", output);
+
+    TEST_PASS();
+}
+
+TEST(convert_trad_to_simp) {
+    char output[256];
+    int len;
+
+    /* Test single character conversion */
+    len = hime_convert_trad_to_simp("國", output, sizeof(output));
+    ASSERT_TRUE(len > 0);
+    ASSERT_STR_EQ("国", output);
+
+    /* Test multiple characters */
+    len = hime_convert_trad_to_simp("國家", output, sizeof(output));
+    ASSERT_TRUE(len > 0);
+    ASSERT_STR_EQ("国家", output);
+
+    /* Test string with no conversion needed */
+    len = hime_convert_trad_to_simp("你好", output, sizeof(output));
+    ASSERT_TRUE(len > 0);
+    ASSERT_STR_EQ("你好", output);
+
+    TEST_PASS();
+}
+
+TEST(convert_mixed_string) {
+    char output[256];
+    int len;
+
+    /* Test mixed simplified and ASCII */
+    len = hime_convert_simp_to_trad("中国China", output, sizeof(output));
+    ASSERT_TRUE(len > 0);
+    /* Should convert Chinese but keep ASCII */
+    ASSERT_TRUE(strstr(output, "China") != NULL);
+
+    TEST_PASS();
+}
+
+TEST(output_variant_toggle) {
+    hime_init("../../data");
+    HimeContext *ctx = hime_context_new();
+
+    /* Default should be Traditional */
+    ASSERT_EQ(HIME_OUTPUT_TRADITIONAL, hime_get_output_variant(ctx));
+
+    /* Toggle to Simplified */
+    HimeOutputVariant result = hime_toggle_output_variant(ctx);
+    ASSERT_EQ(HIME_OUTPUT_SIMPLIFIED, result);
+    ASSERT_EQ(HIME_OUTPUT_SIMPLIFIED, hime_get_output_variant(ctx));
+
+    /* Toggle back to Traditional */
+    result = hime_toggle_output_variant(ctx);
+    ASSERT_EQ(HIME_OUTPUT_TRADITIONAL, result);
+    ASSERT_EQ(HIME_OUTPUT_TRADITIONAL, hime_get_output_variant(ctx));
+
+    hime_context_free(ctx);
+    hime_cleanup();
+    TEST_PASS();
+}
+
+TEST(set_output_variant) {
+    hime_init("../../data");
+    HimeContext *ctx = hime_context_new();
+
+    hime_set_output_variant(ctx, HIME_OUTPUT_SIMPLIFIED);
+    ASSERT_EQ(HIME_OUTPUT_SIMPLIFIED, hime_get_output_variant(ctx));
+
+    hime_set_output_variant(ctx, HIME_OUTPUT_TRADITIONAL);
+    ASSERT_EQ(HIME_OUTPUT_TRADITIONAL, hime_get_output_variant(ctx));
+
+    hime_context_free(ctx);
+    hime_cleanup();
+    TEST_PASS();
+}
+
+TEST(convert_to_output_variant) {
+    hime_init("../../data");
+    HimeContext *ctx = hime_context_new();
+
+    char output[256];
+    int len;
+
+    /* Set to Simplified output */
+    hime_set_output_variant(ctx, HIME_OUTPUT_SIMPLIFIED);
+    len = hime_convert_to_output_variant(ctx, "國家", output, sizeof(output));
+    ASSERT_TRUE(len > 0);
+    ASSERT_STR_EQ("国家", output);
+
+    /* Set to Traditional output */
+    hime_set_output_variant(ctx, HIME_OUTPUT_TRADITIONAL);
+    len = hime_convert_to_output_variant(ctx, "国家", output, sizeof(output));
+    ASSERT_TRUE(len > 0);
+    ASSERT_STR_EQ("國家", output);
+
+    hime_context_free(ctx);
+    hime_cleanup();
+    TEST_PASS();
+}
+
+TEST(conversion_null_safety) {
+    char output[256];
+
+    /* NULL input */
+    int len = hime_convert_simp_to_trad(NULL, output, sizeof(output));
+    ASSERT_EQ(-1, len);
+
+    /* NULL output */
+    len = hime_convert_simp_to_trad("国", NULL, sizeof(output));
+    ASSERT_EQ(-1, len);
+
+    /* Zero size */
+    len = hime_convert_simp_to_trad("国", output, 0);
+    ASSERT_EQ(-1, len);
+
+    TEST_PASS();
+}
+
+TEST(conversion_common_chars) {
+    char output[256];
+    int len;
+
+    /* Test common conversion pairs */
+    struct { const char *simp; const char *trad; } tests[] = {
+        {"东", "東"}, {"书", "書"}, {"学", "學"}, {"开", "開"},
+        {"门", "門"}, {"马", "馬"}, {"龙", "龍"}, {"鸟", "鳥"},
+        {"车", "車"}, {"鱼", "魚"}, {"风", "風"}, {"飞", "飛"},
+        {NULL, NULL}
+    };
+
+    for (int i = 0; tests[i].simp != NULL; i++) {
+        len = hime_convert_simp_to_trad(tests[i].simp, output, sizeof(output));
+        ASSERT_TRUE(len > 0);
+        ASSERT_STR_EQ(tests[i].trad, output);
+    }
+
+    TEST_PASS();
+}
+
 /* ========== Test Suite ========== */
 
 TEST_SUITE_BEGIN("HIME Core Library Tests")
@@ -936,5 +1208,23 @@ TEST_SUITE_BEGIN("HIME Core Library Tests")
 
     /* NULL safety */
     RUN_TEST(null_context_safety);
+
+    /* Input method search */
+    RUN_TEST(search_methods_all);
+    RUN_TEST(search_methods_with_query);
+    RUN_TEST(search_methods_filter_by_type);
+    RUN_TEST(gtab_search_tables);
+    RUN_TEST(gtab_search_tables_empty_query);
+    RUN_TEST(find_method_by_name);
+
+    /* Simplified/Traditional conversion */
+    RUN_TEST(convert_simp_to_trad);
+    RUN_TEST(convert_trad_to_simp);
+    RUN_TEST(convert_mixed_string);
+    RUN_TEST(output_variant_toggle);
+    RUN_TEST(set_output_variant);
+    RUN_TEST(convert_to_output_variant);
+    RUN_TEST(conversion_null_safety);
+    RUN_TEST(conversion_common_chars);
 
 TEST_SUITE_END()
