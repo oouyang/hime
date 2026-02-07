@@ -18,15 +18,64 @@
  */
 
 #include <signal.h>
+#include <string.h>
 
 #include "hime.h"
 
+#include "hime-protocol.h"
 #include "im-srv.h"
+#include "lang.h"
 #include "win-gtab.h"
 #include "win-kbm.h"
 #include "win-pho.h"
 #include "win0.h"
 #include "win1.h"
+
+/* Forward declarations - grouped for maintainability */
+void load_tsin_db (void);
+void load_tsin_conf (void);
+void load_settings (void);
+void load_tab_pho_file (void);
+void disp_hide_tsin_status_row (void);
+void update_win_kbm_inited (void);
+void change_tsin_line_color (void);
+void change_win0_style (void);
+void change_win_gtab_style (void);
+void destroy_inmd_menu (void);
+void load_gtab_list (gboolean);
+void change_win1_font (void);
+void set_wselkey (char *s);
+gboolean init_in_method (int in_no);
+void toggle_im_enabled (void);
+void change_tsin_font_size (void);
+void change_gtab_font_size (void);
+void change_pho_font_size (void);
+void change_win_sym_font_size (void);
+void change_module_font_size (void);
+void toggle_gb_output (void);
+void execute_message (char *message);
+void disp_win_kbm_capslock_init (void);
+void reload_tsin_db (void);
+void load_phrase (void);
+void exec_setup_scripts (void);
+void free_pho_mem (void);
+void free_tsin (void);
+void free_all_IC (void);
+void free_gtab (void);
+void free_phrase (void);
+void sim_output (void);
+void trad_output (void);
+
+#if TRAY_ENABLED
+void update_item_active_all (void);
+void disp_tray_icon (void);
+void destroy_tray (void);
+void init_tray (void);
+void init_tray_double (void);
+#if TRAY_UNITY
+void init_tray_appindicator (void);
+#endif
+#endif
 
 Window root;
 
@@ -50,7 +99,7 @@ char *half_char_to_full_char (KeySym xkey) {
     return _ (fullchar[xkey - ' ']);
 }
 
-static void start_inmd_window () {
+static void start_inmd_window (void) {
     GtkWidget *win = gtk_window_new (GTK_WINDOW_TOPLEVEL);
     gtk_widget_realize (win);
     xim_xwin = GDK_WINDOW_XWINDOW (gtk_widget_get_window (win));
@@ -127,106 +176,98 @@ void GetIC (IMChangeICStruct *call_data);
 int xim_hime_FocusIn (IMChangeFocusStruct *call_data);
 int xim_hime_FocusOut (IMChangeFocusStruct *call_data);
 
-int hime_ProtoHandler (XIMS ims, IMProtocol *call_data) {
-    //  dbg("hime_ProtoHandler %x ims\n", ims);
+#define MAX_CONNECT 20000
 
+/* Debug macro for XIM protocol - set to 1 to enable verbose XIM logging */
+#define XIM_DEBUG 0
+#if XIM_DEBUG
+#define XIM_DBG(fmt, ...) dbg (fmt, ##__VA_ARGS__)
+#else
+#define XIM_DBG(fmt, ...) \
+    do {                  \
+    } while (0)
+#endif
+
+int hime_ProtoHandler (XIMS ims, IMProtocol *call_data) {
     current_ims = ims;
 
     switch (call_data->major_code) {
-    case XIM_OPEN:
-#define MAX_CONNECT 20000
-    {
+    case XIM_OPEN: {
         IMOpenStruct *pimopen = (IMOpenStruct *) call_data;
-
         if (pimopen->connect_id > MAX_CONNECT - 1)
             return True;
-
-#if DEBUG && 0
-        dbg ("open lang %s  connectid:%d\n", pimopen->lang.name, pimopen->connect_id);
-#endif
+        XIM_DBG ("XIM_OPEN lang=%s connect_id=%d\n", pimopen->lang.name, pimopen->connect_id);
         return True;
     }
+
     case XIM_CLOSE:
-#if DEBUG && 0
-        dbg ("XIM_CLOSE\n");
-#endif
+        XIM_DBG ("XIM_CLOSE\n");
         return True;
+
     case XIM_CREATE_IC:
-#if DEBUG && 0
-        dbg ("CREATE_IC\n");
-#endif
+        XIM_DBG ("XIM_CREATE_IC\n");
         CreateIC ((IMChangeICStruct *) call_data);
         return True;
+
     case XIM_DESTROY_IC: {
         IMChangeICStruct *pimcha = (IMChangeICStruct *) call_data;
-#if DEBUG && 0
-        dbg ("DESTROY_IC %d\n", pimcha->icid);
-#endif
+        XIM_DBG ("XIM_DESTROY_IC icid=%d\n", pimcha->icid);
         DeleteIC (pimcha->icid);
-    }
         return True;
+    }
+
     case XIM_SET_IC_VALUES:
-#if DEBUG && 0
-        dbg ("SET_IC\n");
-#endif
+        XIM_DBG ("XIM_SET_IC_VALUES\n");
         SetIC ((IMChangeICStruct *) call_data);
         return True;
+
     case XIM_GET_IC_VALUES:
-#if DEBUG && 0
-        dbg ("GET_IC\n");
-#endif
+        XIM_DBG ("XIM_GET_IC_VALUES\n");
         GetIC ((IMChangeICStruct *) call_data);
         return True;
+
     case XIM_FORWARD_EVENT:
-#if DEBUG && 0
-        dbg ("XIM_FORWARD_EVENT\n");
-#endif
+        XIM_DBG ("XIM_FORWARD_EVENT\n");
         return xim_ForwardEventHandler ((IMForwardEventStruct *) call_data);
+
     case XIM_SET_IC_FOCUS:
-#if DEBUG && 0
-        dbg ("XIM_SET_IC_FOCUS\n");
-#endif
+        XIM_DBG ("XIM_SET_IC_FOCUS\n");
         return xim_hime_FocusIn ((IMChangeFocusStruct *) call_data);
+
     case XIM_UNSET_IC_FOCUS:
-#if DEBUG && 0
-        dbg ("XIM_UNSET_IC_FOCUS\n");
-#endif
+        XIM_DBG ("XIM_UNSET_IC_FOCUS\n");
         return xim_hime_FocusOut ((IMChangeFocusStruct *) call_data);
+
     case XIM_RESET_IC:
-#if DEBUG && 0
-        dbg ("XIM_UNSET_IC_FOCUS\n");
-#endif
+        XIM_DBG ("XIM_RESET_IC\n");
         return True;
+
     case XIM_TRIGGER_NOTIFY:
-#if DEBUG && 0
-        dbg ("XIM_TRIGGER_NOTIFY\n");
-#endif
+        XIM_DBG ("XIM_TRIGGER_NOTIFY\n");
         MyTriggerNotifyHandler ((IMTriggerNotifyStruct *) call_data);
         return True;
+
     case XIM_PREEDIT_START_REPLY:
-#if DEBUG && 1
-        dbg ("XIM_PREEDIT_START_REPLY\n");
-#endif
+        XIM_DBG ("XIM_PREEDIT_START_REPLY\n");
         return True;
+
     case XIM_PREEDIT_CARET_REPLY:
-#if DEBUG && 1
-        dbg ("XIM_PREEDIT_CARET_REPLY\n");
-#endif
+        XIM_DBG ("XIM_PREEDIT_CARET_REPLY\n");
         return True;
+
     case XIM_STR_CONVERSION_REPLY:
-#if DEBUG && 1
-        dbg ("XIM_STR_CONVERSION_REPLY\n");
-#endif
+        XIM_DBG ("XIM_STR_CONVERSION_REPLY\n");
         return True;
+
     default:
-        printf ("Unknown major code.\n");
+        dbg ("Unknown XIM major code: %d\n", call_data->major_code);
         break;
     }
 
     return True;
 }
 
-void open_xim () {
+static void open_xim (void) {
     XIMTriggerKeys triggerKeys;
 
     im_styles.supported_styles = Styles;
@@ -261,28 +302,7 @@ void open_xim () {
 
 #endif  // if USE_XIM
 
-void load_tsin_db ();
-void load_tsin_conf (), load_settings (), load_tab_pho_file ();
-
-void disp_hide_tsin_status_row (), update_win_kbm_inited ();
-void change_tsin_line_color (), change_win0_style ();
-void change_win_gtab_style ();
-#if TRAY_ENABLED
-void update_item_active_all ();
-#endif
-void destroy_inmd_menu ();
-void load_gtab_list (gboolean);
-void change_win1_font ();
-void set_wselkey (char *s);
-
-#if TRAY_ENABLED
-void disp_tray_icon ();
-#endif
-gboolean init_in_method (int in_no);
-#include "hime-protocol.h"
-#include "im-srv.h"
-
-static int get_in_method_by_filename (char filename[]) {
+static int get_in_method_by_filename (const char *filename) {
     int i, in_method = 0;
     gboolean found = FALSE;
     for (i = 0; i < inmdN; i++) {
@@ -297,40 +317,47 @@ static int get_in_method_by_filename (char filename[]) {
     return in_method;
 }
 
-static void reload_data () {
+/* Client state backup for reload - avoids VLA with dynamic allocation */
+typedef struct {
+    char *filename;
+    gboolean im_enabled;
+} ClientStateBackup;
+
+static void reload_data (void) {
     dbg ("reload_data\n");
-    //  Save input method state before reload
-    char temp_inmd_filenames[hime_clientsN][128];
-    gboolean temp_CS_im_enabled[hime_clientsN];
-    char temp_current_CS_inmd_filename[128] = "";
-    gboolean temp_current_CS_im_enabled = FALSE;
+
+    /* Save current CS state */
+    char *current_filename = NULL;
+    gboolean current_im_enabled = FALSE;
     if (current_CS) {
-        temp_current_CS_im_enabled = current_CS->b_im_enabled;
-        strcpy (temp_current_CS_inmd_filename, inmd[current_CS->in_method].filename);
+        current_im_enabled = current_CS->b_im_enabled;
+        current_filename = g_strdup (inmd[current_CS->in_method].filename);
     }
-    int c;
-    for (c = 0; c < hime_clientsN; c++) {
-        strcpy (temp_inmd_filenames[c], "");
-        temp_CS_im_enabled[c] = FALSE;
-        if (!hime_clients[c].cs)
-            continue;
-        ClientState *cs = hime_clients[c].cs;
-        temp_CS_im_enabled[c] = cs->b_im_enabled;
-        strcpy (temp_inmd_filenames[c], inmd[cs->in_method].filename);
+
+    /* Save all client states with dynamic allocation */
+    ClientStateBackup *backups = NULL;
+    if (hime_clientsN > 0) {
+        backups = g_new0 (ClientStateBackup, hime_clientsN);
+        for (int c = 0; c < hime_clientsN; c++) {
+            if (!hime_clients[c].cs)
+                continue;
+            ClientState *cs = hime_clients[c].cs;
+            backups[c].im_enabled = cs->b_im_enabled;
+            backups[c].filename = g_strdup (inmd[cs->in_method].filename);
+        }
     }
+
+    /* Reload configuration */
     free_omni_config ();
     load_settings ();
     if (current_method_type () == method_type_TSIN)
         set_wselkey (pho_selkey);
 
-    //  load_tsin_db();
     change_win0_style ();
     change_win1_font ();
     change_win_gtab_style ();
-    //  change_win_pho_style();
     load_tab_pho_file ();
     update_win_kbm_inited ();
-
     destroy_inmd_menu ();
     load_gtab_list (TRUE);
 
@@ -338,34 +365,36 @@ static void reload_data () {
     update_item_active_all ();
 #endif
 
-    //  Load input method state after reload, which may change inmd
-    // load clientstate properties back
-    for (c = 0; c < hime_clientsN; c++) {
-        if (!hime_clients[c].cs)
-            continue;
-        hime_clients[c].cs->b_im_enabled = TRUE;
-        hime_clients[c].cs->in_method = get_in_method_by_filename (temp_inmd_filenames[c]);
-        init_in_method (hime_clients[c].cs->in_method);
-        if (!temp_CS_im_enabled[c])
-            toggle_im_enabled ();
-        hime_clients[c].cs->b_im_enabled = temp_CS_im_enabled[c];
+    /* Restore client states */
+    if (backups) {
+        for (int c = 0; c < hime_clientsN; c++) {
+            if (!hime_clients[c].cs || !backups[c].filename)
+                continue;
+            hime_clients[c].cs->b_im_enabled = TRUE;
+            hime_clients[c].cs->in_method = get_in_method_by_filename (backups[c].filename);
+            init_in_method (hime_clients[c].cs->in_method);
+            if (!backups[c].im_enabled)
+                toggle_im_enabled ();
+            hime_clients[c].cs->b_im_enabled = backups[c].im_enabled;
+            g_free (backups[c].filename);
+        }
+        g_free (backups);
     }
-    current_CS->b_im_enabled = TRUE;
-    init_in_method (get_in_method_by_filename (temp_current_CS_inmd_filename));
-    if (!temp_current_CS_im_enabled)
-        toggle_im_enabled ();
-    current_CS->b_im_enabled = temp_current_CS_im_enabled;
+
+    /* Restore current CS state */
+    if (current_filename) {
+        current_CS->b_im_enabled = TRUE;
+        init_in_method (get_in_method_by_filename (current_filename));
+        if (!current_im_enabled)
+            toggle_im_enabled ();
+        current_CS->b_im_enabled = current_im_enabled;
+        g_free (current_filename);
+    }
 }
 
-void change_tsin_font_size ();
-void change_gtab_font_size ();
-void change_pho_font_size ();
-void change_win_sym_font_size ();
-void change_win_gtab_style ();
 extern gboolean win_kbm_on;
-extern void change_module_font_size ();
 
-static void change_font_size () {
+static void change_font_size (void) {
     load_settings ();
     change_tsin_font_size ();
     change_gtab_font_size ();
@@ -384,78 +413,116 @@ static int xerror_handler (Display *d, XErrorEvent *eve) {
 }
 
 Atom hime_atom;
+extern int hime_show_win_kbm;
 
-void toggle_gb_output ();
-
-void cb_trad_sim_toggle () {
+static void cb_trad_sim_toggle (void) {
     toggle_gb_output ();
 #if TRAY_ENABLED
     disp_tray_icon ();
 #endif
 }
-void execute_message (char *message);
-void disp_win_kbm_capslock_init ();
 
-extern int hime_show_win_kbm;
 void kbm_open_close (GtkButton *checkmenuitem, gboolean b_show) {
     hime_show_win_kbm = b_show;
 
     if (hime_show_win_kbm) {
         show_win_kbm ();
         disp_win_kbm_capslock_init ();
-    } else
+    } else {
         hide_win_kbm ();
+    }
 }
 
-void kbm_toggle () {
+static void kbm_toggle (void) {
     win_kbm_inited = 1;
     kbm_open_close (NULL, !hime_show_win_kbm);
 }
 
-void reload_tsin_db ();
-void do_exit ();
+static void do_exit (void);
+
+/* Message handler functions for dispatch table */
+static void msg_change_font_size (void) {
+    change_font_size ();
+}
+
+static void msg_gb_output_toggle (void) {
+    cb_trad_sim_toggle ();
+#if TRAY_ENABLED
+    update_item_active_all ();
+#endif
+}
+
+static void msg_sim_output (void) {
+    sim_output ();
+#if TRAY_ENABLED
+    disp_tray_icon ();
+    update_item_active_all ();
+#endif
+}
+
+static void msg_trad_output (void) {
+    trad_output ();
+#if TRAY_ENABLED
+    disp_tray_icon ();
+    update_item_active_all ();
+#endif
+}
+
+static void msg_kbm_toggle (void) {
+    kbm_toggle ();
+}
+
+#if TRAY_ENABLED
+static void msg_update_tray (void) {
+    disp_tray_icon ();
+}
+#endif
+
+static void msg_reload_tsin (void) {
+    reload_tsin_db ();
+}
+
+static void msg_exit (void) {
+    do_exit ();
+}
+
+/* Message dispatch table for O(n) lookup - more maintainable than if-else chain */
+typedef struct {
+    const char *message;
+    void (*handler) (void);
+} MessageHandler;
+
+static const MessageHandler message_handlers[] = {
+    {CHANGE_FONT_SIZE, msg_change_font_size},
+    {GB_OUTPUT_TOGGLE, msg_gb_output_toggle},
+    {SIM_OUTPUT_TOGGLE, msg_sim_output},
+    {TRAD_OUTPUT_TOGGLE, msg_trad_output},
+    {KBM_TOGGLE, msg_kbm_toggle},
+#if TRAY_ENABLED
+    {UPDATE_TRAY, msg_update_tray},
+#endif
+    {RELOAD_TSIN_DB, msg_reload_tsin},
+    {HIME_EXIT_MESSAGE, msg_exit},
+    {NULL, NULL}  /* sentinel */
+};
 
 void message_cb (char *message) {
-    void sim_output ();   // FIXME
-    void trad_output ();  // FIXME
-                          //   dbg("message '%s'\n", message);
+    /* Check dispatch table first */
+    for (const MessageHandler *h = message_handlers; h->message != NULL; h++) {
+        if (strcmp (message, h->message) == 0) {
+            h->handler ();
+            return;
+        }
+    }
 
-    /* TODO: rewrite the mess with case() ? */
-    if (!strcmp (message, CHANGE_FONT_SIZE)) {
-        change_font_size ();
-    } else if (!strcmp (message, GB_OUTPUT_TOGGLE)) {
-        cb_trad_sim_toggle ();
-#if TRAY_ENABLED
-        update_item_active_all ();
-#endif
-    } else if (!strcmp (message, SIM_OUTPUT_TOGGLE)) {
-        sim_output ();
-#if TRAY_ENABLED
-        disp_tray_icon ();
-        update_item_active_all ();
-#endif
-    } else if (!strcmp (message, TRAD_OUTPUT_TOGGLE)) {
-        trad_output ();
-#if TRAY_ENABLED
-        disp_tray_icon ();
-        update_item_active_all ();
-#endif
-    } else if (!strcmp (message, KBM_TOGGLE)) {
-        kbm_toggle ();
-    } else if (strstr (message, "#hime_message")) {
+    /* Handle special case: embedded hime_message */
+    if (strstr (message, "#hime_message")) {
         execute_message (message);
-    } else
-#if TRAY_ENABLED
-        if (!strcmp (message, UPDATE_TRAY)) {
-        disp_tray_icon ();
-    } else
-#endif
-        if (!strcmp (message, RELOAD_TSIN_DB)) {
-        reload_tsin_db ();
-    } else if (!strcmp (message, HIME_EXIT_MESSAGE)) {
-        do_exit ();
-    } else
-        reload_data ();
+        return;
+    }
+
+    /* Default: reload data */
+    reload_data ();
 }
 
 static GdkFilterReturn my_gdk_filter (GdkXEvent *xevent,
@@ -482,18 +549,13 @@ static GdkFilterReturn my_gdk_filter (GdkXEvent *xevent,
     return GDK_FILTER_CONTINUE;
 }
 
-void init_atom_property () {
+static void init_atom_property (void) {
     hime_atom = get_hime_atom (dpy);
     XSetSelectionOwner (dpy, hime_atom, xim_xwin, CurrentTime);
 }
 
-void free_pho_mem (), free_tsin (), free_all_IC (), free_gtab (), free_phrase ();
-#if TRAY_ENABLED
-void destroy_tray ();
-#endif
-
-void do_exit () {
-    dbg ("----------------- do_ exit ----------------\n");
+static void do_exit (void) {
+    dbg ("----------------- do_exit ----------------\n");
 
     free_pho_mem ();
     free_tsin ();
@@ -503,12 +565,10 @@ void do_exit () {
     free_gtab ();
     free_phrase ();
 
-#if 1
     destroy_win0 ();
     destroy_win1 ();
     destroy_win_pho ();
     destroy_win_gtab ();
-#endif
 
 #if TRAY_ENABLED
     destroy_tray ();
@@ -518,19 +578,11 @@ void do_exit () {
     gtk_main_quit ();
 }
 
-void sig_do_exit (int sig) {
+static void sig_do_exit (int sig) {
     do_exit ();
 }
 
-void load_phrase ();
-void init_tray (), exec_setup_scripts ();
-void init_tray_double ();
-
-#if TRAY_UNITY
-void init_tray_appindicator ();
-#endif
-
-gboolean delayed_start_cb (gpointer data) {
+static gboolean delayed_start_cb (gpointer data) {
 #if TRAY_ENABLED
     if (hime_status_tray) {
         if (hime_tray_display == HIME_TRAY_DISPLAY_SINGLE)
@@ -549,7 +601,7 @@ gboolean delayed_start_cb (gpointer data) {
     return FALSE;
 }
 
-static void get_display_size () {
+static void get_display_size (void) {
 #if !GTK_CHECK_VERSION(3, 0, 0)
     display_width = gdk_screen_width ();
     display_height = gdk_screen_height ();
@@ -568,8 +620,6 @@ static void get_display_size () {
 static void screen_size_changed (GdkScreen *screen, gpointer user_data) {
     get_display_size ();
 }
-
-#include "lang.h"
 
 int main (int argc, char **argv) {
     gtk_init (&argc, &argv);
