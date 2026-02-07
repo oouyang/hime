@@ -401,6 +401,118 @@ typedef struct {
     int phrase_area_size;
 } PhoTable;
 
+/* ========== GTAB Structures ========== */
+
+#define GTAB_MAX_KEYS 8
+#define GTAB_MAX_KEYNAME 64
+
+/* GTAB file header (matches original HIME format) */
+typedef struct {
+    int version;
+    uint32_t flag;
+    char cname[32];      /* Display name */
+    char selkey[12];     /* Selection keys */
+    int space_style;     /* Space key behavior */
+    int key_count;       /* Number of keys in keymap */
+    int max_press;       /* Max keystrokes per character */
+    int dup_sel;         /* Duplicate selection count */
+    int def_chars;       /* Number of defined characters */
+    /* Quick keys omitted for simplicity */
+    char reserved[512];  /* Reserved/padding */
+} GtabHeader;
+
+/* GTAB item (32-bit key) */
+typedef struct {
+    uint8_t key[4];
+    char ch[HIME_CH_SZ];
+} GtabItem;
+
+/* GTAB item (64-bit key for large tables) */
+typedef struct {
+    uint8_t key[8];
+    char ch[HIME_CH_SZ];
+} GtabItem64;
+
+/* Loaded GTAB table */
+typedef struct {
+    char name[64];
+    char filename[128];
+    char keymap[128];        /* Key to symbol mapping */
+    char keyname[128];       /* Symbol display names */
+    char selkey[16];
+    int key_count;
+    int max_press;
+    int def_chars;
+    int keybits;
+    bool key64;              /* Using 64-bit keys */
+    GtabItem *items;
+    GtabItem64 *items64;
+    int item_count;
+    uint32_t *idx;           /* Index for fast lookup */
+    int idx_count;
+    bool loaded;
+} GtabTable;
+
+/* GTAB registry entry */
+typedef struct {
+    char name[64];
+    char filename[128];
+    char icon[64];
+    HimeGtabTable id;
+} GtabRegistry;
+
+/* Well-known GTAB tables */
+static const GtabRegistry GTAB_REGISTRY[] = {
+    {"倉頡", "cj.gtab", "cj.png", HIME_GTAB_CJ},
+    {"倉五", "cj5.gtab", "cj5.png", HIME_GTAB_CJ5},
+    {"速成", "simplex.gtab", "simplex.png", HIME_GTAB_SIMPLEX},
+    {"大易", "dayi3.gtab", "dayi3.png", HIME_GTAB_DAYI},
+    {"行列30", "ar30.gtab", "ar30.png", HIME_GTAB_ARRAY30},
+    {"行列40", "array40.gtab", "ar30.png", HIME_GTAB_ARRAY40},
+    {"拼音", "pinyin.gtab", "pinyin.png", HIME_GTAB_PINYIN},
+    {"粵拼", "jyutping.gtab", "jyutping.png", HIME_GTAB_JYUTPING},
+    {"韓諺", "hangul.gtab", "hangul.png", HIME_GTAB_HANGUL},
+    {"符號", "symbols.gtab", "symbols.png", HIME_GTAB_SYMBOLS},
+    {"希臘文", "greek.gtab", "greek.png", HIME_GTAB_GREEK},
+    {"俄文", "russian.gtab", "russian.png", HIME_GTAB_RUSSIAN},
+    {"", "", "", HIME_GTAB_CUSTOM}  /* Sentinel */
+};
+
+/* ========== TSIN Structures ========== */
+
+#define TSIN_MAX_PHRASE_LEN 32
+
+/* TSIN phrase entry */
+typedef struct {
+    uint16_t phokeys[TSIN_MAX_PHRASE_LEN];
+    char phrase[TSIN_MAX_PHRASE_LEN * HIME_CH_SZ];
+    int len;
+    int usecount;
+} TsinPhrase;
+
+/* TSIN database */
+typedef struct {
+    uint16_t *idx;
+    int idx_count;
+    TsinPhrase *phrases;
+    int phrase_count;
+    bool loaded;
+} TsinDatabase;
+
+/* ========== Intcode Structures ========== */
+
+#define INTCODE_MAX_DIGITS 8
+
+/* Input method names */
+static const char *INPUT_METHOD_NAMES[] = {
+    "注音 (Phonetic)",
+    "詞音 (Phrase)",
+    "倉頡 (Table)",
+    "日文 (Anthy)",
+    "新酷音 (Chewing)",
+    "內碼 (Intcode)"
+};
+
 /* Input context structure */
 struct HimeContext {
     /* Current input state */
@@ -422,6 +534,22 @@ struct HimeContext {
 
     /* Selection keys */
     char sel_keys[16];
+
+    /* GTAB state */
+    GtabTable *gtab;                    /* Current GTAB table */
+    uint8_t gtab_keys[GTAB_MAX_KEYS];   /* Current key buffer */
+    int gtab_key_count;                 /* Number of keys entered */
+    char gtab_key_display[64];          /* Key display string */
+
+    /* TSIN state */
+    char tsin_phrase[HIME_MAX_PREEDIT]; /* Current phrase buffer */
+    int tsin_phrase_len;                /* Phrase length in chars */
+    int tsin_cursor;                    /* Cursor position */
+
+    /* Intcode state */
+    HimeIntcodeMode intcode_mode;       /* Unicode or Big5 */
+    char intcode_buffer[INTCODE_MAX_DIGITS + 1];
+    int intcode_len;                    /* Number of hex digits */
 
     /* New features - Settings */
     HimeCharset charset;                /* Simplified/Traditional */
@@ -446,6 +574,9 @@ struct HimeContext {
 /* Global state */
 static char g_data_dir[512] = "";
 static PhoTable g_pho_table = {0};
+static GtabTable g_gtab_tables[16] = {0};  /* Loaded GTAB tables */
+static int g_gtab_table_count = 0;
+static TsinDatabase g_tsin_db = {0};
 static bool g_initialized = false;
 
 /* ========== Internal Functions ========== */
@@ -708,6 +839,10 @@ HIME_API HimeContext *hime_context_new(void) {
     ctx->feedback_callback = NULL;
     ctx->feedback_user_data = NULL;
 
+    /* Initialize input method specific state */
+    ctx->gtab = NULL;
+    ctx->intcode_mode = HIME_INTCODE_UNICODE;
+
     return ctx;
 }
 
@@ -720,12 +855,29 @@ HIME_API void hime_context_free(HimeContext *ctx) {
 HIME_API void hime_context_reset(HimeContext *ctx) {
     if (!ctx) return;
 
+    /* Reset PHO state */
     memset(ctx->typ_pho, 0, sizeof(ctx->typ_pho));
     memset(ctx->inph, 0, sizeof(ctx->inph));
+
+    /* Reset common buffers */
     ctx->preedit[0] = '\0';
     ctx->commit[0] = '\0';
     ctx->candidate_count = 0;
     ctx->candidate_page = 0;
+
+    /* Reset GTAB state */
+    memset(ctx->gtab_keys, 0, sizeof(ctx->gtab_keys));
+    ctx->gtab_key_count = 0;
+    ctx->gtab_key_display[0] = '\0';
+
+    /* Reset TSIN state */
+    ctx->tsin_phrase[0] = '\0';
+    ctx->tsin_phrase_len = 0;
+    ctx->tsin_cursor = 0;
+
+    /* Reset intcode state */
+    ctx->intcode_buffer[0] = '\0';
+    ctx->intcode_len = 0;
 }
 
 HIME_API int hime_set_input_method(HimeContext *ctx, HimeInputMethod method) {
@@ -758,44 +910,9 @@ HIME_API void hime_set_chinese_mode(HimeContext *ctx, bool chinese) {
     }
 }
 
-HIME_API HimeKeyResult hime_process_key(
-    HimeContext *ctx,
-    uint32_t keycode,
-    uint32_t charcode,
-    uint32_t modifiers
-) {
-    (void)modifiers;  /* Currently unused */
-
-    if (!ctx || !ctx->chinese_mode) {
-        return HIME_KEY_IGNORED;
-    }
-
-    /* Handle candidate selection */
-    if (ctx->candidate_count > 0 && charcode) {
-        char c = (char)charcode;
-        char *pos = strchr(ctx->sel_keys, c);
-        if (pos) {
-            int idx = (pos - ctx->sel_keys) +
-                     (ctx->candidate_page * ctx->candidates_per_page);
-            if (idx < ctx->candidate_count) {
-                strcpy(ctx->commit, ctx->candidates[idx]);
-                hime_context_reset(ctx);
-                trigger_feedback(ctx, HIME_FEEDBACK_CANDIDATE);
-                return HIME_KEY_COMMIT;
-            }
-        }
-    }
-
-    /* Handle Escape */
-    if (keycode == 0x1B || charcode == 0x1B) {
-        if (!typ_pho_empty(ctx->typ_pho) || ctx->candidate_count > 0) {
-            hime_context_reset(ctx);
-            return HIME_KEY_ABSORBED;
-        }
-        return HIME_KEY_IGNORED;
-    }
-
-    /* Handle Backspace */
+/* PHO input method processing */
+static HimeKeyResult pho_process_key(HimeContext *ctx, uint32_t keycode, uint32_t charcode) {
+    /* Handle Backspace for PHO */
     if (keycode == 0x08 || charcode == 0x08) {
         if (!typ_pho_empty(ctx->typ_pho)) {
             /* Delete last component */
@@ -812,12 +929,6 @@ HIME_API HimeKeyResult hime_process_key(
             trigger_feedback(ctx, HIME_FEEDBACK_KEY_DELETE);
             return HIME_KEY_PREEDIT;
         }
-        return HIME_KEY_IGNORED;
-    }
-
-    /* Handle Enter key */
-    if (keycode == 0x0D || charcode == 0x0D) {
-        trigger_feedback(ctx, HIME_FEEDBACK_KEY_ENTER);
         return HIME_KEY_IGNORED;
     }
 
@@ -862,6 +973,152 @@ HIME_API HimeKeyResult hime_process_key(
             }
 
             return HIME_KEY_PREEDIT;
+        }
+    }
+
+    return HIME_KEY_IGNORED;
+}
+
+HIME_API HimeKeyResult hime_process_key(
+    HimeContext *ctx,
+    uint32_t keycode,
+    uint32_t charcode,
+    uint32_t modifiers
+) {
+    (void)modifiers;  /* Currently unused */
+
+    if (!ctx || !ctx->chinese_mode) {
+        return HIME_KEY_IGNORED;
+    }
+
+    /* Handle candidate selection (common to all methods) */
+    if (ctx->candidate_count > 0 && charcode) {
+        char c = (char)charcode;
+        char *pos = strchr(ctx->sel_keys, c);
+        if (pos) {
+            int idx = (pos - ctx->sel_keys) +
+                     (ctx->candidate_page * ctx->candidates_per_page);
+            if (idx < ctx->candidate_count) {
+                strcpy(ctx->commit, ctx->candidates[idx]);
+                hime_context_reset(ctx);
+                trigger_feedback(ctx, HIME_FEEDBACK_CANDIDATE);
+                return HIME_KEY_COMMIT;
+            }
+        }
+    }
+
+    /* Handle Escape (common to all methods) */
+    if (keycode == 0x1B || charcode == 0x1B) {
+        bool has_input = !typ_pho_empty(ctx->typ_pho) ||
+                        ctx->candidate_count > 0 ||
+                        ctx->gtab_key_count > 0 ||
+                        ctx->intcode_len > 0 ||
+                        ctx->tsin_phrase_len > 0;
+        if (has_input) {
+            hime_context_reset(ctx);
+            return HIME_KEY_ABSORBED;
+        }
+        return HIME_KEY_IGNORED;
+    }
+
+    /* Handle Enter key (common to all methods) */
+    if (keycode == 0x0D || charcode == 0x0D) {
+        /* For TSIN, commit current phrase */
+        if (ctx->method == HIME_IM_TSIN && ctx->tsin_phrase_len > 0) {
+            hime_tsin_commit_phrase(ctx);
+            trigger_feedback(ctx, HIME_FEEDBACK_KEY_ENTER);
+            return HIME_KEY_COMMIT;
+        }
+        /* For intcode, commit if valid */
+        if (ctx->method == HIME_IM_INTCODE && ctx->intcode_len > 0) {
+            char utf8[8];
+            int len = hime_intcode_convert(ctx, ctx->intcode_buffer, utf8, sizeof(utf8));
+            if (len > 0) {
+                strcpy(ctx->commit, utf8);
+                ctx->intcode_len = 0;
+                ctx->intcode_buffer[0] = '\0';
+                ctx->preedit[0] = '\0';
+                trigger_feedback(ctx, HIME_FEEDBACK_KEY_ENTER);
+                return HIME_KEY_COMMIT;
+            }
+        }
+        trigger_feedback(ctx, HIME_FEEDBACK_KEY_ENTER);
+        return HIME_KEY_IGNORED;
+    }
+
+    /* Handle Backspace based on input method */
+    if (keycode == 0x08 || charcode == 0x08) {
+        switch (ctx->method) {
+            case HIME_IM_GTAB:
+                if (ctx->gtab_key_count > 0) {
+                    ctx->gtab_key_count--;
+                    ctx->gtab_key_display[ctx->gtab_key_count] = '\0';
+                    strcpy(ctx->preedit, ctx->gtab_key_display);
+                    if (ctx->gtab_key_count > 0) {
+                        gtab_lookup(ctx);
+                    } else {
+                        ctx->candidate_count = 0;
+                    }
+                    trigger_feedback(ctx, HIME_FEEDBACK_KEY_DELETE);
+                    return HIME_KEY_PREEDIT;
+                }
+                return HIME_KEY_IGNORED;
+
+            case HIME_IM_INTCODE:
+                if (ctx->intcode_len > 0) {
+                    ctx->intcode_len--;
+                    ctx->intcode_buffer[ctx->intcode_len] = '\0';
+                    if (ctx->intcode_len > 0) {
+                        snprintf(ctx->preedit, HIME_MAX_PREEDIT, "U+%s", ctx->intcode_buffer);
+                    } else {
+                        ctx->preedit[0] = '\0';
+                    }
+                    trigger_feedback(ctx, HIME_FEEDBACK_KEY_DELETE);
+                    return HIME_KEY_PREEDIT;
+                }
+                return HIME_KEY_IGNORED;
+
+            case HIME_IM_TSIN:
+                /* For TSIN, delete last character from phrase */
+                if (ctx->tsin_phrase_len > 0) {
+                    /* Find last character boundary (UTF-8) */
+                    int i = strlen(ctx->tsin_phrase) - 1;
+                    while (i > 0 && (ctx->tsin_phrase[i] & 0xC0) == 0x80) i--;
+                    ctx->tsin_phrase[i] = '\0';
+                    ctx->tsin_phrase_len--;
+                    strcpy(ctx->preedit, ctx->tsin_phrase);
+                    trigger_feedback(ctx, HIME_FEEDBACK_KEY_DELETE);
+                    return HIME_KEY_PREEDIT;
+                }
+                /* Fall through to PHO backspace if phrase empty */
+                /* FALLTHROUGH */
+
+            case HIME_IM_PHO:
+            default:
+                return pho_process_key(ctx, keycode, charcode);
+        }
+    }
+
+    /* Dispatch to input method for character input */
+    if (charcode && charcode < 128) {
+        char key = (char)charcode;
+
+        switch (ctx->method) {
+            case HIME_IM_GTAB:
+                return gtab_process_key(ctx, key);
+
+            case HIME_IM_INTCODE:
+                return intcode_process_key(ctx, key);
+
+            case HIME_IM_TSIN:
+                /* TSIN uses PHO for input, builds phrase from selected candidates */
+                /* When a candidate is selected, it's added to the phrase */
+                /* Fall through to PHO processing */
+                /* FALLTHROUGH */
+
+            case HIME_IM_PHO:
+            default:
+                return pho_process_key(ctx, keycode, charcode);
         }
     }
 
@@ -1016,6 +1273,480 @@ HIME_API void hime_set_candidates_per_page(HimeContext *ctx, int count) {
     if (count < 1) count = 1;
     if (count > 10) count = 10;
     ctx->candidates_per_page = count;
+}
+
+/* ========== GTAB Implementation ========== */
+
+HIME_API int hime_gtab_get_table_count(void) {
+    int count = 0;
+    for (int i = 0; GTAB_REGISTRY[i].filename[0] != '\0'; i++) {
+        count++;
+    }
+    return count;
+}
+
+HIME_API int hime_gtab_get_table_info(int index, HimeGtabInfo *info) {
+    if (!info) return -1;
+
+    int count = hime_gtab_get_table_count();
+    if (index < 0 || index >= count) return -1;
+
+    strncpy(info->name, GTAB_REGISTRY[index].name, sizeof(info->name) - 1);
+    strncpy(info->filename, GTAB_REGISTRY[index].filename, sizeof(info->filename) - 1);
+    strncpy(info->icon, GTAB_REGISTRY[index].icon, sizeof(info->icon) - 1);
+
+    /* Check if already loaded */
+    info->loaded = false;
+    for (int i = 0; i < g_gtab_table_count; i++) {
+        if (strcmp(g_gtab_tables[i].filename, GTAB_REGISTRY[index].filename) == 0) {
+            info->loaded = true;
+            info->key_count = g_gtab_tables[i].key_count;
+            info->max_keystrokes = g_gtab_tables[i].max_press;
+            strncpy(info->selkey, g_gtab_tables[i].selkey, sizeof(info->selkey) - 1);
+            break;
+        }
+    }
+
+    return 0;
+}
+
+/* Simple GTAB loader - loads basic structure */
+static GtabTable *load_gtab_file(const char *filepath) {
+    FILE *fp = fopen(filepath, "rb");
+    if (!fp) return NULL;
+
+    /* Find free slot */
+    if (g_gtab_table_count >= 16) {
+        fclose(fp);
+        return NULL;
+    }
+
+    GtabTable *table = &g_gtab_tables[g_gtab_table_count];
+    memset(table, 0, sizeof(GtabTable));
+
+    /* Read header */
+    GtabHeader header;
+    if (fread(&header, sizeof(GtabHeader), 1, fp) != 1) {
+        fclose(fp);
+        return NULL;
+    }
+
+    strncpy(table->name, header.cname, sizeof(table->name) - 1);
+    strncpy(table->selkey, header.selkey, sizeof(table->selkey) - 1);
+    table->key_count = header.key_count;
+    table->max_press = header.max_press;
+    table->def_chars = header.def_chars;
+    table->keybits = 6;  /* Default: 6 bits per key */
+
+    /* Determine if using 64-bit keys */
+    table->key64 = (table->max_press > 5);
+
+    /* Read keymap (128 bytes) */
+    fread(table->keymap, 1, 128, fp);
+
+    /* Read index */
+    int idx_size = (1 << table->keybits);
+    table->idx = (uint32_t *)malloc(sizeof(uint32_t) * idx_size);
+    if (!table->idx) {
+        fclose(fp);
+        return NULL;
+    }
+    fread(table->idx, sizeof(uint32_t), idx_size, fp);
+    table->idx_count = idx_size;
+
+    /* Read items */
+    if (table->key64) {
+        table->items64 = (GtabItem64 *)malloc(sizeof(GtabItem64) * table->def_chars);
+        if (!table->items64) {
+            free(table->idx);
+            fclose(fp);
+            return NULL;
+        }
+        fread(table->items64, sizeof(GtabItem64), table->def_chars, fp);
+    } else {
+        table->items = (GtabItem *)malloc(sizeof(GtabItem) * table->def_chars);
+        if (!table->items) {
+            free(table->idx);
+            fclose(fp);
+            return NULL;
+        }
+        fread(table->items, sizeof(GtabItem), table->def_chars, fp);
+    }
+    table->item_count = table->def_chars;
+    table->loaded = true;
+
+    fclose(fp);
+    g_gtab_table_count++;
+    return table;
+}
+
+HIME_API int hime_gtab_load_table(HimeContext *ctx, const char *filename) {
+    if (!ctx || !filename) return -1;
+
+    /* Check if already loaded */
+    for (int i = 0; i < g_gtab_table_count; i++) {
+        if (strcmp(g_gtab_tables[i].filename, filename) == 0) {
+            ctx->gtab = &g_gtab_tables[i];
+            ctx->method = HIME_IM_GTAB;
+            hime_context_reset(ctx);
+            return 0;
+        }
+    }
+
+    /* Build full path */
+    char filepath[1024];
+    snprintf(filepath, sizeof(filepath), "%s/%s", g_data_dir, filename);
+
+    GtabTable *table = load_gtab_file(filepath);
+    if (!table) {
+        /* Try alternate path */
+        snprintf(filepath, sizeof(filepath), "%s/data/%s", g_data_dir, filename);
+        table = load_gtab_file(filepath);
+    }
+
+    if (!table) return -1;
+
+    strncpy(table->filename, filename, sizeof(table->filename) - 1);
+    ctx->gtab = table;
+    ctx->method = HIME_IM_GTAB;
+    hime_context_reset(ctx);
+    return 0;
+}
+
+HIME_API int hime_gtab_load_table_by_id(HimeContext *ctx, HimeGtabTable table_id) {
+    if (!ctx) return -1;
+
+    for (int i = 0; GTAB_REGISTRY[i].filename[0] != '\0'; i++) {
+        if (GTAB_REGISTRY[i].id == table_id) {
+            return hime_gtab_load_table(ctx, GTAB_REGISTRY[i].filename);
+        }
+    }
+
+    return -1;
+}
+
+HIME_API const char *hime_gtab_get_current_table(HimeContext *ctx) {
+    if (!ctx || !ctx->gtab) return "";
+    return ctx->gtab->name;
+}
+
+HIME_API int hime_gtab_get_key_string(HimeContext *ctx, char *buffer, int buffer_size) {
+    if (!ctx || !buffer || buffer_size <= 0) return -1;
+
+    int len = strlen(ctx->gtab_key_display);
+    if (len >= buffer_size) len = buffer_size - 1;
+    strncpy(buffer, ctx->gtab_key_display, len);
+    buffer[len] = '\0';
+    return len;
+}
+
+/* GTAB key processing - lookup candidates based on entered keys */
+static int gtab_lookup(HimeContext *ctx) {
+    if (!ctx || !ctx->gtab || ctx->gtab_key_count == 0) return 0;
+
+    ctx->candidate_count = 0;
+    GtabTable *table = ctx->gtab;
+
+    /* Build key value from entered keys */
+    uint32_t key = 0;
+    for (int i = 0; i < ctx->gtab_key_count; i++) {
+        key = (key << table->keybits) | ctx->gtab_keys[i];
+    }
+
+    /* Search for matches */
+    if (!table->key64 && table->items) {
+        for (int i = 0; i < table->item_count && ctx->candidate_count < HIME_MAX_CANDIDATES; i++) {
+            uint32_t item_key = (table->items[i].key[0] << 24) |
+                               (table->items[i].key[1] << 16) |
+                               (table->items[i].key[2] << 8) |
+                               table->items[i].key[3];
+
+            /* Match prefix */
+            int shift = (table->max_press - ctx->gtab_key_count) * table->keybits;
+            if ((item_key >> shift) == key) {
+                strncpy(ctx->candidates[ctx->candidate_count],
+                       (char *)table->items[i].ch, HIME_CH_SZ);
+                ctx->candidates[ctx->candidate_count][HIME_CH_SZ] = '\0';
+                ctx->candidate_count++;
+            }
+        }
+    }
+
+    return ctx->candidate_count;
+}
+
+/* Process GTAB key input */
+static HimeKeyResult gtab_process_key(HimeContext *ctx, char key) {
+    if (!ctx || !ctx->gtab) return HIME_KEY_IGNORED;
+
+    GtabTable *table = ctx->gtab;
+
+    /* Check if key is in keymap */
+    int key_idx = -1;
+    for (int i = 0; i < 128 && table->keymap[i]; i++) {
+        if (table->keymap[i] == key) {
+            key_idx = i;
+            break;
+        }
+    }
+
+    if (key_idx < 0) return HIME_KEY_IGNORED;
+
+    /* Add key */
+    if (ctx->gtab_key_count < GTAB_MAX_KEYS && ctx->gtab_key_count < table->max_press) {
+        ctx->gtab_keys[ctx->gtab_key_count++] = key_idx;
+
+        /* Update display string */
+        int len = strlen(ctx->gtab_key_display);
+        if (len < (int)sizeof(ctx->gtab_key_display) - 1) {
+            ctx->gtab_key_display[len] = key;
+            ctx->gtab_key_display[len + 1] = '\0';
+        }
+
+        /* Update preedit */
+        strcpy(ctx->preedit, ctx->gtab_key_display);
+
+        /* Lookup candidates */
+        gtab_lookup(ctx);
+
+        if (ctx->candidate_count == 1 && ctx->gtab_key_count >= table->max_press) {
+            /* Auto-commit single match at max keys */
+            strcpy(ctx->commit, ctx->candidates[0]);
+            ctx->gtab_key_count = 0;
+            ctx->gtab_key_display[0] = '\0';
+            ctx->preedit[0] = '\0';
+            ctx->candidate_count = 0;
+            return HIME_KEY_COMMIT;
+        }
+
+        return HIME_KEY_PREEDIT;
+    }
+
+    return HIME_KEY_ABSORBED;
+}
+
+/* ========== TSIN Implementation ========== */
+
+HIME_API int hime_tsin_load_database(HimeContext *ctx, const char *filename) {
+    if (!ctx || !filename) return -1;
+
+    /* Build full path */
+    char filepath[1024];
+    snprintf(filepath, sizeof(filepath), "%s/%s", g_data_dir, filename);
+
+    FILE *fp = fopen(filepath, "rb");
+    if (!fp) {
+        snprintf(filepath, sizeof(filepath), "%s/data/%s", g_data_dir, filename);
+        fp = fopen(filepath, "rb");
+    }
+
+    if (!fp) return -1;
+
+    /* Free existing database */
+    if (g_tsin_db.idx) {
+        free(g_tsin_db.idx);
+        g_tsin_db.idx = NULL;
+    }
+    if (g_tsin_db.phrases) {
+        free(g_tsin_db.phrases);
+        g_tsin_db.phrases = NULL;
+    }
+
+    /* Read header - similar to pho.tab2 format */
+    uint16_t idxnum;
+    int32_t phrase_count;
+
+    fread(&idxnum, 2, 1, fp);
+    fread(&idxnum, 2, 1, fp);  /* Read twice (historical quirk) */
+    fread(&phrase_count, 4, 1, fp);
+
+    g_tsin_db.idx_count = idxnum;
+    g_tsin_db.phrase_count = phrase_count;
+    g_tsin_db.loaded = true;
+
+    fclose(fp);
+
+    ctx->method = HIME_IM_TSIN;
+    return 0;
+}
+
+HIME_API int hime_tsin_get_phrase(HimeContext *ctx, char *buffer, int buffer_size) {
+    if (!ctx || !buffer || buffer_size <= 0) return -1;
+
+    int len = strlen(ctx->tsin_phrase);
+    if (len >= buffer_size) len = buffer_size - 1;
+    strncpy(buffer, ctx->tsin_phrase, len);
+    buffer[len] = '\0';
+    return len;
+}
+
+HIME_API int hime_tsin_commit_phrase(HimeContext *ctx) {
+    if (!ctx) return 0;
+
+    int len = strlen(ctx->tsin_phrase);
+    if (len > 0) {
+        strcpy(ctx->commit, ctx->tsin_phrase);
+        ctx->tsin_phrase[0] = '\0';
+        ctx->tsin_phrase_len = 0;
+        ctx->tsin_cursor = 0;
+    }
+    return len;
+}
+
+/* ========== Intcode Implementation ========== */
+
+HIME_API void hime_intcode_set_mode(HimeContext *ctx, HimeIntcodeMode mode) {
+    if (!ctx) return;
+    ctx->intcode_mode = mode;
+    ctx->intcode_len = 0;
+    ctx->intcode_buffer[0] = '\0';
+}
+
+HIME_API HimeIntcodeMode hime_intcode_get_mode(HimeContext *ctx) {
+    return ctx ? ctx->intcode_mode : HIME_INTCODE_UNICODE;
+}
+
+HIME_API int hime_intcode_get_buffer(HimeContext *ctx, char *buffer, int buffer_size) {
+    if (!ctx || !buffer || buffer_size <= 0) return -1;
+
+    int len = ctx->intcode_len;
+    if (len >= buffer_size) len = buffer_size - 1;
+    strncpy(buffer, ctx->intcode_buffer, len);
+    buffer[len] = '\0';
+    return len;
+}
+
+/* Convert Unicode codepoint to UTF-8 */
+static int unicode_to_utf8(uint32_t codepoint, char *buffer) {
+    if (codepoint < 0x80) {
+        buffer[0] = (char)codepoint;
+        return 1;
+    } else if (codepoint < 0x800) {
+        buffer[0] = 0xC0 | (codepoint >> 6);
+        buffer[1] = 0x80 | (codepoint & 0x3F);
+        return 2;
+    } else if (codepoint < 0x10000) {
+        buffer[0] = 0xE0 | (codepoint >> 12);
+        buffer[1] = 0x80 | ((codepoint >> 6) & 0x3F);
+        buffer[2] = 0x80 | (codepoint & 0x3F);
+        return 3;
+    } else if (codepoint < 0x110000) {
+        buffer[0] = 0xF0 | (codepoint >> 18);
+        buffer[1] = 0x80 | ((codepoint >> 12) & 0x3F);
+        buffer[2] = 0x80 | ((codepoint >> 6) & 0x3F);
+        buffer[3] = 0x80 | (codepoint & 0x3F);
+        return 4;
+    }
+    return 0;
+}
+
+/* Big5 to Unicode conversion table (simplified subset) */
+static uint32_t big5_to_unicode(uint16_t big5) {
+    /* This is a simplified implementation - real conversion requires full table */
+    /* Common Big5 range: 0xA140-0xF9FE */
+    if (big5 >= 0xA440 && big5 <= 0xC67E) {
+        /* Level 1 frequently used characters - approximate mapping */
+        /* Full implementation would use complete conversion table */
+        return 0x4E00 + (big5 - 0xA440);  /* Simplified: map to CJK range */
+    }
+    return big5;  /* Return as-is for unsupported codes */
+}
+
+HIME_API int hime_intcode_convert(HimeContext *ctx, const char *hex_code,
+                                   char *buffer, int buffer_size) {
+    if (!ctx || !hex_code || !buffer || buffer_size < 5) return 0;
+
+    /* Parse hex code */
+    uint32_t code = 0;
+    for (const char *p = hex_code; *p; p++) {
+        char c = *p;
+        int digit;
+        if (c >= '0' && c <= '9') digit = c - '0';
+        else if (c >= 'A' && c <= 'F') digit = c - 'A' + 10;
+        else if (c >= 'a' && c <= 'f') digit = c - 'a' + 10;
+        else return 0;  /* Invalid hex */
+        code = (code << 4) | digit;
+    }
+
+    /* Convert based on mode */
+    uint32_t unicode;
+    if (ctx->intcode_mode == HIME_INTCODE_BIG5) {
+        unicode = big5_to_unicode((uint16_t)code);
+    } else {
+        unicode = code;
+    }
+
+    /* Convert to UTF-8 */
+    int len = unicode_to_utf8(unicode, buffer);
+    buffer[len] = '\0';
+    return len;
+}
+
+/* Process intcode key input */
+static HimeKeyResult intcode_process_key(HimeContext *ctx, char key) {
+    if (!ctx) return HIME_KEY_IGNORED;
+
+    /* Check if valid hex digit */
+    bool valid = (key >= '0' && key <= '9') ||
+                 (key >= 'A' && key <= 'F') ||
+                 (key >= 'a' && key <= 'f');
+
+    if (!valid) return HIME_KEY_IGNORED;
+
+    /* Max digits: 4 for Big5, 6 for Unicode */
+    int max_digits = (ctx->intcode_mode == HIME_INTCODE_BIG5) ? 4 : 6;
+
+    if (ctx->intcode_len < max_digits) {
+        ctx->intcode_buffer[ctx->intcode_len++] = (key >= 'a') ? (key - 32) : key;
+        ctx->intcode_buffer[ctx->intcode_len] = '\0';
+
+        /* Update preedit to show hex digits */
+        snprintf(ctx->preedit, HIME_MAX_PREEDIT, "U+%s", ctx->intcode_buffer);
+
+        /* Auto-commit at max digits */
+        if (ctx->intcode_len >= max_digits) {
+            char utf8[8];
+            int len = hime_intcode_convert(ctx, ctx->intcode_buffer, utf8, sizeof(utf8));
+            if (len > 0) {
+                strcpy(ctx->commit, utf8);
+                ctx->intcode_len = 0;
+                ctx->intcode_buffer[0] = '\0';
+                ctx->preedit[0] = '\0';
+                return HIME_KEY_COMMIT;
+            }
+        }
+
+        return HIME_KEY_PREEDIT;
+    }
+
+    return HIME_KEY_ABSORBED;
+}
+
+/* ========== Input Method Availability ========== */
+
+HIME_API bool hime_is_method_available(HimeInputMethod method) {
+    switch (method) {
+        case HIME_IM_PHO:
+            return g_pho_table.items != NULL;
+        case HIME_IM_TSIN:
+            return true;  /* Always available, uses PHO table */
+        case HIME_IM_GTAB:
+            return true;  /* Available if tables exist */
+        case HIME_IM_INTCODE:
+            return true;  /* Always available */
+        case HIME_IM_ANTHY:
+        case HIME_IM_CHEWING:
+            return false; /* External modules - not bundled */
+        default:
+            return false;
+    }
+}
+
+HIME_API const char *hime_get_method_name(HimeInputMethod method) {
+    if (method >= 0 && method < HIME_IM_COUNT) {
+        return INPUT_METHOD_NAMES[method];
+    }
+    return "Unknown";
 }
 
 /* ========== Settings/Preferences Implementation ========== */

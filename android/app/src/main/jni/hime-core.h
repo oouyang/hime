@@ -59,8 +59,44 @@ typedef enum {
     HIME_IM_TSIN = 1,     /* Phrase input */
     HIME_IM_GTAB = 2,     /* Table-based (Cangjie, etc.) */
     HIME_IM_ANTHY = 3,    /* Japanese Anthy */
-    HIME_IM_CHEWING = 4   /* Chewing library */
+    HIME_IM_CHEWING = 4,  /* Chewing library */
+    HIME_IM_INTCODE = 5,  /* Unicode/Big5 code input */
+    HIME_IM_COUNT         /* Number of input methods */
 } HimeInputMethod;
+
+/* Well-known GTAB table IDs */
+typedef enum {
+    HIME_GTAB_CJ = 0,        /* Cangjie (倉頡) */
+    HIME_GTAB_CJ5 = 1,       /* Cangjie 5 (倉五) */
+    HIME_GTAB_SIMPLEX = 2,   /* Simplex (速成/簡易) */
+    HIME_GTAB_DAYI = 3,      /* DaYi (大易) */
+    HIME_GTAB_ARRAY30 = 4,   /* Array 30 (行列30) */
+    HIME_GTAB_ARRAY40 = 5,   /* Array 40 (行列40) */
+    HIME_GTAB_PINYIN = 6,    /* Pinyin table (拼音) */
+    HIME_GTAB_JYUTPING = 7,  /* Cantonese Jyutping (粵拼) */
+    HIME_GTAB_HANGUL = 8,    /* Korean Hangul (韓諺) */
+    HIME_GTAB_SYMBOLS = 9,   /* Symbol input (符號) */
+    HIME_GTAB_GREEK = 10,    /* Greek letters */
+    HIME_GTAB_RUSSIAN = 11,  /* Russian/Cyrillic */
+    HIME_GTAB_CUSTOM = 99    /* Custom/user table */
+} HimeGtabTable;
+
+/* GTAB table info structure */
+typedef struct {
+    char name[64];           /* Display name (UTF-8) */
+    char filename[128];      /* Table filename */
+    char icon[64];           /* Icon filename */
+    int key_count;           /* Number of defined characters */
+    int max_keystrokes;      /* Max keystrokes per character */
+    char selkey[16];         /* Selection keys */
+    bool loaded;             /* Whether table is loaded */
+} HimeGtabInfo;
+
+/* Intcode input mode */
+typedef enum {
+    HIME_INTCODE_UNICODE = 0, /* Unicode (hex, e.g., "4E2D" for 中) */
+    HIME_INTCODE_BIG5 = 1     /* Big5 (hex, e.g., "A4A4" for 中) */
+} HimeIntcodeMode;
 
 /* Key event modifiers */
 typedef enum {
@@ -338,6 +374,146 @@ HIME_API void hime_set_selection_keys(HimeContext *ctx, const char *keys);
  * Set candidates per page
  */
 HIME_API void hime_set_candidates_per_page(HimeContext *ctx, int count);
+
+/* ========== GTAB (Table-based) Input ========== */
+
+/**
+ * Get number of available GTAB tables
+ * @return Number of registered tables
+ */
+HIME_API int hime_gtab_get_table_count(void);
+
+/**
+ * Get GTAB table info by index
+ * @param index Table index (0-based)
+ * @param info Output structure for table info
+ * @return 0 on success, -1 if index out of range
+ */
+HIME_API int hime_gtab_get_table_info(int index, HimeGtabInfo *info);
+
+/**
+ * Load a GTAB table by filename
+ * @param ctx Context handle
+ * @param filename Table filename (e.g., "cj.gtab")
+ * @return 0 on success, -1 on error
+ */
+HIME_API int hime_gtab_load_table(HimeContext *ctx, const char *filename);
+
+/**
+ * Load a GTAB table by well-known ID
+ * @param ctx Context handle
+ * @param table_id Well-known table ID
+ * @return 0 on success, -1 on error
+ */
+HIME_API int hime_gtab_load_table_by_id(HimeContext *ctx, HimeGtabTable table_id);
+
+/**
+ * Get current GTAB table name
+ * @param ctx Context handle
+ * @return Table name or empty string
+ */
+HIME_API const char *hime_gtab_get_current_table(HimeContext *ctx);
+
+/**
+ * Get GTAB key display string (shows entered keys)
+ * @param ctx Context handle
+ * @param buffer Output buffer
+ * @param buffer_size Buffer size
+ * @return Length of string
+ */
+HIME_API int hime_gtab_get_key_string(
+    HimeContext *ctx,
+    char *buffer,
+    int buffer_size
+);
+
+/* ========== TSIN (Phrase) Input ========== */
+
+/**
+ * Load TSIN phrase database
+ * @param ctx Context handle
+ * @param filename Phrase database filename (e.g., "tsin32")
+ * @return 0 on success, -1 on error
+ */
+HIME_API int hime_tsin_load_database(HimeContext *ctx, const char *filename);
+
+/**
+ * Get current phrase buffer (composed phrase)
+ * @param ctx Context handle
+ * @param buffer Output buffer
+ * @param buffer_size Buffer size
+ * @return Length of phrase
+ */
+HIME_API int hime_tsin_get_phrase(
+    HimeContext *ctx,
+    char *buffer,
+    int buffer_size
+);
+
+/**
+ * Commit current phrase and clear buffer
+ * @param ctx Context handle
+ * @return Length of committed string
+ */
+HIME_API int hime_tsin_commit_phrase(HimeContext *ctx);
+
+/* ========== Intcode (Unicode/Big5) Input ========== */
+
+/**
+ * Set intcode input mode
+ * @param ctx Context handle
+ * @param mode Unicode or Big5 mode
+ */
+HIME_API void hime_intcode_set_mode(HimeContext *ctx, HimeIntcodeMode mode);
+
+/**
+ * Get current intcode mode
+ */
+HIME_API HimeIntcodeMode hime_intcode_get_mode(HimeContext *ctx);
+
+/**
+ * Get current intcode input buffer (hex digits entered)
+ * @param ctx Context handle
+ * @param buffer Output buffer
+ * @param buffer_size Buffer size
+ * @return Length of hex string
+ */
+HIME_API int hime_intcode_get_buffer(
+    HimeContext *ctx,
+    char *buffer,
+    int buffer_size
+);
+
+/**
+ * Convert hex code to character
+ * @param ctx Context handle
+ * @param hex_code Hex string (e.g., "4E2D" for Unicode, "A4A4" for Big5)
+ * @param buffer Output buffer for UTF-8 character
+ * @param buffer_size Buffer size
+ * @return Length of UTF-8 character, 0 if invalid code
+ */
+HIME_API int hime_intcode_convert(
+    HimeContext *ctx,
+    const char *hex_code,
+    char *buffer,
+    int buffer_size
+);
+
+/* ========== Input Method Availability ========== */
+
+/**
+ * Check if an input method is available/supported
+ * @param method Input method type
+ * @return true if available
+ */
+HIME_API bool hime_is_method_available(HimeInputMethod method);
+
+/**
+ * Get input method display name
+ * @param method Input method type
+ * @return Display name string
+ */
+HIME_API const char *hime_get_method_name(HimeInputMethod method);
 
 /* ========== Settings/Preferences (New Features) ========== */
 
