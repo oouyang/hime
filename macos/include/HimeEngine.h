@@ -59,6 +59,17 @@ typedef NS_ENUM(NSInteger, HimeFeedbackEventType) {
     HimeFeedbackError = 6
 };
 
+/* Keyboard layout type */
+typedef NS_ENUM(NSInteger, HimeKeyboardLayoutType) {
+    HimeKeyboardLayoutStandard = 0,  /* Standard Zhuyin (大千/標準注音) */
+    HimeKeyboardLayoutHSU = 1,       /* HSU layout (許氏鍵盤) */
+    HimeKeyboardLayoutETen = 2,      /* ETen layout (倚天鍵盤) */
+    HimeKeyboardLayoutETen26 = 3,    /* ETen 26-key layout */
+    HimeKeyboardLayoutIBM = 4,       /* IBM layout */
+    HimeKeyboardLayoutPinyin = 5,    /* Hanyu Pinyin layout */
+    HimeKeyboardLayoutDvorak = 6     /* Dvorak-based Zhuyin */
+};
+
 /* Feedback callback block */
 typedef void (^HimeFeedbackBlock)(HimeFeedbackEventType type);
 
@@ -123,6 +134,10 @@ typedef void (^HimeFeedbackBlock)(HimeFeedbackEventType type);
 /* Color scheme */
 @property (nonatomic, assign) HimeColorSchemeType colorScheme;
 - (void)setSystemDarkMode:(BOOL)isDark;
+
+/* Keyboard layout */
+@property (nonatomic, assign) HimeKeyboardLayoutType keyboardLayout;
+- (BOOL)setKeyboardLayoutByName:(NSString *)layoutName;
 
 /* Sound/Vibration feedback */
 @property (nonatomic, assign) BOOL soundEnabled;

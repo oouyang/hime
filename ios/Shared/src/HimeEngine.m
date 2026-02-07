@@ -298,6 +298,23 @@ static void feedbackTrampoline(HimeFeedbackType type, void *userData);
     }
 }
 
+#pragma mark - Keyboard Layout
+
+- (HimeKeyboardLayoutType)keyboardLayout {
+    return _ctx ? (HimeKeyboardLayoutType)hime_get_keyboard_layout(_ctx) : HimeKeyboardLayoutStandard;
+}
+
+- (void)setKeyboardLayout:(HimeKeyboardLayoutType)keyboardLayout {
+    if (_ctx) {
+        hime_set_keyboard_layout(_ctx, (HimeKeyboardLayout)keyboardLayout);
+    }
+}
+
+- (BOOL)setKeyboardLayoutByName:(NSString *)layoutName {
+    if (!_ctx || !layoutName.length) return NO;
+    return hime_set_keyboard_layout_by_name(_ctx, [layoutName UTF8String]) == 0;
+}
+
 #pragma mark - Feedback
 
 - (BOOL)soundEnabled {

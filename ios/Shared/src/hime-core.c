@@ -48,25 +48,335 @@ typedef struct {
     int typ;
 } KeyMapEntry;
 
-static const KeyMapEntry ZHUYIN_KEYMAP[] = {
-    /* Initials */
+/* Standard Zhuyin keyboard layout (大千/標準注音) */
+static const KeyMapEntry KEYMAP_STANDARD[] = {
+    /* Initials: ㄅㄆㄇㄈㄉㄊㄋㄌㄍㄎㄏㄐㄑㄒㄓㄔㄕㄖㄗㄘㄙ */
     {'1', 1, 0}, {'q', 2, 0}, {'a', 3, 0}, {'z', 4, 0},
     {'2', 5, 0}, {'w', 6, 0}, {'s', 7, 0}, {'x', 8, 0},
     {'e', 9, 0}, {'d', 10, 0}, {'c', 11, 0},
     {'r', 12, 0}, {'f', 13, 0}, {'v', 14, 0},
     {'5', 15, 0}, {'t', 16, 0}, {'g', 17, 0}, {'b', 18, 0},
     {'y', 19, 0}, {'h', 20, 0}, {'n', 21, 0},
-    /* Medials */
+    /* Medials: ㄧㄨㄩ */
     {'u', 1, 1}, {'j', 2, 1}, {'m', 3, 1},
-    /* Finals */
+    /* Finals: ㄚㄛㄜㄝㄞㄟㄠㄡㄢㄣㄤㄥㄦ */
     {'8', 1, 2}, {'i', 2, 2}, {'k', 3, 2}, {',', 4, 2},
     {'9', 5, 2}, {'o', 6, 2}, {'l', 7, 2}, {'.', 8, 2},
     {'0', 9, 2}, {'p', 10, 2}, {';', 11, 2}, {'/', 12, 2},
     {'-', 13, 2},
-    /* Tones */
+    /* Tones: 二聲ˊ 三聲ˇ 四聲ˋ 輕聲˙ */
     {'3', 2, 3}, {'4', 3, 3}, {'6', 4, 3}, {'7', 5, 3},
     {' ', 1, 3},
     {0, 0, 0}  /* Sentinel */
+};
+
+/* HSU keyboard layout (許氏鍵盤) - designed by Hsu Deh-Chang */
+static const KeyMapEntry KEYMAP_HSU[] = {
+    /* Initials */
+    {'b', 1, 0},   /* ㄅ */
+    {'p', 2, 0},   /* ㄆ */
+    {'m', 3, 0},   /* ㄇ */
+    {'f', 4, 0},   /* ㄈ */
+    {'d', 5, 0},   /* ㄉ */
+    {'t', 6, 0},   /* ㄊ */
+    {'n', 7, 0},   /* ㄋ */
+    {'l', 8, 0},   /* ㄌ */
+    {'g', 9, 0},   /* ㄍ */
+    {'k', 10, 0},  /* ㄎ */
+    {'h', 11, 0},  /* ㄏ */
+    {'j', 12, 0},  /* ㄐ */
+    {'v', 13, 0},  /* ㄑ */
+    {'c', 14, 0},  /* ㄒ */
+    {'j', 15, 0},  /* ㄓ (shared with ㄐ, context-dependent) */
+    {'v', 16, 0},  /* ㄔ (shared with ㄑ) */
+    {'c', 17, 0},  /* ㄕ (shared with ㄒ) */
+    {'r', 18, 0},  /* ㄖ */
+    {'z', 19, 0},  /* ㄗ */
+    {'a', 20, 0},  /* ㄘ */
+    {'s', 21, 0},  /* ㄙ */
+    /* Medials */
+    {'e', 1, 1},   /* ㄧ */
+    {'x', 2, 1},   /* ㄨ */
+    {'u', 3, 1},   /* ㄩ */
+    /* Finals */
+    {'a', 1, 2},   /* ㄚ */
+    {'o', 2, 2},   /* ㄛ */
+    {'r', 3, 2},   /* ㄜ */
+    {'w', 4, 2},   /* ㄝ */
+    {'i', 5, 2},   /* ㄞ */
+    {'q', 6, 2},   /* ㄟ */
+    {'z', 7, 2},   /* ㄠ */
+    {'p', 8, 2},   /* ㄡ */
+    {'m', 9, 2},   /* ㄢ */
+    {'n', 10, 2},  /* ㄣ */
+    {'k', 11, 2},  /* ㄤ */
+    {'g', 12, 2},  /* ㄥ */
+    {'l', 13, 2},  /* ㄦ */
+    /* Tones */
+    {'s', 2, 3},   /* ˊ 二聲 */
+    {'d', 3, 3},   /* ˇ 三聲 */
+    {'f', 4, 3},   /* ˋ 四聲 */
+    {'j', 5, 3},   /* ˙ 輕聲 */
+    {' ', 1, 3},   /* 一聲 */
+    {0, 0, 0}
+};
+
+/* ETen keyboard layout (倚天鍵盤) */
+static const KeyMapEntry KEYMAP_ETEN[] = {
+    /* Initials */
+    {'b', 1, 0},   /* ㄅ */
+    {'p', 2, 0},   /* ㄆ */
+    {'m', 3, 0},   /* ㄇ */
+    {'f', 4, 0},   /* ㄈ */
+    {'d', 5, 0},   /* ㄉ */
+    {'t', 6, 0},   /* ㄊ */
+    {'n', 7, 0},   /* ㄋ */
+    {'l', 8, 0},   /* ㄌ */
+    {'v', 9, 0},   /* ㄍ */
+    {'k', 10, 0},  /* ㄎ */
+    {'h', 11, 0},  /* ㄏ */
+    {'g', 12, 0},  /* ㄐ */
+    {'7', 13, 0},  /* ㄑ */
+    {'c', 14, 0},  /* ㄒ */
+    {';', 15, 0},  /* ㄓ */
+    {'\'', 16, 0}, /* ㄔ */
+    {'s', 17, 0},  /* ㄕ */
+    {'j', 18, 0},  /* ㄖ */
+    {'r', 19, 0},  /* ㄗ */
+    {'z', 20, 0},  /* ㄘ */
+    {'y', 21, 0},  /* ㄙ */
+    /* Medials */
+    {'u', 1, 1},   /* ㄧ */
+    {'i', 2, 1},   /* ㄨ */
+    {'x', 3, 1},   /* ㄩ */
+    /* Finals */
+    {'a', 1, 2},   /* ㄚ */
+    {'o', 2, 2},   /* ㄛ */
+    {'w', 3, 2},   /* ㄜ */
+    {',', 4, 2},   /* ㄝ */
+    {'e', 5, 2},   /* ㄞ */
+    {'q', 6, 2},   /* ㄟ */
+    {'1', 7, 2},   /* ㄠ */
+    {'.', 8, 2},   /* ㄡ */
+    {'2', 9, 2},   /* ㄢ */
+    {'/', 10, 2},  /* ㄣ */
+    {'3', 11, 2},  /* ㄤ */
+    {'4', 12, 2},  /* ㄥ */
+    {'-', 13, 2},  /* ㄦ */
+    /* Tones */
+    {'6', 2, 3},   /* ˊ */
+    {'9', 3, 3},   /* ˇ */
+    {'0', 4, 3},   /* ˋ */
+    {'8', 5, 3},   /* ˙ */
+    {' ', 1, 3},
+    {0, 0, 0}
+};
+
+/* ETen 26-key layout (倚天26鍵) */
+static const KeyMapEntry KEYMAP_ETEN26[] = {
+    /* Initials */
+    {'b', 1, 0},   /* ㄅ */
+    {'p', 2, 0},   /* ㄆ */
+    {'m', 3, 0},   /* ㄇ */
+    {'f', 4, 0},   /* ㄈ */
+    {'d', 5, 0},   /* ㄉ */
+    {'t', 6, 0},   /* ㄊ */
+    {'n', 7, 0},   /* ㄋ */
+    {'l', 8, 0},   /* ㄌ */
+    {'v', 9, 0},   /* ㄍ */
+    {'k', 10, 0},  /* ㄎ */
+    {'h', 11, 0},  /* ㄏ */
+    {'g', 12, 0},  /* ㄐ */
+    {'c', 13, 0},  /* ㄑ */
+    {'y', 14, 0},  /* ㄒ */
+    {'j', 15, 0},  /* ㄓ */
+    {'q', 16, 0},  /* ㄔ */
+    {'w', 17, 0},  /* ㄕ */
+    {'s', 18, 0},  /* ㄖ */
+    {'r', 19, 0},  /* ㄗ */
+    {'z', 20, 0},  /* ㄘ */
+    {'x', 21, 0},  /* ㄙ */
+    /* Medials */
+    {'u', 1, 1},   /* ㄧ */
+    {'i', 2, 1},   /* ㄨ */
+    {'o', 3, 1},   /* ㄩ */
+    /* Finals */
+    {'a', 1, 2},   /* ㄚ */
+    {'o', 2, 2},   /* ㄛ */
+    {'e', 3, 2},   /* ㄜ */
+    {'e', 4, 2},   /* ㄝ (shared) */
+    {'i', 5, 2},   /* ㄞ */
+    {'a', 6, 2},   /* ㄟ (shared) */
+    {'u', 7, 2},   /* ㄠ */
+    {'o', 8, 2},   /* ㄡ (shared) */
+    {'n', 9, 2},   /* ㄢ */
+    {'n', 10, 2},  /* ㄣ (shared) */
+    {'k', 11, 2},  /* ㄤ */
+    {'g', 12, 2},  /* ㄥ */
+    {'l', 13, 2},  /* ㄦ */
+    /* Tones */
+    {'d', 2, 3},   /* ˊ */
+    {'f', 3, 3},   /* ˇ */
+    {'j', 4, 3},   /* ˋ */
+    {'s', 5, 3},   /* ˙ */
+    {' ', 1, 3},
+    {0, 0, 0}
+};
+
+/* IBM keyboard layout (IBM倚天) */
+static const KeyMapEntry KEYMAP_IBM[] = {
+    /* Initials */
+    {'1', 1, 0},   /* ㄅ */
+    {'2', 2, 0},   /* ㄆ */
+    {'3', 3, 0},   /* ㄇ */
+    {'4', 4, 0},   /* ㄈ */
+    {'5', 5, 0},   /* ㄉ */
+    {'6', 6, 0},   /* ㄊ */
+    {'7', 7, 0},   /* ㄋ */
+    {'8', 8, 0},   /* ㄌ */
+    {'9', 9, 0},   /* ㄍ */
+    {'0', 10, 0},  /* ㄎ */
+    {'-', 11, 0},  /* ㄏ */
+    {'q', 12, 0},  /* ㄐ */
+    {'w', 13, 0},  /* ㄑ */
+    {'e', 14, 0},  /* ㄒ */
+    {'r', 15, 0},  /* ㄓ */
+    {'t', 16, 0},  /* ㄔ */
+    {'y', 17, 0},  /* ㄕ */
+    {'u', 18, 0},  /* ㄖ */
+    {'a', 19, 0},  /* ㄗ */
+    {'s', 20, 0},  /* ㄘ */
+    {'d', 21, 0},  /* ㄙ */
+    /* Medials */
+    {'i', 1, 1},   /* ㄧ */
+    {'o', 2, 1},   /* ㄨ */
+    {'p', 3, 1},   /* ㄩ */
+    /* Finals */
+    {'z', 1, 2},   /* ㄚ */
+    {'x', 2, 2},   /* ㄛ */
+    {'c', 3, 2},   /* ㄜ */
+    {'v', 4, 2},   /* ㄝ */
+    {'b', 5, 2},   /* ㄞ */
+    {'n', 6, 2},   /* ㄟ */
+    {'m', 7, 2},   /* ㄠ */
+    {',', 8, 2},   /* ㄡ */
+    {'.', 9, 2},   /* ㄢ */
+    {'/', 10, 2},  /* ㄣ */
+    {'f', 11, 2},  /* ㄤ */
+    {'g', 12, 2},  /* ㄥ */
+    {'h', 13, 2},  /* ㄦ */
+    /* Tones */
+    {'j', 2, 3},   /* ˊ */
+    {'k', 3, 3},   /* ˇ */
+    {'l', 4, 3},   /* ˋ */
+    {';', 5, 3},   /* ˙ */
+    {' ', 1, 3},
+    {0, 0, 0}
+};
+
+/* Hanyu Pinyin keyboard layout (漢語拼音) */
+static const KeyMapEntry KEYMAP_PINYIN[] = {
+    /* Initials - mapped to Pinyin consonants */
+    {'b', 1, 0},   /* ㄅ = b */
+    {'p', 2, 0},   /* ㄆ = p */
+    {'m', 3, 0},   /* ㄇ = m */
+    {'f', 4, 0},   /* ㄈ = f */
+    {'d', 5, 0},   /* ㄉ = d */
+    {'t', 6, 0},   /* ㄊ = t */
+    {'n', 7, 0},   /* ㄋ = n */
+    {'l', 8, 0},   /* ㄌ = l */
+    {'g', 9, 0},   /* ㄍ = g */
+    {'k', 10, 0},  /* ㄎ = k */
+    {'h', 11, 0},  /* ㄏ = h */
+    {'j', 12, 0},  /* ㄐ = j */
+    {'q', 13, 0},  /* ㄑ = q */
+    {'x', 14, 0},  /* ㄒ = x */
+    {'v', 15, 0},  /* ㄓ = zh (use v) */
+    {'c', 16, 0},  /* ㄔ = ch (use c) */
+    {'s', 17, 0},  /* ㄕ = sh (use s in context) */
+    {'r', 18, 0},  /* ㄖ = r */
+    {'z', 19, 0},  /* ㄗ = z */
+    {'c', 20, 0},  /* ㄘ = c */
+    {'s', 21, 0},  /* ㄙ = s */
+    /* Medials */
+    {'i', 1, 1},   /* ㄧ = i */
+    {'u', 2, 1},   /* ㄨ = u */
+    {'y', 3, 1},   /* ㄩ = ü (use y or v) */
+    /* Finals */
+    {'a', 1, 2},   /* ㄚ = a */
+    {'o', 2, 2},   /* ㄛ = o */
+    {'e', 3, 2},   /* ㄜ = e */
+    {'e', 4, 2},   /* ㄝ = ê */
+    {'i', 5, 2},   /* ㄞ = ai */
+    {'i', 6, 2},   /* ㄟ = ei */
+    {'o', 7, 2},   /* ㄠ = ao */
+    {'u', 8, 2},   /* ㄡ = ou */
+    {'n', 9, 2},   /* ㄢ = an */
+    {'n', 10, 2},  /* ㄣ = en */
+    {'g', 11, 2},  /* ㄤ = ang */
+    {'g', 12, 2},  /* ㄥ = eng */
+    {'r', 13, 2},  /* ㄦ = er */
+    /* Tones - use number keys */
+    {'2', 2, 3},   /* ˊ */
+    {'3', 3, 3},   /* ˇ */
+    {'4', 4, 3},   /* ˋ */
+    {'5', 5, 3},   /* ˙ */
+    {' ', 1, 3},   /* 一聲 */
+    {'1', 1, 3},   /* 一聲 (explicit) */
+    {0, 0, 0}
+};
+
+/* Dvorak-based Zhuyin keyboard layout */
+static const KeyMapEntry KEYMAP_DVORAK[] = {
+    /* Remapped from Standard based on Dvorak layout */
+    /* Initials */
+    {'1', 1, 0}, {'\'', 2, 0}, {'a', 3, 0}, {';', 4, 0},
+    {'2', 5, 0}, {',', 6, 0}, {'o', 7, 0}, {'q', 8, 0},
+    {'.', 9, 0}, {'e', 10, 0}, {'j', 11, 0},
+    {'p', 12, 0}, {'u', 13, 0}, {'k', 14, 0},
+    {'5', 15, 0}, {'y', 16, 0}, {'i', 17, 0}, {'x', 18, 0},
+    {'f', 19, 0}, {'d', 20, 0}, {'b', 21, 0},
+    /* Medials */
+    {'g', 1, 1}, {'h', 2, 1}, {'m', 3, 1},
+    /* Finals */
+    {'8', 1, 2}, {'c', 2, 2}, {'t', 3, 2}, {'w', 4, 2},
+    {'9', 5, 2}, {'r', 6, 2}, {'n', 7, 2}, {'v', 8, 2},
+    {'0', 9, 2}, {'l', 10, 2}, {'s', 11, 2}, {'z', 12, 2},
+    {'[', 13, 2},
+    /* Tones */
+    {'3', 2, 3}, {'4', 3, 3}, {'6', 4, 3}, {'7', 5, 3},
+    {' ', 1, 3},
+    {0, 0, 0}
+};
+
+/* Array of keyboard layout tables for easy switching */
+static const KeyMapEntry *KEYBOARD_LAYOUTS[] = {
+    KEYMAP_STANDARD,  /* HIME_KB_STANDARD */
+    KEYMAP_HSU,       /* HIME_KB_HSU */
+    KEYMAP_ETEN,      /* HIME_KB_ETEN */
+    KEYMAP_ETEN26,    /* HIME_KB_ETEN26 */
+    KEYMAP_IBM,       /* HIME_KB_IBM */
+    KEYMAP_PINYIN,    /* HIME_KB_PINYIN */
+    KEYMAP_DVORAK     /* HIME_KB_DVORAK */
+};
+
+/* Layout name mapping for hime_set_keyboard_layout_by_name() */
+static const struct {
+    const char *name;
+    HimeKeyboardLayout layout;
+} LAYOUT_NAMES[] = {
+    {"standard", HIME_KB_STANDARD},
+    {"zo", HIME_KB_STANDARD},      /* Alias */
+    {"hsu", HIME_KB_HSU},
+    {"eten", HIME_KB_ETEN},
+    {"et", HIME_KB_ETEN},          /* Alias */
+    {"eten26", HIME_KB_ETEN26},
+    {"et26", HIME_KB_ETEN26},      /* Alias */
+    {"ibm", HIME_KB_IBM},
+    {"pinyin", HIME_KB_PINYIN},
+    {"hanyu", HIME_KB_PINYIN},     /* Alias */
+    {"dvorak", HIME_KB_DVORAK},
+    {NULL, HIME_KB_STANDARD}
 };
 
 /* Phonetic index entry */
@@ -108,6 +418,7 @@ struct HimeContext {
     /* State */
     bool chinese_mode;
     HimeInputMethod method;
+    HimeKeyboardLayout keyboard_layout;  /* Current keyboard layout */
 
     /* Selection keys */
     char sel_keys[16];
@@ -319,10 +630,14 @@ static void update_preedit(HimeContext *ctx) {
     }
 }
 
-static const KeyMapEntry *find_keymap(char key) {
-    for (int i = 0; ZHUYIN_KEYMAP[i].key != 0; i++) {
-        if (ZHUYIN_KEYMAP[i].key == key) {
-            return &ZHUYIN_KEYMAP[i];
+static const KeyMapEntry *find_keymap(HimeContext *ctx, char key) {
+    HimeKeyboardLayout layout = ctx ? ctx->keyboard_layout : HIME_KB_STANDARD;
+    if (layout >= HIME_KB_COUNT) layout = HIME_KB_STANDARD;
+
+    const KeyMapEntry *keymap = KEYBOARD_LAYOUTS[layout];
+    for (int i = 0; keymap[i].key != 0; i++) {
+        if (keymap[i].key == key) {
+            return &keymap[i];
         }
     }
     return NULL;
@@ -372,6 +687,7 @@ HIME_API HimeContext *hime_context_new(void) {
 
     ctx->chinese_mode = true;
     ctx->method = HIME_IM_PHO;
+    ctx->keyboard_layout = HIME_KB_STANDARD;
     ctx->candidates_per_page = 10;
     strcpy(ctx->sel_keys, "1234567890");
 
@@ -512,7 +828,7 @@ HIME_API HimeKeyResult hime_process_key(
             key = key - 'A' + 'a';  /* Convert to lowercase */
         }
 
-        const KeyMapEntry *entry = find_keymap(key);
+        const KeyMapEntry *entry = find_keymap(ctx, key);
         if (entry) {
             int typ = entry->typ;
             int num = entry->num;
@@ -663,11 +979,30 @@ HIME_API int hime_get_bopomofo_string(HimeContext *ctx, char *buffer, int buffer
     return hime_get_preedit(ctx, buffer, buffer_size);
 }
 
-HIME_API int hime_set_keyboard_layout(HimeContext *ctx, const char *layout_name) {
-    /* TODO: Load different keyboard mappings */
-    (void)ctx;
-    (void)layout_name;
+HIME_API int hime_set_keyboard_layout(HimeContext *ctx, HimeKeyboardLayout layout) {
+    if (!ctx) return -1;
+    if (layout < 0 || layout >= HIME_KB_COUNT) return -1;
+
+    ctx->keyboard_layout = layout;
+    hime_context_reset(ctx);  /* Reset state when changing layout */
     return 0;
+}
+
+HIME_API HimeKeyboardLayout hime_get_keyboard_layout(HimeContext *ctx) {
+    return ctx ? ctx->keyboard_layout : HIME_KB_STANDARD;
+}
+
+HIME_API int hime_set_keyboard_layout_by_name(HimeContext *ctx, const char *layout_name) {
+    if (!ctx || !layout_name) return -1;
+
+    /* Search for matching layout name */
+    for (int i = 0; LAYOUT_NAMES[i].name != NULL; i++) {
+        if (strcmp(layout_name, LAYOUT_NAMES[i].name) == 0) {
+            return hime_set_keyboard_layout(ctx, LAYOUT_NAMES[i].layout);
+        }
+    }
+
+    return -1;  /* Layout not found */
 }
 
 HIME_API void hime_set_selection_keys(HimeContext *ctx, const char *keys) {
