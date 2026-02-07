@@ -22,6 +22,7 @@ add_library(hime-jni SHARED
 # Include directories
 target_include_directories(hime-jni PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../../../../shared/include
 )
 
 # Link Android log library

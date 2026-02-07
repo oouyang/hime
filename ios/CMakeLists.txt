@@ -39,6 +39,7 @@ add_library(hime-shared STATIC
 
 target_include_directories(hime-shared PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/Shared/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../shared/include
 )
 
 target_compile_definitions(hime-shared PRIVATE
