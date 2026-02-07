@@ -352,6 +352,16 @@ pkg-config --list-all | grep -i gtk
 
 ## Troubleshooting
 
+### Quick Diagnosis Checklist
+
+When the build fails, check these in order:
+
+1. **Are autotools installed?** → `which autoreconf automake autoconf`
+2. **Are dev packages installed?** → `pkg-config --exists gtk+-2.0 && echo OK`
+3. **Are there line ending issues?** → `file configure` (should say "ASCII text", not "CRLF")
+4. **What's the actual error?** → Check `config.log` for configure errors
+5. **Missing symbols at link time?** → Check if functions are incorrectly marked `static`
+
 ### autoreconf fails
 
 **Error:** `autoreconf: command not found`
@@ -430,6 +440,221 @@ make install
    ```bash
    HIME_DEBUG=1 ./src/hime
    ```
+
+### CRLF line ending issues
+
+**Error:** `./configure: cannot execute: required file not found` (but file exists)
+
+**Cause:** The configure script has Windows-style line endings (CRLF).
+
+**Diagnosis:**
+```bash
+file configure
+# Bad: "ASCII text, with CRLF line terminators"
+# Good: "POSIX shell script, ASCII text executable"
+```
+
+**Solution:**
+```bash
+# Fix line endings
+sed -i 's/\r$//' configure
+
+# Or use dos2unix if available
+dos2unix configure
+```
+
+**Prevention:** Configure git to handle line endings:
+```bash
+git config --global core.autocrlf input  # On Linux/Mac
+```
+
+### Missing transitive dependencies (bzip2, etc.)
+
+**Error:** `Package 'bzip2' not found` (when checking for GTK)
+
+**Cause:** GTK depends on freetype2, which depends on bzip2. The bzip2 library is installed but missing its `.pc` file.
+
+**Diagnosis:**
+```bash
+# Check what's requiring bzip2
+pkg-config --print-requires freetype2
+
+# Check if library exists but .pc is missing
+ls /usr/lib/x86_64-linux-gnu/libbz2* && ls /usr/lib/*/pkgconfig/bzip2.pc
+```
+
+**Solution 1:** Install the development package:
+```bash
+# Debian/Ubuntu
+sudo apt-get install libbz2-dev
+
+# Fedora
+sudo dnf install bzip2-devel
+```
+
+**Solution 2:** Create a local `.pc` file if you can't install packages:
+```bash
+mkdir -p ~/pkgconfig
+cat > ~/pkgconfig/bzip2.pc << 'EOF'
+prefix=/usr
+exec_prefix=${prefix}
+libdir=${exec_prefix}/lib/x86_64-linux-gnu
+includedir=${prefix}/include
+
+Name: bzip2
+Description: A file compression library
+Version: 1.0.8
+Libs: -L${libdir} -lbz2
+Cflags: -I${includedir}
+EOF
+
+# Use it
+export PKG_CONFIG_PATH=~/pkgconfig:$PKG_CONFIG_PATH
+./configure
+```
+
+### Linker errors: undefined reference
+
+**Error:** `undefined reference to 'function_name'`
+
+**Cause:** Usually one of:
+1. A function is marked `static` but called from another file
+2. An object file is missing from the link command
+3. Library order issue
+
+**Diagnosis:**
+```bash
+# Find where the function is defined
+grep -rn "function_name" src/*.c src/*.h
+
+# Check if it's marked static
+grep -n "static.*function_name" src/*.c
+
+# Check if the object file is being linked
+grep "function_name" src/Makefile.am
+```
+
+**Solution:** If a function needs to be called from other files, remove `static`:
+```c
+// Before (wrong if called from other files)
+static void my_function(void) { ... }
+
+// After (correct)
+void my_function(void) { ... }
+```
+
+### Configure succeeds but make fails
+
+**Diagnosis workflow:**
+
+```bash
+# 1. Get the actual error (not just the last line)
+make 2>&1 | head -100
+
+# 2. For compiler errors, check the exact command
+make V=1  # Verbose mode shows actual commands
+
+# 3. For missing headers
+grep -r "include.*missing_header" src/
+
+# 4. For linking errors, check symbol visibility
+nm src/problematic.o | grep function_name
+# 'T' = defined, 'U' = undefined
+```
+
+### pkg-config debugging
+
+**Check what pkg-config sees:**
+```bash
+# List search paths
+pkg-config --variable pc_path pkg-config
+
+# Debug a specific package
+PKG_CONFIG_DEBUG_SPEW=1 pkg-config --cflags gtk+-2.0
+
+# Check package dependencies
+pkg-config --print-requires gtk+-2.0
+pkg-config --print-requires-private freetype2
+
+# Verify a package works
+pkg-config --exists gtk+-2.0 && echo "OK" || echo "FAIL"
+```
+
+**Common pkg-config issues:**
+| Symptom | Cause | Fix |
+|---------|-------|-----|
+| Package not found | Dev package not installed | Install `-dev` or `-devel` package |
+| Version too old | System package outdated | Update system or build from source |
+| Wrong pkg-config | Multiple pkg-config versions | Check `which pkg-config` |
+| Missing .pc file | Library installed without .pc | Create .pc manually (see above) |
+
+### Reading config.log
+
+When `./configure` fails, check `config.log`:
+
+```bash
+# Find the actual error
+grep -A5 "error:" config.log | head -20
+
+# Find what configure tried
+grep "checking for" config.log | tail -20
+
+# Find pkg-config commands
+grep "pkg-config" config.log
+```
+
+### Build in a clean environment
+
+If you're getting strange errors, try a clean build:
+
+```bash
+# Full clean
+make distclean 2>/dev/null
+rm -rf autom4te.cache
+rm -f config.status config.log
+
+# Regenerate everything
+autoreconf -fi
+./configure
+make -j$(nproc)
+```
+
+## Advanced: Understanding the Build System
+
+### How autotools works
+
+```
+configure.ac  ──autoreconf──►  configure  ──./configure──►  Makefile
+Makefile.am   ──────────────►  Makefile.in ────────────────►
+```
+
+1. `configure.ac` - Defines what to check (libraries, features)
+2. `Makefile.am` - Defines what to build (sources, targets)
+3. `autoreconf -i` - Generates `configure` and `Makefile.in`
+4. `./configure` - Checks system and generates `Makefile`
+5. `make` - Compiles using generated `Makefile`
+
+### Key files to understand
+
+| File | Purpose | When to modify |
+|------|---------|----------------|
+| `configure.ac` | Autoconf input | Adding dependencies, features |
+| `src/Makefile.am` | Automake input | Adding source files, targets |
+| `config.log` | Configure debug output | Debugging configure failures |
+| `src/Makefile` | Generated makefile | Never (regenerated) |
+
+### Adding a new source file
+
+1. Edit `src/Makefile.am`
+2. Add `.c` file to appropriate `_SOURCES` variable
+3. Run `autoreconf -i` (or just `make` if Makefile exists)
+
+### Adding a new dependency
+
+1. Edit `configure.ac`
+2. Add `PKG_CHECK_MODULES([NAME], [pkg-name])`
+3. Use `$(NAME_CFLAGS)` and `$(NAME_LIBS)` in `Makefile.am`
+4. Run `autoreconf -i && ./configure`
 
 ## Contributing
 
