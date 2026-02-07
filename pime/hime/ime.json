@@ -1,0 +1,10 @@
+{
+    "name": "HIME 輸入法",
+    "version": "0.1.0",
+    "description": "HIME Input Method for Windows - Bopomofo/Zhuyin Traditional Chinese Input",
+    "guid": "{A8E1B5C3-F2D4-4E6A-9B0C-1D2E3F4A5B6C}",
+    "locale": "zh-TW",
+    "icon": "icon.ico",
+    "moduleName": "hime_ime",
+    "serviceName": "HIMETextService"
+}
