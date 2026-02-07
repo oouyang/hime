@@ -37,7 +37,7 @@ chewing-module.so: $(chewing_module_obj) $(chewing_module_so)
 install:
 	install $(HIME_MODULES) "$(himelibdir)"
 
-.PHONY: unintall
+.PHONY: uninstall
 uninstall:
 	cd $(himelibdir) && rm -f $(HIME_MODULES)
 

@@ -16,17 +16,14 @@ DEPS = hime-common.o hime-conf.o hime-crypt.o hime-settings.o \
 		locale.o im-addr.o pho2pinyin.o pinyin.o util.o
 OBJS = hime-im-client.o hime-send.o $(DEPS)
 
-%.E: %.cpp
+# Pattern rules for compilation
+%.E: %.c
 	@echo "  $< -> $@"
 	$(CC) $(CPPFLAGS) $(CFLAGS) -E -o $@ $<
 
 %.o: %.c
 	@echo "  $< -> $@"
 	$(CC) -c $(CPPFLAGS) $(CFLAGS) $<
-
-.o: %.cpp
-	@echo "  $< -> $@"
-	$(CC) -x c -c $(CPPFLAGS) $(CFLAGS) $<
 
 all: $(SOFILEVER)
 
@@ -62,39 +59,39 @@ uninstall:
 # rules to rebuild $(DEPS), rebuild with -fPIC
 hime-common.o: ../hime-common.c
 	@echo "  $^ -> $@"
-	$(CCX) -c $(CPPFLAGS) $(CFLAGS) -o $@ $<
+	$(CC) -c $(CPPFLAGS) $(CFLAGS) -o $@ $<
 
 hime-conf.o: ../hime-conf.c
 	@echo "  $^ -> $@"
-	$(CCX) -c $(CPPFLAGS) $(CFLAGS) -o $@ $<
+	$(CC) -c $(CPPFLAGS) $(CFLAGS) -o $@ $<
 
 hime-crypt.o: ../hime-crypt.c
 	@echo "  $^ -> $@"
-	$(CCX) -c $(CPPFLAGS) $(CFLAGS) -o $@ $<
+	$(CC) -c $(CPPFLAGS) $(CFLAGS) -o $@ $<
 
 hime-settings.o: ../hime-settings.c
 	@echo "  $^ -> $@"
-	$(CCX) -c $(CPPFLAGS) $(CFLAGS) -o $@ $<
+	$(CC) -c $(CPPFLAGS) $(CFLAGS) -o $@ $<
 
 locale.o: ../locale.c
 	@echo "  $^ -> $@"
-	$(CCX) -c $(CPPFLAGS) $(CFLAGS) -o $@ $<
+	$(CC) -c $(CPPFLAGS) $(CFLAGS) -o $@ $<
 
 im-addr.o: ../im-addr.c
 	@echo "  $^ -> $@"
-	$(CCX) -c $(CPPFLAGS) $(CFLAGS) -o $@ $<
+	$(CC) -c $(CPPFLAGS) $(CFLAGS) -o $@ $<
 
 pho2pinyin.o: ../pho2pinyin.c
 	@echo "  $^ -> $@"
-	$(CCX) -c $(CPPFLAGS) $(CFLAGS) -o $@ $<
+	$(CC) -c $(CPPFLAGS) $(CFLAGS) -o $@ $<
 
 pinyin.o: ../pinyin.c
 	@echo "  $^ -> $@"
-	$(CCX) -c $(CPPFLAGS) $(CFLAGS) -o $@ $<
+	$(CC) -c $(CPPFLAGS) $(CFLAGS) -o $@ $<
 
 util.o: ../util.c
 	@echo "  $^ -> $@"
-	$(CCX) -c $(CPPFLAGS) $(CFLAGS) -o $@ $<
+	$(CC) -c $(CPPFLAGS) $(CFLAGS) -o $@ $<
 
 
 .PHONY: clean
@@ -104,5 +101,5 @@ clean:
 
 .depend:
 	@echo "building $@ ..."
-	$(CCX) $(CPPFLAGS) $(CFLAGS) -MM *.c > $@
+	$(CC) $(CPPFLAGS) $(CFLAGS) -MM *.c > $@
 

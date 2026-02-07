@@ -31,32 +31,19 @@ AC_DEFUN(
   ]
 )
 
+# Compiler settings
 AC_SUBST([CCLD], [$CC])
-AC_SUBST([CCX], [$CC])
-# Set CFLAGS to empty string since AC_PROG_CC() would set it with the default value "-g -O2"
-AC_SUBST([CFLAGS], [""])
-AS_IF(
-  [test -z "$CFLAGS"],
-  [
-    AC_SUBST([CFLAGS], ["-std=gnu17"])
-    AC_SUBST([CXXFLAGS], ["-std=gnu++17"])
-    AC_SUBST([OPTFLAGS], ["-Wall"])
-  ],
-  [AC_SUBST([OPTFLAGS], ["$CFLAGS"])]
-)
-AC_SUBST([CFLAGS], ["$CFLAGS $CPPFLAGS"])
-AC_SUBST([CXXFLAGS], ["$CXXFLAGS $CPPFLAGS"])
+AC_SUBST([CCX], [$CXX])
+
+# Set standard flags - clear defaults from AC_PROG_CC
+AC_SUBST([CFLAGS], ["-std=gnu17 $CPPFLAGS"])
+AC_SUBST([CXXFLAGS], ["-std=gnu++17 $CPPFLAGS"])
+AC_SUBST([OPTFLAGS], ["-Wall"])
+
 AC_SUBST([DOC_DIR], ["\${datadir}/doc/hime"])
-AS_IF(
-  [test "x$ECHO" = "x"],
-  [
-    AC_SUBST([ECHO], ["$(whereis -b echo | awk "{print \$2}")"])
-    AS_IF(
-      [test "x$ECHO" = "x"],
-      [AC_SUBST([ECHO], ["echo"])]
-    )
-  ]
-)
+
+# Use printf for portability (echo -e is not POSIX)
+AC_SUBST([ECHO], ["echo"])
 AC_SUBST([FREEBSD], ["0"])
 AS_IF(
   [uname | grep FreeBSD | grep -v GNU/kFreeBSD >/dev/null 2>/dev/null],
@@ -81,12 +68,9 @@ AS_IF(
   [command -v gmake > /dev/null 2> /dev/null],
   [AC_SUBST([MAKE], ["gmake"])]
 )
+# Directory paths - DESTDIR is handled at install time by make, not here
 AC_SUBST([SYS_ICON_DIR], ["\${datadir}/pixmaps"])
-AC_SUBST([bindir], ["\${DESTDIR}$bindir"])
-AC_SUBST([datadir], ["\${DESTDIR}$datadir"])
 AC_SUBST([filterdir], ["\${datadir}/hime/filter"])
-AC_SUBST([includedir], ["\${DESTDIR}$includedir"])
-AC_SUBST([mandir], ["\${DESTDIR}$mandir"])
 AC_SUBST([man1dir], ["\${mandir}/man1"])
 
 # USE_XIM
@@ -111,29 +95,45 @@ AS_IF(
   [test -d /usr/lib64 -a -d /lib64],
   [AC_SUBST([LIB], ["lib64"])]
 )
+# Detect distribution to determine lib vs lib64
+# Use /etc/os-release (standard on modern Linux) or fallback methods
 AS_IF(
   [test "x$(uname -s)" = "xLinux"],
   [AS_IF(
-    [command -v lsb_release >/dev/null],
+    [test -f /etc/os-release],
     [
-      distid=$(lsb_release -is 2>/dev/null)
-      AS_IF(
-        [test "x$distid" = "xUbuntu" -o "x$distid" = "xDebian" -o "x$distid" = "xArch" -o "x$distid" = "xarchlinux"],
-        [AC_SUBST([LIB], ["lib"])]
+      # Modern standard: /etc/os-release
+      distid=$(. /etc/os-release && echo "$ID")
+      AS_CASE([$distid],
+        [ubuntu|debian|arch|manjaro], [AC_SUBST([LIB], ["lib"])],
+        []
       )
     ],
-    [
-      DEBIAN_LD=$(ld -v 2>&1 | grep -i debian)
-      UBUNTU_LD=$(ld -v 2>&1 | grep -i ubuntu)
-      if [ test "x$DEBIAN_LD" != "x" -o "x$UBUNTU_LD" != "x"]; then
-        AC_SUBST([LIB], ["lib"])
-      elif [ test -e /etc/arch-release ]; then
-        AC_SUBST([LIB], ["lib"])
-      fi
-    ]
+    [AS_IF(
+      [command -v lsb_release >/dev/null],
+      [
+        distid=$(lsb_release -is 2>/dev/null)
+        AS_IF(
+          [test "x$distid" = "xUbuntu" -o "x$distid" = "xDebian" -o "x$distid" = "xArch"],
+          [AC_SUBST([LIB], ["lib"])]
+        )
+      ],
+      [
+        # Fallback: check linker version string
+        AS_IF(
+          [ld -v 2>&1 | grep -qi 'debian\|ubuntu'],
+          [AC_SUBST([LIB], ["lib"])],
+          [AS_IF(
+            [test -e /etc/arch-release],
+            [AC_SUBST([LIB], ["lib"])]
+          )]
+        )
+      ]
+    )]
   )]
 )
-# use_lib
+
+# Allow manual override of lib directory
 AC_SUBST([use_lib], [""])
 AC_ARG_ENABLE(
   [lib64],
@@ -141,19 +141,15 @@ AC_ARG_ENABLE(
   [enable_lib64=$enableval],
   [enable_lib64=""]
 )
-if [ test "x$enable_lib64" = "xyes"]; then
-  AC_SUBST([use_lib], ["lib64"])
-elif [ test "x$enable_lib64" = "xno"]; then
-  AC_SUBST([use_lib], ["lib"])
-elif [ test -n "$enable_lib64"]; then
-  AC_SUBST([use_lib], ["$enable_lib64"])
-fi
+AS_IF([test "x$enable_lib64" = "xyes"], [AC_SUBST([use_lib], ["lib64"])])
+AS_IF([test "x$enable_lib64" = "xno"], [AC_SUBST([use_lib], ["lib"])])
+AS_IF([test -n "$enable_lib64" -a "x$enable_lib64" != "xyes" -a "x$enable_lib64" != "xno"],
+      [AC_SUBST([use_lib], ["$enable_lib64"])])
 AS_IF(
   [test -n "$use_lib"],
   [AC_SUBST([LIB], ["$use_lib"])]
 )
 AC_SUBST([libdir], ["\${prefix}/$LIB"])
-AC_SUBST([libdir], ["\${DESTDIR}$libdir"])
 AC_SUBST([himelibdir], ["\${libdir}/hime"])
 AC_SUBST([hime_ld_run_path], ["\${himelibdir}"])
 AC_SUBST([gcc_ld_run_path], ["-Wl,-rpath,\${hime_ld_run_path}"])
