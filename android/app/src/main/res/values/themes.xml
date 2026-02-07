@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  HIME Android - Theme Resources
+
+  Copyright (C) 2020 The HIME team, Taiwan
+  License: GNU LGPL v2.1
+-->
+<resources>
+    <style name="Theme.Hime" parent="Theme.AppCompat.DayNight.DarkActionBar">
+        <item name="colorPrimary">#1976D2</item>
+        <item name="colorPrimaryDark">#1565C0</item>
+        <item name="colorAccent">#2196F3</item>
+        <item name="android:windowBackground">#303030</item>
+    </style>
+</resources>

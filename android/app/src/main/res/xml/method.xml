@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  HIME Android - Input Method Configuration
+
+  Copyright (C) 2020 The HIME team, Taiwan
+  License: GNU LGPL v2.1
+-->
+<input-method xmlns:android="http://schemas.android.com/apk/res/android"
+    android:settingsActivity="org.hime.android.HimeSettingsActivity"
+    android:isDefault="false">
+
+    <!-- Zhuyin/Bopomofo input subtype -->
+    <subtype
+        android:label="@string/subtype_zhuyin"
+        android:imeSubtypeLocale="zh_TW"
+        android:imeSubtypeMode="keyboard"
+        android:isAsciiCapable="true" />
+
+    <!-- English input subtype -->
+    <subtype
+        android:label="@string/subtype_english"
+        android:imeSubtypeLocale="en_US"
+        android:imeSubtypeMode="keyboard"
+        android:isAsciiCapable="true" />
+
+</input-method>

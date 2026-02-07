@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  HIME Android - Launcher Icon
+
+  Simple vector icon representing Chinese input.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- Background circle -->
+    <path
+        android:fillColor="#1976D2"
+        android:pathData="M54,54m-50,0a50,50 0,1 1,100 0a50,50 0,1 1,-100 0" />
+
+    <!-- Chinese character 中 (zhong - middle/Chinese) -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M34,30 L74,30 L74,38 L58,38 L58,70 L74,70 L74,78 L34,78 L34,70 L50,70 L50,38 L34,38 Z" />
+
+</vector>
