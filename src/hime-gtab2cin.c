@@ -34,12 +34,14 @@
 #include "gtab.h"
 #include "hime-endian.h"
 
-int futf8cpy_bytes (FILE *fp, char *s, int n) {
+#define MAX_FILENAME_LEN 512
+
+/* Write UTF-8 bytes to file, up to n bytes */
+static int futf8cpy_bytes (FILE *fp, const char *s, int n) {
     int tn = 0;
 
     while (tn < n && *s) {
         int sz = utf8_sz (s);
-
         fwrite (s, 1, sz, fp);
         tn += sz;
         s += sz;
@@ -47,85 +49,115 @@ int futf8cpy_bytes (FILE *fp, char *s, int n) {
     return tn;
 }
 
-int is_endkey (struct TableHead *th, char key) {
-    int i;
+static int is_endkey (const struct TableHead *th, char key) {
     if (key == ' ')
         return 1;
-    for (i = 0; i < sizeof (th->endkey); i++)
+    for (size_t i = 0; i < sizeof (th->endkey); i++) {
         if (key == th->endkey[i])
             return 1;
+    }
     return 0;
 }
 
-u_int convert_key32 (unsigned char *key32) {
-    u_int key = 0;
-    key |= *(key32);
-    key |= *(key32 + 1) << 8;
-    key |= *(key32 + 2) << 16;
-    key |= *(key32 + 3) << 24;
-    return key;
+static u_int convert_key32 (const unsigned char *key32) {
+    return (u_int) key32[0] |
+           ((u_int) key32[1] << 8) |
+           ((u_int) key32[2] << 16) |
+           ((u_int) key32[3] << 24);
 }
 
-u_int64_t convert_key64 (unsigned char *key64) {
-    u_int64_t key = 0;
-    key |= (u_int64_t) * (key64);
-    key |= (u_int64_t) * (key64 + 1) << 8;
-    key |= (u_int64_t) * (key64 + 2) << 16;
-    key |= (u_int64_t) * (key64 + 3) << 24;
-    key |= (u_int64_t) * (key64 + 4) << 32;
-    key |= (u_int64_t) * (key64 + 5) << 40;
-    key |= (u_int64_t) * (key64 + 6) << 48;
-    key |= (u_int64_t) * (key64 + 7) << 56;
-    return key;
+static u_int64_t convert_key64 (const unsigned char *key64) {
+    return (u_int64_t) key64[0] |
+           ((u_int64_t) key64[1] << 8) |
+           ((u_int64_t) key64[2] << 16) |
+           ((u_int64_t) key64[3] << 24) |
+           ((u_int64_t) key64[4] << 32) |
+           ((u_int64_t) key64[5] << 40) |
+           ((u_int64_t) key64[6] << 48) |
+           ((u_int64_t) key64[7] << 56);
 }
 
-void bot_output (int status, struct TableHead *th) {
+static void bot_output (int status, const struct TableHead *th) {
     if (status == 0 && th) {
-        printf ("0:%d:%d%d", th->keybits, th->MaxPress, th->DefC);
-        return;
+        printf ("0:%d:%d:%d", th->keybits, th->MaxPress, th->DefC);
+    } else {
+        printf ("%d:0:0:0", status);
     }
-    printf ("%d:0:0:0", status);
 }
 
-void usage () {
+static void usage (void) {
     printf (
-        "hime-gtab2cin usages:\n"
-        "  hime-gtab2cin -i <gtab> -o <cin>\n\n"
-        "    -h         Help message\n"
-        "    -i         Table(gtab) filename\n"
-        "    -o         Table(cin) filename\n"
-        "    -b         Output information for machine\n");
+        "hime-gtab2cin - convert gtab to cin format\n\n"
+        "Usage: hime-gtab2cin -i <gtab> -o <cin>\n\n"
+        "Options:\n"
+        "    -h         Show this help message\n"
+        "    -i FILE    Input table (.gtab) filename\n"
+        "    -o FILE    Output table (.cin) filename\n"
+        "    -b         Machine-readable output\n");
+}
+
+/**
+ * Write a single chardef entry to the output file.
+ * Handles both single characters and phrases.
+ */
+static void write_chardef_entry (FILE *fw, u_int64_t key, const unsigned char *ch,
+                                 const char *keymap, const struct TableHead *th,
+                                 int bits_per_key, const int *phridx, const char *phrbuf) {
+    u_int64_t mask = ((u_int64_t) 1 << th->keybits) - 1;
+
+    /* Output the key sequence */
+    for (int key_seq = 0; key_seq < th->MaxPress; key_seq++) {
+        int key_idx = (key >> (th->keybits * (bits_per_key - key_seq - 1))) & mask;
+        /* Prevent leading # which would be treated as comment */
+        if (key_seq == 0 && keymap[key_idx] == '#')
+            fputc (' ', fw);
+        fputc (keymap[key_idx], fw);
+    }
+    fputc (' ', fw);
+
+    /* Output the character or phrase */
+    if (ch[0] == 0) {
+        /* Phrase: index stored in ch[0-2] */
+        int idx = (ch[0] << 16) | (ch[1] << 8) | ch[2];
+        int phr_len = phridx[idx + 2] - phridx[idx + 1];
+        char phr_str[MAX_CIN_PHR + 1];
+
+        memset (phr_str, 0, sizeof (phr_str));
+        memcpy (phr_str, phrbuf + phridx[idx + 1], phr_len);
+        fprintf (fw, "%s\n", phr_str);
+    } else {
+        /* Single character */
+        futf8cpy_bytes (fw, (const char *) ch, CH_SZ);
+        fputc ('\n', fw);
+    }
 }
 
 int main (int argc, char **argv) {
-    const char CIN_HEADER[] = "#\n# cin file created via hime-gtab2cin\n#\n";
+    static const char CIN_HEADER[] = "#\n# cin file created via hime-gtab2cin\n#\n";
     FILE *fr, *fw;
-    char fname[256];
-    char fname_cin[256];
-    char fname_tab[256];
+    char fname_cin[MAX_FILENAME_LEN] = "";
+    char fname_tab[MAX_FILENAME_LEN] = "";
     struct TableHead *th;
     char *kname;
     char *keymap;
     int quick_def = 0;
     char *gtabbuf = NULL;
     long gtablen = 0;
-    int key_idx, key_idx2, i, key_seq;
     QUICK_KEYS qkeys;
     int *phridx;
     char *phrbuf;
     int opt;
     int bot = 0;
 
-    fname_cin[0] = fname_tab[0] = 0;
     while ((opt = getopt (argc, argv, "i:o:bh")) != -1) {
         switch (opt) {
         case 'i':
-            if (strlen (optarg) < 256)
-                strncpy (fname_tab, optarg, 256);
+            strncpy (fname_tab, optarg, sizeof (fname_tab) - 1);
+            fname_tab[sizeof (fname_tab) - 1] = '\0';
             break;
         case 'o':
-            if (strlen (optarg) < 256)
-                strncpy (fname_cin, optarg, 256);
+            strncpy (fname_cin, optarg, sizeof (fname_cin) - 1);
+            fname_cin[sizeof (fname_cin) - 1] = '\0';
             break;
         case 'b':
             bot = 1;
@@ -137,10 +169,10 @@ int main (int argc, char **argv) {
         }
     }
 
-    if (!strlen (fname_cin) || !strlen (fname_tab)) {
-        if (bot) {
+    if (!fname_cin[0] || !fname_tab[0]) {
+        if (bot)
             bot_output (-1, NULL);
-        } else
+        else
             usage ();
         exit (1);
     }
@@ -149,34 +181,58 @@ int main (int argc, char **argv) {
         if (bot) {
             bot_output (1, NULL);
             exit (1);
-        } else
-            p_err ("Cannot open %s\n", fname_tab);
+        }
+        p_err ("Cannot open %s\n", fname_tab);
     }
 
+    /* Read entire gtab file into memory */
     fseek (fr, 0L, SEEK_END);
     gtablen = ftell (fr);
     rewind (fr);
-    gtabbuf = malloc (gtablen);
-    if (gtabbuf && (gtablen != fread (gtabbuf, 1, gtablen, fr) || gtablen <= 0)) {
+
+    if (gtablen <= 0) {
         fclose (fr);
-        if (bot) {
+        if (bot)
             bot_output (1, NULL);
-        } else
-            p_err ("Read %s fail\n", fname_tab);
+        p_err ("Invalid file size for %s\n", fname_tab);
+    }
+
+    gtabbuf = malloc (gtablen);
+    if (!gtabbuf) {
+        fclose (fr);
+        if (bot)
+            bot_output (1, NULL);
+        p_err ("Cannot allocate memory\n");
+    }
+
+    if (fread (gtabbuf, 1, gtablen, fr) != (size_t) gtablen) {
+        free (gtabbuf);
+        fclose (fr);
+        if (bot)
+            bot_output (1, NULL);
+        p_err ("Read %s fail\n", fname_tab);
     }
     fclose (fr);
+
     if ((fw = fopen (fname_cin, "wb")) == NULL) {
         free (gtabbuf);
         if (bot) {
             bot_output (2, NULL);
-        } else
-            p_err ("Cannot create");
+            exit (1);
+        }
+        p_err ("Cannot create %s\n", fname_cin);
     }
 
     th = (struct TableHead *) gtabbuf;
+
+    /* Extract base name from input file for ename */
+    const char *base_name = strrchr (fname_tab, '/');
+    base_name = base_name ? base_name + 1 : fname_tab;
+
+    /* Write CIN header */
     fprintf (fw, "%s", CIN_HEADER);
     fprintf (fw, "%%gen_inp\n");
-    fprintf (fw, "%%ename %s\n", fname);
+    fprintf (fw, "%%ename %s\n", base_name);
     fprintf (fw, "%%cname %s\n", th->cname);
     fprintf (fw, "%%selkey ");
     if (th->selkey[sizeof (th->selkey) - 1] == 0) {
@@ -211,13 +267,13 @@ int main (int argc, char **argv) {
     keymap = gtabbuf + sizeof (struct TableHead);
     kname = keymap + th->KeyS;
     fprintf (fw, "%%keyname begin\n");
-    for (key_idx = 1; key_idx < th->KeyS; key_idx++) {
-        // prevent leading #
-        if (*(keymap + key_idx) == '#')
-            fprintf (fw, "%c", ' ');
-        fprintf (fw, "%c ", *(keymap + key_idx));
-        futf8cpy_bytes (fw, (kname + CH_SZ * key_idx), CH_SZ);
-        fprintf (fw, "\n");
+    for (int key_idx = 1; key_idx < th->KeyS; key_idx++) {
+        /* prevent leading # */
+        if (keymap[key_idx] == '#')
+            fputc (' ', fw);
+        fprintf (fw, "%c ", keymap[key_idx]);
+        futf8cpy_bytes (fw, kname + CH_SZ * key_idx, CH_SZ);
+        fputc ('\n', fw);
     }
     fprintf (fw, "%%keyname end\n");
 
@@ -227,26 +283,26 @@ int main (int argc, char **argv) {
         quick_def = 1;
     if (quick_def) {
         fprintf (fw, "%%quick begin\n");
-        for (key_idx = 0; key_idx < th->KeyS; key_idx++) {
-            if (is_endkey (th, *(keymap + key_idx + 1)))
+        for (int key_idx = 0; key_idx < th->KeyS; key_idx++) {
+            if (is_endkey (th, keymap[key_idx + 1]))
                 continue;
-            fprintf (fw, "%c ", *(keymap + key_idx + 1));
-            for (i = 0; i < 10; i++)
+            fprintf (fw, "%c ", keymap[key_idx + 1]);
+            for (int i = 0; i < 10; i++)
                 futf8cpy_bytes (fw, th->qkeys.quick1[key_idx][i], CH_SZ);
-            fprintf (fw, "\n");
+            fputc ('\n', fw);
         }
-        for (key_idx = 0; key_idx < th->KeyS; key_idx++) {
-            for (key_idx2 = 0; key_idx2 < th->KeyS; key_idx2++) {
-                if (is_endkey (th, *(keymap + key_idx + 1)))
+        for (int key_idx = 0; key_idx < th->KeyS; key_idx++) {
+            for (int key_idx2 = 0; key_idx2 < th->KeyS; key_idx2++) {
+                if (is_endkey (th, keymap[key_idx + 1]))
                     continue;
-                if (is_endkey (th, *(keymap + key_idx2 + 1)))
+                if (is_endkey (th, keymap[key_idx2 + 1]))
                     continue;
-                fprintf (fw, "%c%c ", *(keymap + key_idx + 1), *(keymap + key_idx2 + 1));
-                for (i = 0; i < 10; i++) {
+                fprintf (fw, "%c%c ", keymap[key_idx + 1], keymap[key_idx2 + 1]);
+                for (int i = 0; i < 10; i++) {
                     if (0 == futf8cpy_bytes (fw, th->qkeys.quick2[key_idx][key_idx2][i], CH_SZ))
                         futf8cpy_bytes (fw, "□", CH_SZ);
                 }
-                fprintf (fw, "\n");
+                fputc ('\n', fw);
             }
         }
         fprintf (fw, "%%quick end\n");
@@ -264,72 +320,20 @@ int main (int argc, char **argv) {
 
     if (th->keybits * th->MaxPress <= 32) {
         ITEM *item = (ITEM *) (kname + (CH_SZ * th->KeyS) + (sizeof (gtab_idx1_t) * (th->KeyS + 1)));
-        u_int key;
-        u_int mask = (1 << th->keybits) - 1;
         phridx = (int *) (item + th->DefC);
         phrbuf = (char *) (phridx + *phridx + 1);
-        for (i = 0; i < th->DefC; i++) {
-            key = convert_key32 ((unsigned char *) item->key);
-            for (key_seq = 0; key_seq < th->MaxPress; key_seq++) {
-                key_idx =
-                    ((key >> (th->keybits * ((32 / th->keybits) - key_seq - 1))) & mask);
-                /* prevent leading # */
-                if (key_seq == 0 && (*(keymap + key_idx) == '#'))
-                    fprintf (fw, "%c", ' ');
-                fprintf (fw, "%c", *(keymap + key_idx));
-            }
-            fprintf (fw, " ");
-            if (item->ch[0] == 0) { /* assume total phrases is less than 65535 */
-                /* phrases define */
-                int idx = 0, phr_len;
-                char phr_str[MAX_CIN_PHR + 1];
-                idx |= item->ch[0] << 16;
-                idx |= item->ch[1] << 8;
-                idx |= item->ch[2];
-                memset (phr_str, 0, MAX_CIN_PHR + 1);
-                phr_len = *(phridx + idx + 2) - *(phridx + idx + 1);
-                memcpy (phr_str, phrbuf + *(phridx + idx + 1), phr_len);
-                fprintf (fw, "%s\n", phr_str);
-            } else {
-                /* characters define */
-                futf8cpy_bytes (fw, (char *) item->ch, CH_SZ);
-                fprintf (fw, "\n");
-            }
+        for (int i = 0; i < th->DefC; i++) {
+            u_int key = convert_key32 ((unsigned char *) item->key);
+            write_chardef_entry (fw, key, item->ch, keymap, th, 32 / th->keybits, phridx, phrbuf);
             item++;
         }
     } else if (th->keybits * th->MaxPress <= 64) {
         ITEM64 *item = (ITEM64 *) (kname + (CH_SZ * th->KeyS) + (sizeof (gtab_idx1_t) * (th->KeyS + 1)));
-        u_int64_t key;
-        u_int mask = (1L << th->keybits) - 1;
         phridx = (int *) (item + th->DefC);
         phrbuf = (char *) (phridx + *phridx + 1);
-        for (i = 0; i < th->DefC; i++) {
-            key = convert_key64 ((unsigned char *) item->key);
-            for (key_seq = 0; key_seq < th->MaxPress; key_seq++) {
-                key_idx =
-                    ((key >> (th->keybits * ((64 / th->keybits) - key_seq - 1))) & mask);
-                /* prevent leading # */
-                if (key_seq == 0 && (*(keymap + key_idx) == '#'))
-                    fprintf (fw, "%c", ' ');
-                fprintf (fw, "%c", *(keymap + key_idx));
-            }
-            fprintf (fw, " ");
-            if (item->ch[0] == 0) { /* assume total phrases is less than 65535 */
-                /* phrases define */
-                int idx = 0, phr_len;
-                char phr_str[MAX_CIN_PHR + 1];
-                idx |= item->ch[0] << 16;
-                idx |= item->ch[1] << 8;
-                idx |= item->ch[2];
-                memset (phr_str, 0, MAX_CIN_PHR + 1);
-                phr_len = *(phridx + idx + 2) - *(phridx + idx + 1);
-                memcpy (phr_str, phrbuf + *(phridx + idx + 1), phr_len);
-                fprintf (fw, "%s\n", phr_str);
-            } else {
-                /* characters define */
-                futf8cpy_bytes (fw, (char *) item->ch, CH_SZ);
-                fprintf (fw, "\n");
-            }
+        for (int i = 0; i < th->DefC; i++) {
+            u_int64_t key = convert_key64 ((unsigned char *) item->key);
+            write_chardef_entry (fw, key, item->ch, keymap, th, 64 / th->keybits, phridx, phrbuf);
             item++;
         }
     } else
