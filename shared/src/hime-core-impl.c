@@ -20,6 +20,12 @@
 #include <stdlib.h>
 #include <string.h>
 
+#ifdef _WIN32
+#include <windows.h>
+#else
+#include <time.h>
+#endif
+
 #include "hime-core.h"
 
 /* Version - must be defined by platform wrapper, or use default */
@@ -651,6 +657,18 @@ struct HimeContext {
     int vibration_duration_ms;
     HimeFeedbackCallback feedback_callback;
     void *feedback_user_data;
+
+    /* Typing practice state */
+    bool typing_active;         /* Session active flag */
+    char *typing_text;          /* Practice text (allocated) */
+    int typing_text_len;        /* Text length in bytes */
+    int typing_char_count;      /* Total character count */
+    int typing_position;        /* Current character position */
+    int typing_byte_offset;     /* Current byte offset */
+    int typing_correct;         /* Correct characters */
+    int typing_incorrect;       /* Incorrect characters */
+    int typing_keystrokes;      /* Total keystrokes */
+    uint64_t typing_start_time; /* Start time in ms */
 };
 
 /* Global state */
@@ -3495,6 +3513,542 @@ HIME_API void hime_convert_candidates_to_variant (HimeContext *ctx) {
             ctx->candidates[i][HIME_MAX_CANDIDATE_LEN - 1] = '\0';
         }
     }
+}
+
+/* ========== Typing Practice Implementation ========== */
+
+/* Get current time in milliseconds */
+static uint64_t get_time_ms (void) {
+#ifdef _WIN32
+    return GetTickCount64 ();
+#else
+    struct timespec ts;
+    clock_gettime (CLOCK_MONOTONIC, &ts);
+    return (uint64_t) ts.tv_sec * 1000 + ts.tv_nsec / 1000000;
+#endif
+}
+
+/* Count UTF-8 characters in string */
+static int typing_utf8_char_count (const char *str) {
+    if (!str)
+        return 0;
+    int count = 0;
+    while (*str) {
+        if ((*str & 0xC0) != 0x80) {
+            count++;
+        }
+        str++;
+    }
+    return count;
+}
+
+/* Get UTF-8 character length at position (for typing practice) */
+static int typing_utf8_char_len (const char *str) {
+    if (!str || !*str)
+        return 0;
+    unsigned char c = (unsigned char) *str;
+    if ((c & 0x80) == 0)
+        return 1;
+    if ((c & 0xE0) == 0xC0)
+        return 2;
+    if ((c & 0xF0) == 0xE0)
+        return 3;
+    if ((c & 0xF8) == 0xF0)
+        return 4;
+    return 1; /* Invalid, treat as 1 byte */
+}
+
+HIME_API int hime_typing_start_session (HimeContext *ctx, const char *practice_text) {
+    if (!ctx || !practice_text)
+        return -1;
+
+    /* End any existing session */
+    hime_typing_end_session (ctx);
+
+    /* Allocate and copy practice text */
+    int len = strlen (practice_text);
+    ctx->typing_text = (char *) malloc (len + 1);
+    if (!ctx->typing_text)
+        return -1;
+
+    strcpy (ctx->typing_text, practice_text);
+    ctx->typing_text_len = len;
+    ctx->typing_char_count = typing_utf8_char_count (practice_text);
+    ctx->typing_position = 0;
+    ctx->typing_byte_offset = 0;
+    ctx->typing_correct = 0;
+    ctx->typing_incorrect = 0;
+    ctx->typing_keystrokes = 0;
+    ctx->typing_start_time = get_time_ms ();
+    ctx->typing_active = true;
+
+    return 0;
+}
+
+HIME_API int hime_typing_end_session (HimeContext *ctx) {
+    if (!ctx)
+        return -1;
+
+    if (ctx->typing_text) {
+        free (ctx->typing_text);
+        ctx->typing_text = NULL;
+    }
+    ctx->typing_active = false;
+    ctx->typing_text_len = 0;
+    ctx->typing_char_count = 0;
+    ctx->typing_position = 0;
+    ctx->typing_byte_offset = 0;
+
+    return 0;
+}
+
+HIME_API int hime_typing_reset_session (HimeContext *ctx) {
+    if (!ctx || !ctx->typing_active || !ctx->typing_text)
+        return -1;
+
+    ctx->typing_position = 0;
+    ctx->typing_byte_offset = 0;
+    ctx->typing_correct = 0;
+    ctx->typing_incorrect = 0;
+    ctx->typing_keystrokes = 0;
+    ctx->typing_start_time = get_time_ms ();
+
+    return 0;
+}
+
+HIME_API bool hime_typing_is_active (HimeContext *ctx) {
+    return ctx && ctx->typing_active;
+}
+
+HIME_API int hime_typing_submit_char (HimeContext *ctx, const char *typed_char) {
+    if (!ctx || !ctx->typing_active || !ctx->typing_text || !typed_char)
+        return -1;
+
+    /* Check if we're at the end */
+    if (ctx->typing_position >= ctx->typing_char_count)
+        return -1;
+
+    /* Get expected character */
+    const char *expected = ctx->typing_text + ctx->typing_byte_offset;
+    int expected_len = typing_utf8_char_len (expected);
+    int typed_len = typing_utf8_char_len (typed_char);
+
+    /* Compare characters */
+    int correct = 0;
+    if (expected_len == typed_len && memcmp (expected, typed_char, typed_len) == 0) {
+        correct = 1;
+        ctx->typing_correct++;
+    } else {
+        ctx->typing_incorrect++;
+    }
+
+    /* Advance position */
+    ctx->typing_position++;
+    ctx->typing_byte_offset += expected_len;
+
+    return correct;
+}
+
+HIME_API int hime_typing_submit_string (HimeContext *ctx, const char *typed_str) {
+    if (!ctx || !ctx->typing_active || !typed_str)
+        return -1;
+
+    int correct_count = 0;
+    const char *p = typed_str;
+
+    while (*p) {
+        int len = typing_utf8_char_len (p);
+        char char_buf[8];
+        memcpy (char_buf, p, len);
+        char_buf[len] = '\0';
+
+        int result = hime_typing_submit_char (ctx, char_buf);
+        if (result > 0)
+            correct_count++;
+
+        p += len;
+    }
+
+    return correct_count;
+}
+
+HIME_API int hime_typing_get_stats (HimeContext *ctx, HimeTypingStats *stats) {
+    if (!ctx || !stats)
+        return -1;
+
+    memset (stats, 0, sizeof (HimeTypingStats));
+
+    if (!ctx->typing_active) {
+        return 0;
+    }
+
+    stats->total_characters = ctx->typing_char_count;
+    stats->typed_characters = ctx->typing_position;
+    stats->correct_characters = ctx->typing_correct;
+    stats->incorrect_characters = ctx->typing_incorrect;
+    stats->total_keystrokes = ctx->typing_keystrokes;
+    stats->start_time_ms = ctx->typing_start_time;
+    stats->elapsed_time_ms = get_time_ms () - ctx->typing_start_time;
+    stats->completed = (ctx->typing_position >= ctx->typing_char_count);
+
+    /* Calculate accuracy */
+    int total_typed = ctx->typing_correct + ctx->typing_incorrect;
+    if (total_typed > 0) {
+        stats->accuracy = (double) ctx->typing_correct / total_typed * 100.0;
+    } else {
+        stats->accuracy = 100.0;
+    }
+
+    /* Calculate speed (characters per minute) */
+    if (stats->elapsed_time_ms > 0) {
+        stats->chars_per_minute = (double) ctx->typing_correct / stats->elapsed_time_ms * 60000.0;
+    } else {
+        stats->chars_per_minute = 0.0;
+    }
+
+    return 0;
+}
+
+HIME_API int hime_typing_get_position (HimeContext *ctx) {
+    if (!ctx || !ctx->typing_active)
+        return -1;
+    return ctx->typing_position;
+}
+
+HIME_API int hime_typing_get_expected_char (HimeContext *ctx, char *buffer, int buffer_size) {
+    if (!ctx || !buffer || buffer_size <= 0)
+        return -1;
+
+    if (!ctx->typing_active || !ctx->typing_text)
+        return -1;
+
+    if (ctx->typing_position >= ctx->typing_char_count) {
+        buffer[0] = '\0';
+        return 0;
+    }
+
+    const char *expected = ctx->typing_text + ctx->typing_byte_offset;
+    int len = typing_utf8_char_len (expected);
+
+    if (len >= buffer_size)
+        len = buffer_size - 1;
+
+    memcpy (buffer, expected, len);
+    buffer[len] = '\0';
+
+    return len;
+}
+
+HIME_API int hime_typing_get_practice_text (HimeContext *ctx, char *buffer, int buffer_size) {
+    if (!ctx || !buffer || buffer_size <= 0)
+        return -1;
+
+    if (!ctx->typing_active || !ctx->typing_text) {
+        buffer[0] = '\0';
+        return 0;
+    }
+
+    int len = ctx->typing_text_len;
+    if (len >= buffer_size)
+        len = buffer_size - 1;
+
+    memcpy (buffer, ctx->typing_text, len);
+    buffer[len] = '\0';
+
+    return len;
+}
+
+HIME_API void hime_typing_record_keystroke (HimeContext *ctx) {
+    if (ctx && ctx->typing_active) {
+        ctx->typing_keystrokes++;
+    }
+}
+
+/* ========== Practice Text Library ========== */
+
+/* Built-in practice texts */
+typedef struct {
+    int id;
+    const char *text;
+    const char *hint;
+    HimePracticeCategory category;
+    HimePracticeDifficulty difficulty;
+} BuiltinPracticeText;
+
+static const BuiltinPracticeText PRACTICE_TEXTS[] = {
+    /* English - Easy */
+    {1, "The quick brown fox jumps over the lazy dog.", "",
+     HIME_PRACTICE_CAT_ENGLISH, HIME_PRACTICE_EASY},
+    {2, "Pack my box with five dozen liquor jugs.", "",
+     HIME_PRACTICE_CAT_ENGLISH, HIME_PRACTICE_EASY},
+    {3, "How vexingly quick daft zebras jump!", "",
+     HIME_PRACTICE_CAT_ENGLISH, HIME_PRACTICE_EASY},
+    {4, "The five boxing wizards jump quickly.", "",
+     HIME_PRACTICE_CAT_ENGLISH, HIME_PRACTICE_EASY},
+    {5, "Sphinx of black quartz, judge my vow.", "",
+     HIME_PRACTICE_CAT_ENGLISH, HIME_PRACTICE_EASY},
+
+    /* English - Medium */
+    {6, "Programming is the art of telling a computer what to do.", "",
+     HIME_PRACTICE_CAT_ENGLISH, HIME_PRACTICE_MEDIUM},
+    {7, "To be or not to be, that is the question.", "",
+     HIME_PRACTICE_CAT_ENGLISH, HIME_PRACTICE_MEDIUM},
+    {8, "In the beginning, there was darkness and chaos.", "",
+     HIME_PRACTICE_CAT_ENGLISH, HIME_PRACTICE_MEDIUM},
+    {9, "Success is not final, failure is not fatal.", "",
+     HIME_PRACTICE_CAT_ENGLISH, HIME_PRACTICE_MEDIUM},
+    {10, "The only way to do great work is to love what you do.", "",
+     HIME_PRACTICE_CAT_ENGLISH, HIME_PRACTICE_MEDIUM},
+
+    /* English - Hard */
+    {11, "Pneumonoultramicroscopicsilicovolcanoconiosis is a lung disease.", "",
+     HIME_PRACTICE_CAT_ENGLISH, HIME_PRACTICE_HARD},
+    {12, "Supercalifragilisticexpialidocious sounds quite atrocious.", "",
+     HIME_PRACTICE_CAT_ENGLISH, HIME_PRACTICE_HARD},
+
+    /* Traditional Chinese (Zhuyin) - Easy */
+    {20, "你好嗎？", "ni3 hao3 ma",
+     HIME_PRACTICE_CAT_ZHUYIN, HIME_PRACTICE_EASY},
+    {21, "謝謝你。", "xie4 xie4 ni3",
+     HIME_PRACTICE_CAT_ZHUYIN, HIME_PRACTICE_EASY},
+    {22, "早安！", "zao3 an1",
+     HIME_PRACTICE_CAT_ZHUYIN, HIME_PRACTICE_EASY},
+    {23, "再見。", "zai4 jian4",
+     HIME_PRACTICE_CAT_ZHUYIN, HIME_PRACTICE_EASY},
+    {24, "我愛你。", "wo3 ai4 ni3",
+     HIME_PRACTICE_CAT_ZHUYIN, HIME_PRACTICE_EASY},
+
+    /* Traditional Chinese (Zhuyin) - Medium */
+    {25, "今天天氣很好。", "jin1 tian1 tian1 qi4 hen3 hao3",
+     HIME_PRACTICE_CAT_ZHUYIN, HIME_PRACTICE_MEDIUM},
+    {26, "我喜歡學習中文。", "wo3 xi3 huan1 xue2 xi2 zhong1 wen2",
+     HIME_PRACTICE_CAT_ZHUYIN, HIME_PRACTICE_MEDIUM},
+    {27, "台灣是一個美麗的地方。", "tai2 wan1 shi4 yi1 ge4 mei3 li4 de di4 fang1",
+     HIME_PRACTICE_CAT_ZHUYIN, HIME_PRACTICE_MEDIUM},
+    {28, "請問這個多少錢？", "qing3 wen4 zhe4 ge duo1 shao3 qian2",
+     HIME_PRACTICE_CAT_ZHUYIN, HIME_PRACTICE_MEDIUM},
+    {29, "我們一起去吃飯吧。", "wo3 men yi4 qi3 qu4 chi1 fan4 ba",
+     HIME_PRACTICE_CAT_ZHUYIN, HIME_PRACTICE_MEDIUM},
+
+    /* Traditional Chinese (Zhuyin) - Hard */
+    {30, "千里之行始於足下。", "qian1 li3 zhi1 xing2 shi3 yu2 zu2 xia4",
+     HIME_PRACTICE_CAT_ZHUYIN, HIME_PRACTICE_HARD},
+    {31, "學如逆水行舟不進則退。", "xue2 ru2 ni4 shui3 xing2 zhou1 bu4 jin4 ze2 tui4",
+     HIME_PRACTICE_CAT_ZHUYIN, HIME_PRACTICE_HARD},
+    {32, "不經一番寒徹骨焉得梅花撲鼻香。", "",
+     HIME_PRACTICE_CAT_ZHUYIN, HIME_PRACTICE_HARD},
+
+    /* Simplified Chinese (Pinyin) - Easy */
+    {40, "你好吗？", "ni hao ma",
+     HIME_PRACTICE_CAT_PINYIN, HIME_PRACTICE_EASY},
+    {41, "谢谢你。", "xie xie ni",
+     HIME_PRACTICE_CAT_PINYIN, HIME_PRACTICE_EASY},
+    {42, "早安！", "zao an",
+     HIME_PRACTICE_CAT_PINYIN, HIME_PRACTICE_EASY},
+    {43, "再见。", "zai jian",
+     HIME_PRACTICE_CAT_PINYIN, HIME_PRACTICE_EASY},
+    {44, "我爱你。", "wo ai ni",
+     HIME_PRACTICE_CAT_PINYIN, HIME_PRACTICE_EASY},
+
+    /* Simplified Chinese (Pinyin) - Medium */
+    {45, "今天天气很好。", "jin tian tian qi hen hao",
+     HIME_PRACTICE_CAT_PINYIN, HIME_PRACTICE_MEDIUM},
+    {46, "我喜欢学习中文。", "wo xi huan xue xi zhong wen",
+     HIME_PRACTICE_CAT_PINYIN, HIME_PRACTICE_MEDIUM},
+    {47, "中国有很多美丽的风景。", "zhong guo you hen duo mei li de feng jing",
+     HIME_PRACTICE_CAT_PINYIN, HIME_PRACTICE_MEDIUM},
+    {48, "请问这个多少钱？", "qing wen zhe ge duo shao qian",
+     HIME_PRACTICE_CAT_PINYIN, HIME_PRACTICE_MEDIUM},
+    {49, "我们一起去吃饭吧。", "wo men yi qi qu chi fan ba",
+     HIME_PRACTICE_CAT_PINYIN, HIME_PRACTICE_MEDIUM},
+
+    /* Simplified Chinese (Pinyin) - Hard */
+    {50, "千里之行始于足下。", "qian li zhi xing shi yu zu xia",
+     HIME_PRACTICE_CAT_PINYIN, HIME_PRACTICE_HARD},
+    {51, "学如逆水行舟不进则退。", "xue ru ni shui xing zhou bu jin ze tui",
+     HIME_PRACTICE_CAT_PINYIN, HIME_PRACTICE_HARD},
+
+    /* Cangjie practice - character-focused */
+    {60, "日月金木水火土", "",
+     HIME_PRACTICE_CAT_CANGJIE, HIME_PRACTICE_EASY},
+    {61, "人口手心田", "",
+     HIME_PRACTICE_CAT_CANGJIE, HIME_PRACTICE_EASY},
+    {62, "山川雲雨風", "",
+     HIME_PRACTICE_CAT_CANGJIE, HIME_PRACTICE_EASY},
+    {63, "大小中上下左右前後", "",
+     HIME_PRACTICE_CAT_CANGJIE, HIME_PRACTICE_MEDIUM},
+    {64, "春夏秋冬東西南北", "",
+     HIME_PRACTICE_CAT_CANGJIE, HIME_PRACTICE_MEDIUM},
+
+    /* Mixed English and Chinese */
+    {70, "Hello 你好 World 世界", "",
+     HIME_PRACTICE_CAT_MIXED, HIME_PRACTICE_EASY},
+    {71, "Programming 程式設計 is fun 很有趣", "",
+     HIME_PRACTICE_CAT_MIXED, HIME_PRACTICE_MEDIUM},
+    {72, "Input Method 輸入法 Editor 編輯器", "",
+     HIME_PRACTICE_CAT_MIXED, HIME_PRACTICE_MEDIUM},
+
+    /* Sentinel */
+    {0, NULL, NULL, 0, 0}};
+
+static const int PRACTICE_TEXT_COUNT =
+    sizeof (PRACTICE_TEXTS) / sizeof (PRACTICE_TEXTS[0]) - 1;
+
+/* Category names */
+static const char *CATEGORY_NAMES[] = {
+    "English",
+    "注音 (Zhuyin)",
+    "拼音 (Pinyin)",
+    "倉頡 (Cangjie)",
+    "Mixed / 混合"};
+
+/* Difficulty names */
+static const char *DIFFICULTY_NAMES[] = {
+    "", /* 0 is unused */
+    "Easy / 簡單",
+    "Medium / 中等",
+    "Hard / 困難"};
+
+HIME_API int hime_typing_get_text_count (HimePracticeCategory category) {
+    int count = 0;
+    for (int i = 0; PRACTICE_TEXTS[i].text != NULL; i++) {
+        if (category < 0 || PRACTICE_TEXTS[i].category == category) {
+            count++;
+        }
+    }
+    return count;
+}
+
+HIME_API int hime_typing_get_texts_by_category (HimePracticeCategory category,
+                                                HimePracticeText *texts,
+                                                int max_count) {
+    if (!texts || max_count <= 0)
+        return 0;
+
+    int count = 0;
+    for (int i = 0; PRACTICE_TEXTS[i].text != NULL && count < max_count; i++) {
+        if (PRACTICE_TEXTS[i].category == category) {
+            texts[count].id = PRACTICE_TEXTS[i].id;
+            strncpy (texts[count].text, PRACTICE_TEXTS[i].text, sizeof (texts[count].text) - 1);
+            texts[count].text[sizeof (texts[count].text) - 1] = '\0';
+            strncpy (texts[count].hint, PRACTICE_TEXTS[i].hint, sizeof (texts[count].hint) - 1);
+            texts[count].hint[sizeof (texts[count].hint) - 1] = '\0';
+            texts[count].category = PRACTICE_TEXTS[i].category;
+            texts[count].difficulty = PRACTICE_TEXTS[i].difficulty;
+            texts[count].char_count = typing_utf8_char_count (PRACTICE_TEXTS[i].text);
+            count++;
+        }
+    }
+    return count;
+}
+
+HIME_API int hime_typing_get_texts_by_difficulty (HimePracticeDifficulty difficulty,
+                                                  HimePracticeText *texts,
+                                                  int max_count) {
+    if (!texts || max_count <= 0)
+        return 0;
+
+    int count = 0;
+    for (int i = 0; PRACTICE_TEXTS[i].text != NULL && count < max_count; i++) {
+        if (PRACTICE_TEXTS[i].difficulty == difficulty) {
+            texts[count].id = PRACTICE_TEXTS[i].id;
+            strncpy (texts[count].text, PRACTICE_TEXTS[i].text, sizeof (texts[count].text) - 1);
+            texts[count].text[sizeof (texts[count].text) - 1] = '\0';
+            strncpy (texts[count].hint, PRACTICE_TEXTS[i].hint, sizeof (texts[count].hint) - 1);
+            texts[count].hint[sizeof (texts[count].hint) - 1] = '\0';
+            texts[count].category = PRACTICE_TEXTS[i].category;
+            texts[count].difficulty = PRACTICE_TEXTS[i].difficulty;
+            texts[count].char_count = typing_utf8_char_count (PRACTICE_TEXTS[i].text);
+            count++;
+        }
+    }
+    return count;
+}
+
+HIME_API int hime_typing_get_random_text (HimePracticeCategory category,
+                                          HimePracticeText *text) {
+    if (!text)
+        return -1;
+
+    /* Count texts in category */
+    int count = hime_typing_get_text_count (category);
+    if (count == 0)
+        return -1;
+
+    /* Select random index */
+    int target = rand () % count;
+    int current = 0;
+
+    for (int i = 0; PRACTICE_TEXTS[i].text != NULL; i++) {
+        if (PRACTICE_TEXTS[i].category == category) {
+            if (current == target) {
+                text->id = PRACTICE_TEXTS[i].id;
+                strncpy (text->text, PRACTICE_TEXTS[i].text, sizeof (text->text) - 1);
+                text->text[sizeof (text->text) - 1] = '\0';
+                strncpy (text->hint, PRACTICE_TEXTS[i].hint, sizeof (text->hint) - 1);
+                text->hint[sizeof (text->hint) - 1] = '\0';
+                text->category = PRACTICE_TEXTS[i].category;
+                text->difficulty = PRACTICE_TEXTS[i].difficulty;
+                text->char_count = typing_utf8_char_count (PRACTICE_TEXTS[i].text);
+                return 0;
+            }
+            current++;
+        }
+    }
+
+    return -1;
+}
+
+HIME_API int hime_typing_get_text_by_id (int id, HimePracticeText *text) {
+    if (!text || id <= 0)
+        return -1;
+
+    for (int i = 0; PRACTICE_TEXTS[i].text != NULL; i++) {
+        if (PRACTICE_TEXTS[i].id == id) {
+            text->id = PRACTICE_TEXTS[i].id;
+            strncpy (text->text, PRACTICE_TEXTS[i].text, sizeof (text->text) - 1);
+            text->text[sizeof (text->text) - 1] = '\0';
+            strncpy (text->hint, PRACTICE_TEXTS[i].hint, sizeof (text->hint) - 1);
+            text->hint[sizeof (text->hint) - 1] = '\0';
+            text->category = PRACTICE_TEXTS[i].category;
+            text->difficulty = PRACTICE_TEXTS[i].difficulty;
+            text->char_count = typing_utf8_char_count (PRACTICE_TEXTS[i].text);
+            return 0;
+        }
+    }
+
+    return -1;
+}
+
+HIME_API int hime_typing_get_all_texts (HimePracticeText *texts, int max_count) {
+    if (!texts || max_count <= 0)
+        return 0;
+
+    int count = 0;
+    for (int i = 0; PRACTICE_TEXTS[i].text != NULL && count < max_count; i++) {
+        texts[count].id = PRACTICE_TEXTS[i].id;
+        strncpy (texts[count].text, PRACTICE_TEXTS[i].text, sizeof (texts[count].text) - 1);
+        texts[count].text[sizeof (texts[count].text) - 1] = '\0';
+        strncpy (texts[count].hint, PRACTICE_TEXTS[i].hint, sizeof (texts[count].hint) - 1);
+        texts[count].hint[sizeof (texts[count].hint) - 1] = '\0';
+        texts[count].category = PRACTICE_TEXTS[i].category;
+        texts[count].difficulty = PRACTICE_TEXTS[i].difficulty;
+        texts[count].char_count = typing_utf8_char_count (PRACTICE_TEXTS[i].text);
+        count++;
+    }
+    return count;
+}
+
+HIME_API const char *hime_typing_get_category_name (HimePracticeCategory category) {
+    if (category < 0 || category >= HIME_PRACTICE_CAT_COUNT)
+        return "";
+    return CATEGORY_NAMES[category];
+}
+
+HIME_API const char *hime_typing_get_difficulty_name (HimePracticeDifficulty difficulty) {
+    if (difficulty < 1 || difficulty > 3)
+        return "";
+    return DIFFICULTY_NAMES[difficulty];
 }
 
 #endif /* HIME_CORE_IMPL_C */

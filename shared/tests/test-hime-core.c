@@ -1117,6 +1117,322 @@ TEST (conversion_common_chars) {
     TEST_PASS ();
 }
 
+/* ========== Typing Practice Tests ========== */
+
+TEST (typing_start_session) {
+    hime_init ("../../data");
+    HimeContext *ctx = hime_context_new ();
+    ASSERT_NOT_NULL (ctx);
+
+    int ret = hime_typing_start_session (ctx, "Hello");
+    ASSERT_EQ (0, ret);
+    ASSERT_TRUE (hime_typing_is_active (ctx));
+
+    hime_typing_end_session (ctx);
+    hime_context_free (ctx);
+    hime_cleanup ();
+    TEST_PASS ();
+}
+
+TEST (typing_session_null_safety) {
+    ASSERT_EQ (-1, hime_typing_start_session (NULL, "test"));
+    ASSERT_FALSE (hime_typing_is_active (NULL));
+    ASSERT_EQ (-1, hime_typing_end_session (NULL));
+    ASSERT_EQ (-1, hime_typing_reset_session (NULL));
+    ASSERT_EQ (-1, hime_typing_submit_char (NULL, "a"));
+    ASSERT_EQ (-1, hime_typing_get_position (NULL));
+    TEST_PASS ();
+}
+
+TEST (typing_submit_correct_chars) {
+    hime_init ("../../data");
+    HimeContext *ctx = hime_context_new ();
+
+    hime_typing_start_session (ctx, "ABC");
+
+    ASSERT_EQ (1, hime_typing_submit_char (ctx, "A")); /* Correct */
+    ASSERT_EQ (1, hime_typing_submit_char (ctx, "B")); /* Correct */
+    ASSERT_EQ (1, hime_typing_submit_char (ctx, "C")); /* Correct */
+
+    HimeTypingStats stats;
+    hime_typing_get_stats (ctx, &stats);
+    ASSERT_EQ (3, stats.correct_characters);
+    ASSERT_EQ (0, stats.incorrect_characters);
+    ASSERT_TRUE (stats.completed);
+
+    hime_typing_end_session (ctx);
+    hime_context_free (ctx);
+    hime_cleanup ();
+    TEST_PASS ();
+}
+
+TEST (typing_submit_incorrect_chars) {
+    hime_init ("../../data");
+    HimeContext *ctx = hime_context_new ();
+
+    hime_typing_start_session (ctx, "ABC");
+
+    ASSERT_EQ (0, hime_typing_submit_char (ctx, "X")); /* Wrong */
+    ASSERT_EQ (0, hime_typing_submit_char (ctx, "Y")); /* Wrong */
+    ASSERT_EQ (1, hime_typing_submit_char (ctx, "C")); /* Correct */
+
+    HimeTypingStats stats;
+    hime_typing_get_stats (ctx, &stats);
+    ASSERT_EQ (1, stats.correct_characters);
+    ASSERT_EQ (2, stats.incorrect_characters);
+
+    hime_typing_end_session (ctx);
+    hime_context_free (ctx);
+    hime_cleanup ();
+    TEST_PASS ();
+}
+
+TEST (typing_chinese_characters) {
+    hime_init ("../../data");
+    HimeContext *ctx = hime_context_new ();
+
+    hime_typing_start_session (ctx, "你好");
+
+    char expected[8];
+    int len = hime_typing_get_expected_char (ctx, expected, sizeof (expected));
+    ASSERT_TRUE (len > 0);
+    ASSERT_STR_EQ ("你", expected);
+
+    ASSERT_EQ (1, hime_typing_submit_char (ctx, "你"));
+    ASSERT_EQ (1, hime_typing_get_position (ctx));
+
+    len = hime_typing_get_expected_char (ctx, expected, sizeof (expected));
+    ASSERT_TRUE (len > 0);
+    ASSERT_STR_EQ ("好", expected);
+
+    ASSERT_EQ (1, hime_typing_submit_char (ctx, "好"));
+
+    HimeTypingStats stats;
+    hime_typing_get_stats (ctx, &stats);
+    ASSERT_EQ (2, stats.total_characters);
+    ASSERT_EQ (2, stats.correct_characters);
+    ASSERT_TRUE (stats.completed);
+
+    hime_typing_end_session (ctx);
+    hime_context_free (ctx);
+    hime_cleanup ();
+    TEST_PASS ();
+}
+
+TEST (typing_get_practice_text) {
+    hime_init ("../../data");
+    HimeContext *ctx = hime_context_new ();
+
+    hime_typing_start_session (ctx, "Test text");
+
+    char buffer[256];
+    int len = hime_typing_get_practice_text (ctx, buffer, sizeof (buffer));
+    ASSERT_TRUE (len > 0);
+    ASSERT_STR_EQ ("Test text", buffer);
+
+    hime_typing_end_session (ctx);
+    hime_context_free (ctx);
+    hime_cleanup ();
+    TEST_PASS ();
+}
+
+TEST (typing_reset_session) {
+    hime_init ("../../data");
+    HimeContext *ctx = hime_context_new ();
+
+    hime_typing_start_session (ctx, "ABC");
+    hime_typing_submit_char (ctx, "A");
+    hime_typing_submit_char (ctx, "B");
+
+    /* Reset should restart from beginning */
+    hime_typing_reset_session (ctx);
+
+    ASSERT_EQ (0, hime_typing_get_position (ctx));
+
+    HimeTypingStats stats;
+    hime_typing_get_stats (ctx, &stats);
+    ASSERT_EQ (0, stats.correct_characters);
+    ASSERT_EQ (0, stats.incorrect_characters);
+
+    hime_typing_end_session (ctx);
+    hime_context_free (ctx);
+    hime_cleanup ();
+    TEST_PASS ();
+}
+
+TEST (typing_submit_string) {
+    hime_init ("../../data");
+    HimeContext *ctx = hime_context_new ();
+
+    hime_typing_start_session (ctx, "Hello");
+
+    int correct = hime_typing_submit_string (ctx, "Hello");
+    ASSERT_EQ (5, correct);
+
+    HimeTypingStats stats;
+    hime_typing_get_stats (ctx, &stats);
+    ASSERT_EQ (5, stats.correct_characters);
+    ASSERT_TRUE (stats.completed);
+
+    hime_typing_end_session (ctx);
+    hime_context_free (ctx);
+    hime_cleanup ();
+    TEST_PASS ();
+}
+
+TEST (typing_record_keystroke) {
+    hime_init ("../../data");
+    HimeContext *ctx = hime_context_new ();
+
+    hime_typing_start_session (ctx, "AB");
+
+    hime_typing_record_keystroke (ctx);
+    hime_typing_record_keystroke (ctx);
+    hime_typing_record_keystroke (ctx);
+    hime_typing_submit_char (ctx, "A");
+    hime_typing_record_keystroke (ctx);
+    hime_typing_submit_char (ctx, "B");
+
+    HimeTypingStats stats;
+    hime_typing_get_stats (ctx, &stats);
+    ASSERT_EQ (4, stats.total_keystrokes);
+
+    hime_typing_end_session (ctx);
+    hime_context_free (ctx);
+    hime_cleanup ();
+    TEST_PASS ();
+}
+
+TEST (typing_accuracy_calculation) {
+    hime_init ("../../data");
+    HimeContext *ctx = hime_context_new ();
+
+    hime_typing_start_session (ctx, "ABCD");
+
+    hime_typing_submit_char (ctx, "A"); /* Correct */
+    hime_typing_submit_char (ctx, "X"); /* Wrong */
+    hime_typing_submit_char (ctx, "C"); /* Correct */
+    hime_typing_submit_char (ctx, "D"); /* Correct */
+
+    HimeTypingStats stats;
+    hime_typing_get_stats (ctx, &stats);
+
+    /* 3 correct, 1 incorrect = 75% accuracy */
+    ASSERT_TRUE (stats.accuracy >= 74.9 && stats.accuracy <= 75.1);
+
+    hime_typing_end_session (ctx);
+    hime_context_free (ctx);
+    hime_cleanup ();
+    TEST_PASS ();
+}
+
+/* ========== Practice Text Library Tests ========== */
+
+TEST (practice_text_count) {
+    int english_count = hime_typing_get_text_count (HIME_PRACTICE_CAT_ENGLISH);
+    ASSERT_TRUE (english_count >= 5);
+
+    int zhuyin_count = hime_typing_get_text_count (HIME_PRACTICE_CAT_ZHUYIN);
+    ASSERT_TRUE (zhuyin_count >= 5);
+
+    int pinyin_count = hime_typing_get_text_count (HIME_PRACTICE_CAT_PINYIN);
+    ASSERT_TRUE (pinyin_count >= 5);
+
+    TEST_PASS ();
+}
+
+TEST (practice_get_texts_by_category) {
+    HimePracticeText texts[20];
+    int count = hime_typing_get_texts_by_category (HIME_PRACTICE_CAT_ENGLISH, texts, 20);
+    ASSERT_TRUE (count >= 5);
+
+    /* All returned texts should be English category */
+    for (int i = 0; i < count; i++) {
+        ASSERT_EQ (HIME_PRACTICE_CAT_ENGLISH, texts[i].category);
+        ASSERT_TRUE (texts[i].char_count > 0);
+    }
+
+    TEST_PASS ();
+}
+
+TEST (practice_get_texts_by_difficulty) {
+    HimePracticeText texts[50];
+    int count = hime_typing_get_texts_by_difficulty (HIME_PRACTICE_EASY, texts, 50);
+    ASSERT_TRUE (count >= 5);
+
+    /* All returned texts should be easy difficulty */
+    for (int i = 0; i < count; i++) {
+        ASSERT_EQ (HIME_PRACTICE_EASY, texts[i].difficulty);
+    }
+
+    TEST_PASS ();
+}
+
+TEST (practice_get_text_by_id) {
+    HimePracticeText text;
+
+    /* Get English text (ID 1) */
+    int ret = hime_typing_get_text_by_id (1, &text);
+    ASSERT_EQ (0, ret);
+    ASSERT_EQ (1, text.id);
+    ASSERT_TRUE (strlen (text.text) > 0);
+
+    /* Invalid ID */
+    ret = hime_typing_get_text_by_id (9999, &text);
+    ASSERT_EQ (-1, ret);
+
+    TEST_PASS ();
+}
+
+TEST (practice_get_all_texts) {
+    HimePracticeText texts[100];
+    int count = hime_typing_get_all_texts (texts, 100);
+    ASSERT_TRUE (count >= 20);
+    TEST_PASS ();
+}
+
+TEST (practice_category_names) {
+    const char *name = hime_typing_get_category_name (HIME_PRACTICE_CAT_ENGLISH);
+    ASSERT_NOT_NULL (name);
+    ASSERT_TRUE (strlen (name) > 0);
+
+    name = hime_typing_get_category_name (HIME_PRACTICE_CAT_ZHUYIN);
+    ASSERT_NOT_NULL (name);
+    ASSERT_TRUE (strlen (name) > 0);
+
+    /* Invalid category */
+    name = hime_typing_get_category_name (-1);
+    ASSERT_STR_EQ ("", name);
+
+    TEST_PASS ();
+}
+
+TEST (practice_difficulty_names) {
+    const char *name = hime_typing_get_difficulty_name (HIME_PRACTICE_EASY);
+    ASSERT_NOT_NULL (name);
+    ASSERT_TRUE (strlen (name) > 0);
+
+    name = hime_typing_get_difficulty_name (HIME_PRACTICE_HARD);
+    ASSERT_NOT_NULL (name);
+    ASSERT_TRUE (strlen (name) > 0);
+
+    /* Invalid difficulty */
+    name = hime_typing_get_difficulty_name (0);
+    ASSERT_STR_EQ ("", name);
+
+    TEST_PASS ();
+}
+
+TEST (practice_random_text) {
+    HimePracticeText text;
+    int ret = hime_typing_get_random_text (HIME_PRACTICE_CAT_ENGLISH, &text);
+    ASSERT_EQ (0, ret);
+    ASSERT_EQ (HIME_PRACTICE_CAT_ENGLISH, text.category);
+    ASSERT_TRUE (text.id > 0);
+    ASSERT_TRUE (strlen (text.text) > 0);
+    TEST_PASS ();
+}
+
 /* ========== Test Suite ========== */
 
 TEST_SUITE_BEGIN ("HIME Core Library Tests")
@@ -1227,5 +1543,27 @@ RUN_TEST (set_output_variant);
 RUN_TEST (convert_to_output_variant);
 RUN_TEST (conversion_null_safety);
 RUN_TEST (conversion_common_chars);
+
+/* Typing Practice */
+RUN_TEST (typing_start_session);
+RUN_TEST (typing_session_null_safety);
+RUN_TEST (typing_submit_correct_chars);
+RUN_TEST (typing_submit_incorrect_chars);
+RUN_TEST (typing_chinese_characters);
+RUN_TEST (typing_get_practice_text);
+RUN_TEST (typing_reset_session);
+RUN_TEST (typing_submit_string);
+RUN_TEST (typing_record_keystroke);
+RUN_TEST (typing_accuracy_calculation);
+
+/* Practice Text Library */
+RUN_TEST (practice_text_count);
+RUN_TEST (practice_get_texts_by_category);
+RUN_TEST (practice_get_texts_by_difficulty);
+RUN_TEST (practice_get_text_by_id);
+RUN_TEST (practice_get_all_texts);
+RUN_TEST (practice_category_names);
+RUN_TEST (practice_difficulty_names);
+RUN_TEST (practice_random_text);
 
 TEST_SUITE_END ()
