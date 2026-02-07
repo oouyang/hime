@@ -16,77 +16,137 @@
  */
 
 #include <stdio.h>
+#include <sys/stat.h>
 
 #include "hime.h"
 
 #include "t2s-file.h"
 
-static int N;
-static FILE *fp;
+/* Cached translation table for fast in-memory binary search */
+typedef struct {
+    T2S *table;
+    int count;
+} T2SCache;
 
-static int k_lookup (char *s, char out[]) {
-    unsigned int key;
-    memset (&key, 0, sizeof (key));
+static T2SCache t2s_cache = {NULL, 0};
+static T2SCache s2t_cache = {NULL, 0};
 
+/* Initial output buffer size - grows exponentially */
+#define INITIAL_BUF_SIZE 256
+
+/**
+ * Load translation table into memory for fast lookups.
+ * The table is cached and reused across calls.
+ */
+static T2SCache *load_table (const char *fname, T2SCache *cache) {
+    if (cache->table != NULL) {
+        return cache;
+    }
+
+    char fullname[512];
+    get_sys_table_file_name (fname, fullname);
+
+    struct stat st;
+    if (stat (fullname, &st) != 0) {
+        p_err ("cannot stat %s", fullname);
+    }
+
+    FILE *fp = fopen (fullname, "rb");
+    if (fp == NULL) {
+        p_err ("cannot open %s", fullname);
+    }
+
+    cache->count = st.st_size / sizeof (T2S);
+    cache->table = (T2S *) malloc (st.st_size);
+    if (cache->table == NULL) {
+        fclose (fp);
+        p_err ("cannot allocate memory for %s", fname);
+    }
+
+    if (fread (cache->table, sizeof (T2S), cache->count, fp) != (size_t) cache->count) {
+        free (cache->table);
+        cache->table = NULL;
+        cache->count = 0;
+        fclose (fp);
+        p_err ("cannot read %s", fullname);
+    }
+
+    fclose (fp);
+    return cache;
+}
+
+/**
+ * Binary search lookup in cached table.
+ * Returns number of bytes written to out.
+ */
+static int table_lookup (const T2SCache *cache, const char *s, char *out) {
+    unsigned int key = 0;
     u8cpy ((char *) &key, s);
 
-    int bot = 0, top = N - 1;
+    int bot = 0;
+    int top = cache->count - 1;
+    const T2S *table = cache->table;
+
     while (bot <= top) {
         int mid = (bot + top) / 2;
-        T2S t;
-        fseek (fp, mid * sizeof (T2S), SEEK_SET);
-        fread (&t, sizeof (T2S), 1, fp);
+        unsigned int mid_key = table[mid].a;
 
-        if (key > t.a)
+        if (key > mid_key) {
             bot = mid + 1;
-        else if (key < t.a)
+        } else if (key < mid_key) {
             top = mid - 1;
-        else
-            return u8cpy (out, (char *) &t.b);
+        } else {
+            return u8cpy (out, (char *) &table[mid].b);
+        }
     }
 
     return u8cpy (out, s);
 }
 
-#include <sys/stat.h>
+/**
+ * Translate string using the specified translation table.
+ * Uses cached table for fast lookups and exponential buffer growth.
+ */
+static int translate (const char *fname, T2SCache *cache,
+                      const char *str, int strN, char **out) {
+    load_table (fname, cache);
 
-static int translate (char *fname, char *str, int strN, char **out) {
-    char fullname[128];
+    /* Allocate output buffer with exponential growth strategy */
+    int buf_cap = (strN > INITIAL_BUF_SIZE) ? strN * 2 : INITIAL_BUF_SIZE;
+    char *buf = (char *) malloc (buf_cap);
+    if (buf == NULL) {
+        p_err ("cannot allocate output buffer");
+    }
 
-    get_sys_table_file_name (fname, fullname);
-
-    if ((fp = fopen (fullname, "rb")) == NULL)
-        p_err ("cannot open %s %s", fname, fullname);
-
-    struct stat st;
-
-    stat (fullname, &st);
-    N = st.st_size / sizeof (T2S);
-
-    char *p = str;
-    char *endp = str + strN;
-    int opN = 0;
-    char *op = NULL;
+    const char *p = str;
+    const char *endp = str + strN;
+    int out_len = 0;
 
     while (p < endp) {
-        op = (char *) realloc (op, opN + 5);
-        opN += k_lookup (p, &op[opN]);
+        /* Ensure buffer has space for max UTF-8 char (4 bytes) + null */
+        if (out_len + 5 > buf_cap) {
+            buf_cap *= 2;
+            char *new_buf = (char *) realloc (buf, buf_cap);
+            if (new_buf == NULL) {
+                free (buf);
+                p_err ("cannot reallocate output buffer");
+            }
+            buf = new_buf;
+        }
+
+        out_len += table_lookup (cache, p, &buf[out_len]);
         p += utf8_sz (p);
     }
 
-    fclose (fp);
-    *out = op;
-    if (op)
-        op[opN] = 0;
-    return opN;
+    buf[out_len] = '\0';
+    *out = buf;
+    return out_len;
 }
 
 int trad2sim (char *str, int strN, char **out) {
-    return translate ("t2s.dat", str, strN, out);
+    return translate ("t2s.dat", &t2s_cache, str, strN, out);
 }
 
 int sim2trad (char *str, int strN, char **out) {
-    puts (str);
-    return translate ("s2t.dat", str, strN, out);
-    puts (*out);
+    return translate ("s2t.dat", &s2t_cache, str, strN, out);
 }
