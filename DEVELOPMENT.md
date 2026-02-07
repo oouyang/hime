@@ -846,6 +846,26 @@ Then enable in **System Preferences** → **Keyboard** → **Input Sources**.
 
 See `macos/README.md` for detailed build and installation instructions.
 
+### iOS Build (Xcode)
+
+For iOS, HIME provides a custom keyboard extension. Build with Xcode:
+
+```bash
+cd ios
+mkdir build && cd build
+cmake .. -G Xcode -DCMAKE_SYSTEM_NAME=iOS
+open HIME-iOS.xcodeproj
+```
+
+Or create an Xcode project manually and add the source files from `ios/`.
+
+After installing:
+1. Go to **Settings** → **General** → **Keyboard** → **Keyboards**
+2. Add **HIME** keyboard
+3. Switch to HIME using the 🌐 globe icon
+
+See `ios/README.md` for detailed build and installation instructions.
+
 ## Resources
 
 - **Repository:** https://github.com/hime-ime/hime
