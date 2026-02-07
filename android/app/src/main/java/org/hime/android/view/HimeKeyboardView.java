@@ -23,7 +23,6 @@ import android.view.View;
  * Provides standard Taiwan phonetic keyboard layout.
  */
 public class HimeKeyboardView extends View {
-
     private static final String TAG = "HimeKeyboardView";
 
     /* Keyboard dimensions */
@@ -44,34 +43,29 @@ public class HimeKeyboardView extends View {
     /* Standard Zhuyin keyboard layout (5 rows) */
     /* Row format: main_char|sub_char|key_code */
     private static final String[][] ZHUYIN_LAYOUT = {
-        /* Row 1: Numbers/tone marks */
-        {"1|ㄅ|1", "2|ㄉ|2", "3|ˇ|3", "4|ˋ|4", "5|ㄓ|5",
-         "6|ˊ|6", "7|˙|7", "8|ㄚ|8", "9|ㄞ|9", "0|ㄢ|0"},
+            /* Row 1: Numbers/tone marks */
+            {"1|ㄅ|1", "2|ㄉ|2", "3|ˇ|3", "4|ˋ|4", "5|ㄓ|5", "6|ˊ|6", "7|˙|7", "8|ㄚ|8", "9|ㄞ|9", "0|ㄢ|0"},
 
-        /* Row 2: QWERTY with Zhuyin */
-        {"q|ㄆ|q", "w|ㄊ|w", "e|ㄍ|e", "r|ㄐ|r", "t|ㄔ|t",
-         "y|ㄗ|y", "u|ㄧ|u", "i|ㄛ|i", "o|ㄟ|o", "p|ㄣ|p"},
+            /* Row 2: QWERTY with Zhuyin */
+            {"q|ㄆ|q", "w|ㄊ|w", "e|ㄍ|e", "r|ㄐ|r", "t|ㄔ|t", "y|ㄗ|y", "u|ㄧ|u", "i|ㄛ|i", "o|ㄟ|o", "p|ㄣ|p"},
 
-        /* Row 3: ASDF with Zhuyin */
-        {"a|ㄇ|a", "s|ㄋ|s", "d|ㄎ|d", "f|ㄑ|f", "g|ㄕ|g",
-         "h|ㄘ|h", "j|ㄨ|j", "k|ㄜ|k", "l|ㄠ|l", ";|ㄤ|;"},
+            /* Row 3: ASDF with Zhuyin */
+            {"a|ㄇ|a", "s|ㄋ|s", "d|ㄎ|d", "f|ㄑ|f", "g|ㄕ|g", "h|ㄘ|h", "j|ㄨ|j", "k|ㄜ|k", "l|ㄠ|l", ";|ㄤ|;"},
 
-        /* Row 4: ZXCV with Zhuyin + special keys */
-        {"SHIFT||SHIFT", "z|ㄈ|z", "x|ㄌ|x", "c|ㄏ|c", "v|ㄒ|v",
-         "b|ㄖ|b", "n|ㄙ|n", "m|ㄩ|m", ",|ㄝ|,", "DEL||DEL"},
+            /* Row 4: ZXCV with Zhuyin + special keys */
+            {"SHIFT||SHIFT", "z|ㄈ|z", "x|ㄌ|x", "c|ㄏ|c", "v|ㄒ|v", "b|ㄖ|b", "n|ㄙ|n", "m|ㄩ|m", ",|ㄝ|,",
+                    "DEL||DEL"},
 
-        /* Row 5: Bottom row - mode, space, special */
-        {"MODE||MODE", ",||,", "SPACE||SPACE", ".||.", "ENTER||ENTER"}
-    };
+            /* Row 5: Bottom row - mode, space, special */
+            {"MODE||MODE", ",||,", "SPACE||SPACE", ".||.", "ENTER||ENTER"}};
 
     /* English QWERTY layout */
     private static final String[][] ENGLISH_LAYOUT = {
-        {"1||1", "2||2", "3||3", "4||4", "5||5", "6||6", "7||7", "8||8", "9||9", "0||0"},
-        {"q||q", "w||w", "e||e", "r||r", "t||t", "y||y", "u||u", "i||i", "o||o", "p||p"},
-        {"a||a", "s||s", "d||d", "f||f", "g||g", "h||h", "j||j", "k||k", "l||l", "'||'"},
-        {"SHIFT||SHIFT", "z||z", "x||x", "c||c", "v||v", "b||b", "n||n", "m||m", "?||?", "DEL||DEL"},
-        {"MODE||MODE", ",||,", "SPACE||SPACE", ".||.", "ENTER||ENTER"}
-    };
+            {"1||1", "2||2", "3||3", "4||4", "5||5", "6||6", "7||7", "8||8", "9||9", "0||0"},
+            {"q||q", "w||w", "e||e", "r||r", "t||t", "y||y", "u||u", "i||i", "o||o", "p||p"},
+            {"a||a", "s||s", "d||d", "f||f", "g||g", "h||h", "j||j", "k||k", "l||l", "'||'"},
+            {"SHIFT||SHIFT", "z||z", "x||x", "c||c", "v||v", "b||b", "n||n", "m||m", "?||?", "DEL||DEL"},
+            {"MODE||MODE", ",||,", "SPACE||SPACE", ".||.", "ENTER||ENTER"}};
 
     /* Paints */
     private Paint backgroundPaint;
@@ -215,12 +209,8 @@ public class HimeKeyboardView extends View {
             }
 
             /* Draw key background */
-            RectF keyRect = new RectF(
-                x + keyPadding,
-                y + keyPadding,
-                x + widths[col] - keyPadding,
-                y + keyHeight - keyPadding
-            );
+            RectF keyRect =
+                    new RectF(x + keyPadding, y + keyPadding, x + widths[col] - keyPadding, y + keyHeight - keyPadding);
             keyPaint.setColor(keyColor);
             canvas.drawRoundRect(keyRect, keyRadius, keyRadius, keyPaint);
 
@@ -295,11 +285,16 @@ public class HimeKeyboardView extends View {
 
     private String getDisplayText(String key) {
         switch (key) {
-            case "DEL": return "⌫";
-            case "ENTER": return "↵";
-            case "SPACE": return "␣";
-            case "SHIFT": return shiftMode ? "⇧" : "⇪";
-            case "MODE": return chineseMode ? "中" : "EN";
+            case "DEL":
+                return "⌫";
+            case "ENTER":
+                return "↵";
+            case "SPACE":
+                return "␣";
+            case "SHIFT":
+                return shiftMode ? "⇧" : "⇪";
+            case "MODE":
+                return chineseMode ? "中" : "EN";
             default:
                 if (shiftMode && key.length() == 1 && Character.isLetter(key.charAt(0))) {
                     return key.toUpperCase();
@@ -321,9 +316,8 @@ public class HimeKeyboardView extends View {
     }
 
     private boolean isSpecialKey(String key) {
-        return key.equals("DEL") || key.equals("ENTER") || key.equals("SPACE") ||
-               key.equals("SHIFT") || key.equals("MODE") ||
-               key.equals("PREV") || key.equals("NEXT");
+        return key.equals("DEL") || key.equals("ENTER") || key.equals("SPACE") || key.equals("SHIFT")
+                || key.equals("MODE") || key.equals("PREV") || key.equals("NEXT");
     }
 
     @Override
@@ -380,14 +374,15 @@ public class HimeKeyboardView extends View {
         float totalWidth = getWidth() - keyPadding * 2;
 
         int row = (int) ((y - keyPadding) / keyHeight);
-        if (row < 0 || row >= layout.length) return null;
+        if (row < 0 || row >= layout.length)
+            return null;
 
         float[] widths = calculateKeyWidths(layout[row], totalWidth);
         float keyX = keyPadding;
 
         for (int col = 0; col < layout[row].length; col++) {
             if (x >= keyX && x < keyX + widths[col]) {
-                return new int[]{row, col};
+                return new int[] {row, col};
             }
             keyX += widths[col];
         }
@@ -397,7 +392,8 @@ public class HimeKeyboardView extends View {
 
     private void handleKeyPress(int row, int col) {
         String[][] layout = chineseMode ? ZHUYIN_LAYOUT : ENGLISH_LAYOUT;
-        if (row >= layout.length || col >= layout[row].length) return;
+        if (row >= layout.length || col >= layout[row].length)
+            return;
 
         String[] parts = layout[row][col].split("\\|");
         String code = parts.length > 2 ? parts[2] : parts[0];

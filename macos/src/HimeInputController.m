@@ -10,33 +10,31 @@
 
 /* macOS virtual key codes */
 enum {
-    kVK_Return      = 0x24,
-    kVK_Tab         = 0x30,
-    kVK_Space       = 0x31,
-    kVK_Delete      = 0x33,
-    kVK_Escape      = 0x35,
-    kVK_Shift       = 0x38,
-    kVK_CapsLock    = 0x39,
-    kVK_Control     = 0x3B,
-    kVK_RightShift  = 0x3C,
-    kVK_Option      = 0x3A,
-    kVK_LeftArrow   = 0x7B,
-    kVK_RightArrow  = 0x7C,
-    kVK_DownArrow   = 0x7D,
-    kVK_UpArrow     = 0x7E,
-    kVK_PageUp      = 0x74,
-    kVK_PageDown    = 0x79,
-    kVK_Home        = 0x73,
-    kVK_End         = 0x77,
+    kVK_Return = 0x24,
+    kVK_Tab = 0x30,
+    kVK_Space = 0x31,
+    kVK_Delete = 0x33,
+    kVK_Escape = 0x35,
+    kVK_Shift = 0x38,
+    kVK_CapsLock = 0x39,
+    kVK_Control = 0x3B,
+    kVK_RightShift = 0x3C,
+    kVK_Option = 0x3A,
+    kVK_LeftArrow = 0x7B,
+    kVK_RightArrow = 0x7C,
+    kVK_DownArrow = 0x7D,
+    kVK_UpArrow = 0x7E,
+    kVK_PageUp = 0x74,
+    kVK_PageDown = 0x79,
+    kVK_Home = 0x73,
+    kVK_End = 0x77,
 };
 
 @implementation HimeInputController
 
 #pragma mark - Lifecycle
 
-- (instancetype)initWithServer:(IMKServer *)server
-                      delegate:(nullable id)delegate
-                        client:(id<IMKTextInput>)client {
+- (instancetype)initWithServer:(IMKServer *)server delegate:(nullable id)delegate client:(id<IMKTextInput>)client {
     self = [super initWithServer:server delegate:delegate client:client];
     if (self) {
         [self setupEngine];
@@ -58,7 +56,7 @@ enum {
 
 - (void)setupCandidateWindow {
     self.candidateWindow = [[IMKCandidates alloc] initWithServer:self.server
-                                                      panelType:kIMKSingleColumnScrollingCandidatePanel];
+                                                       panelType:kIMKSingleColumnScrollingCandidatePanel];
     [self.candidateWindow setSelectionKeys:@"1234567890"];
     [self.candidateWindow setDismissesAutomatically:YES];
 }
@@ -71,8 +69,10 @@ enum {
 #pragma mark - IMKInputController Override
 
 - (BOOL)handleEvent:(NSEvent *)event client:(id)sender {
-    if (!self.engine) return NO;
-    if (event.type != NSEventTypeKeyDown) return NO;
+    if (!self.engine)
+        return NO;
+    if (event.type != NSEventTypeKeyDown)
+        return NO;
 
     /* Get event properties */
     NSEventModifierFlags modifierFlags = event.modifierFlags;
@@ -82,10 +82,14 @@ enum {
 
     /* Convert modifier flags */
     HimeModifierFlags himeModifiers = HimeModifierNone;
-    if (modifierFlags & NSEventModifierFlagShift) himeModifiers |= HimeModifierShift;
-    if (modifierFlags & NSEventModifierFlagControl) himeModifiers |= HimeModifierControl;
-    if (modifierFlags & NSEventModifierFlagOption) himeModifiers |= HimeModifierAlt;
-    if (modifierFlags & NSEventModifierFlagCapsLock) himeModifiers |= HimeModifierCapsLock;
+    if (modifierFlags & NSEventModifierFlagShift)
+        himeModifiers |= HimeModifierShift;
+    if (modifierFlags & NSEventModifierFlagControl)
+        himeModifiers |= HimeModifierControl;
+    if (modifierFlags & NSEventModifierFlagOption)
+        himeModifiers |= HimeModifierAlt;
+    if (modifierFlags & NSEventModifierFlagCapsLock)
+        himeModifiers |= HimeModifierCapsLock;
 
     /* Handle Shift for mode toggle */
     if (keyCode == kVK_Shift || keyCode == kVK_RightShift) {
@@ -148,15 +152,13 @@ enum {
         case kVK_RightArrow:
             /* Let candidate window handle arrow keys if visible */
             if (self.engine.hasCandidates) {
-                return NO;  /* IMKCandidates handles this */
+                return NO; /* IMKCandidates handles this */
             }
             return NO;
     }
 
     /* Process key through HIME engine */
-    HimeKeyResultType result = [self.engine processKeyCode:keyCode
-                                                 character:character
-                                                 modifiers:himeModifiers];
+    HimeKeyResultType result = [self.engine processKeyCode:keyCode character:character modifiers:himeModifiers];
 
     switch (result) {
         case HimeKeyResultCommit: {
@@ -199,9 +201,7 @@ enum {
         /* Set marked text (composition string) */
         NSDictionary *attrs = [self markForStyle:kTSMHiliteSelectedConvertedText
                                          atRange:NSMakeRange(0, preedit.length)];
-        NSAttributedString *attrString = [[NSAttributedString alloc]
-                                          initWithString:preedit
-                                          attributes:attrs];
+        NSAttributedString *attrString = [[NSAttributedString alloc] initWithString:preedit attributes:attrs];
 
         [client setMarkedText:attrString
                selectionRange:NSMakeRange(preedit.length, 0)
@@ -215,8 +215,7 @@ enum {
 }
 
 - (void)commitString:(NSString *)string client:(id)client {
-    [client insertText:string
-      replacementRange:NSMakeRange(NSNotFound, NSNotFound)];
+    [client insertText:string replacementRange:NSMakeRange(NSNotFound, NSNotFound)];
 }
 
 #pragma mark - Candidate Management

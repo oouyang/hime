@@ -50,8 +50,7 @@
     ]];
 
     /* Set keyboard height */
-    NSLayoutConstraint *heightConstraint = [self.keyboardView.heightAnchor
-                                            constraintEqualToConstant:260];
+    NSLayoutConstraint *heightConstraint = [self.keyboardView.heightAnchor constraintEqualToConstant:260];
     heightConstraint.priority = UILayoutPriorityRequired - 1;
     heightConstraint.active = YES;
 }
@@ -71,7 +70,7 @@
     /* Called when text has changed */
     /* Update UI based on text traits if needed */
     UITextAutocapitalizationType autocapType = self.textDocumentProxy.autocapitalizationType;
-    (void)autocapType;  /* Can be used for shift state */
+    (void) autocapType; /* Can be used for shift state */
 }
 
 #pragma mark - Text Input
@@ -91,15 +90,14 @@
 #pragma mark - Key Handling
 
 - (void)handleKeyPress:(NSString *)key {
-    if (!self.engine) return;
+    if (!self.engine)
+        return;
 
     /* Handle special keys */
     if ([key isEqualToString:@"⌫"]) {
         /* Backspace */
         if (self.engine.preeditString.length > 0) {
-            HimeKeyResultType result = [self.engine processKeyCode:0x08
-                                                         character:0x08
-                                                         modifiers:HimeModifierNone];
+            HimeKeyResultType result = [self.engine processKeyCode:0x08 character:0x08 modifiers:HimeModifierNone];
             [self handleEngineResult:result];
         } else {
             [self deleteBackward];
@@ -122,9 +120,7 @@
     if ([key isEqualToString:@"␣"]) {
         /* Space - tone 1 or confirm */
         if (self.engine.chineseMode && self.engine.preeditString.length > 0) {
-            HimeKeyResultType result = [self.engine processKeyCode:0x20
-                                                         character:' '
-                                                         modifiers:HimeModifierNone];
+            HimeKeyResultType result = [self.engine processKeyCode:0x20 character:' ' modifiers:HimeModifierNone];
             [self handleEngineResult:result];
         } else {
             [self insertText:@" "];
@@ -150,9 +146,7 @@
         unichar ch = [key characterAtIndex:0];
 
         if (self.engine.chineseMode) {
-            HimeKeyResultType result = [self.engine processKeyCode:ch
-                                                         character:ch
-                                                         modifiers:HimeModifierNone];
+            HimeKeyResultType result = [self.engine processKeyCode:ch character:ch modifiers:HimeModifierNone];
             [self handleEngineResult:result];
         } else {
             /* English mode - insert directly */
@@ -185,7 +179,8 @@
 }
 
 - (void)selectCandidate:(NSInteger)index {
-    if (!self.engine) return;
+    if (!self.engine)
+        return;
 
     HimeKeyResultType result = [self.engine selectCandidateAtIndex:index];
     [self handleEngineResult:result];

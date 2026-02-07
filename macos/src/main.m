@@ -13,7 +13,7 @@
 static IMKServer *gServer = nil;
 
 /* Connection name must match Info.plist InputMethodConnectionName */
-static NSString * const kConnectionName = @"HIME_Connection";
+static NSString *const kConnectionName = @"HIME_Connection";
 
 int main(int argc, const char *argv[]) {
     @autoreleasepool {

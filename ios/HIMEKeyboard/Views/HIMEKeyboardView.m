@@ -9,10 +9,10 @@
 #import "HIMEKeyboardViewController.h"
 
 /* Bopomofo keyboard layout - Standard Zhuyin */
-static NSString * const kZhuyinRow1[] = {@"ㄅ", @"ㄉ", @"ˇ", @"ˋ", @"ㄓ", @"ˊ", @"˙", @"ㄚ", @"ㄞ", @"ㄢ"};
-static NSString * const kZhuyinRow2[] = {@"ㄆ", @"ㄊ", @"ㄍ", @"ㄐ", @"ㄔ", @"ㄗ", @"ㄧ", @"ㄛ", @"ㄟ", @"ㄣ"};
-static NSString * const kZhuyinRow3[] = {@"ㄇ", @"ㄋ", @"ㄎ", @"ㄑ", @"ㄕ", @"ㄘ", @"ㄨ", @"ㄜ", @"ㄠ", @"ㄤ"};
-static NSString * const kZhuyinRow4[] = {@"ㄈ", @"ㄌ", @"ㄏ", @"ㄒ", @"ㄖ", @"ㄙ", @"ㄩ", @"ㄝ", @"ㄡ", @"ㄥ"};
+static NSString *const kZhuyinRow1[] = {@"ㄅ", @"ㄉ", @"ˇ", @"ˋ", @"ㄓ", @"ˊ", @"˙", @"ㄚ", @"ㄞ", @"ㄢ"};
+static NSString *const kZhuyinRow2[] = {@"ㄆ", @"ㄊ", @"ㄍ", @"ㄐ", @"ㄔ", @"ㄗ", @"ㄧ", @"ㄛ", @"ㄟ", @"ㄣ"};
+static NSString *const kZhuyinRow3[] = {@"ㄇ", @"ㄋ", @"ㄎ", @"ㄑ", @"ㄕ", @"ㄘ", @"ㄨ", @"ㄜ", @"ㄠ", @"ㄤ"};
+static NSString *const kZhuyinRow4[] = {@"ㄈ", @"ㄌ", @"ㄏ", @"ㄒ", @"ㄖ", @"ㄙ", @"ㄩ", @"ㄝ", @"ㄡ", @"ㄥ"};
 
 /* Key mappings (Zhuyin symbol to keyboard character) */
 static NSDictionary *kZhuyinToKey = nil;
@@ -40,17 +40,47 @@ static NSDictionary *kZhuyinToKey = nil;
     if (self == [HIMEKeyboardView class]) {
         /* Map Zhuyin symbols to keyboard characters */
         kZhuyinToKey = @{
-            @"ㄅ": @"1", @"ㄆ": @"q", @"ㄇ": @"a", @"ㄈ": @"z",
-            @"ㄉ": @"2", @"ㄊ": @"w", @"ㄋ": @"s", @"ㄌ": @"x",
-            @"ˇ": @"3", @"ㄍ": @"e", @"ㄎ": @"d", @"ㄏ": @"c",
-            @"ˋ": @"4", @"ㄐ": @"r", @"ㄑ": @"f", @"ㄒ": @"v",
-            @"ㄓ": @"5", @"ㄔ": @"t", @"ㄕ": @"g", @"ㄖ": @"b",
-            @"ˊ": @"6", @"ㄗ": @"y", @"ㄘ": @"h", @"ㄙ": @"n",
-            @"˙": @"7", @"ㄧ": @"u", @"ㄨ": @"j", @"ㄩ": @"m",
-            @"ㄚ": @"8", @"ㄛ": @"i", @"ㄜ": @"k", @"ㄝ": @",",
-            @"ㄞ": @"9", @"ㄟ": @"o", @"ㄠ": @"l", @"ㄡ": @".",
-            @"ㄢ": @"0", @"ㄣ": @"p", @"ㄤ": @";", @"ㄥ": @"/",
-            @"ㄦ": @"-",
+            @"ㄅ" : @"1",
+            @"ㄆ" : @"q",
+            @"ㄇ" : @"a",
+            @"ㄈ" : @"z",
+            @"ㄉ" : @"2",
+            @"ㄊ" : @"w",
+            @"ㄋ" : @"s",
+            @"ㄌ" : @"x",
+            @"ˇ" : @"3",
+            @"ㄍ" : @"e",
+            @"ㄎ" : @"d",
+            @"ㄏ" : @"c",
+            @"ˋ" : @"4",
+            @"ㄐ" : @"r",
+            @"ㄑ" : @"f",
+            @"ㄒ" : @"v",
+            @"ㄓ" : @"5",
+            @"ㄔ" : @"t",
+            @"ㄕ" : @"g",
+            @"ㄖ" : @"b",
+            @"ˊ" : @"6",
+            @"ㄗ" : @"y",
+            @"ㄘ" : @"h",
+            @"ㄙ" : @"n",
+            @"˙" : @"7",
+            @"ㄧ" : @"u",
+            @"ㄨ" : @"j",
+            @"ㄩ" : @"m",
+            @"ㄚ" : @"8",
+            @"ㄛ" : @"i",
+            @"ㄜ" : @"k",
+            @"ㄝ" : @",",
+            @"ㄞ" : @"9",
+            @"ㄟ" : @"o",
+            @"ㄠ" : @"l",
+            @"ㄡ" : @".",
+            @"ㄢ" : @"0",
+            @"ㄣ" : @"p",
+            @"ㄤ" : @";",
+            @"ㄥ" : @"/",
+            @"ㄦ" : @"-",
         };
     }
 }
@@ -174,15 +204,55 @@ static NSDictionary *kZhuyinToKey = nil;
 
     /* Create Zhuyin rows */
     NSArray *rows = @[
-        @[kZhuyinRow1[0], kZhuyinRow1[1], kZhuyinRow1[2], kZhuyinRow1[3], kZhuyinRow1[4],
-          kZhuyinRow1[5], kZhuyinRow1[6], kZhuyinRow1[7], kZhuyinRow1[8], kZhuyinRow1[9]],
-        @[kZhuyinRow2[0], kZhuyinRow2[1], kZhuyinRow2[2], kZhuyinRow2[3], kZhuyinRow2[4],
-          kZhuyinRow2[5], kZhuyinRow2[6], kZhuyinRow2[7], kZhuyinRow2[8], kZhuyinRow2[9]],
-        @[kZhuyinRow3[0], kZhuyinRow3[1], kZhuyinRow3[2], kZhuyinRow3[3], kZhuyinRow3[4],
-          kZhuyinRow3[5], kZhuyinRow3[6], kZhuyinRow3[7], kZhuyinRow3[8], kZhuyinRow3[9]],
-        @[kZhuyinRow4[0], kZhuyinRow4[1], kZhuyinRow4[2], kZhuyinRow4[3], kZhuyinRow4[4],
-          kZhuyinRow4[5], kZhuyinRow4[6], kZhuyinRow4[7], kZhuyinRow4[8], @"ㄦ"],
-        @[@"中/英", @"🌐", @"␣", @"⌫", @"⏎"],
+        @[
+            kZhuyinRow1[0],
+            kZhuyinRow1[1],
+            kZhuyinRow1[2],
+            kZhuyinRow1[3],
+            kZhuyinRow1[4],
+            kZhuyinRow1[5],
+            kZhuyinRow1[6],
+            kZhuyinRow1[7],
+            kZhuyinRow1[8],
+            kZhuyinRow1[9]
+        ],
+        @[
+            kZhuyinRow2[0],
+            kZhuyinRow2[1],
+            kZhuyinRow2[2],
+            kZhuyinRow2[3],
+            kZhuyinRow2[4],
+            kZhuyinRow2[5],
+            kZhuyinRow2[6],
+            kZhuyinRow2[7],
+            kZhuyinRow2[8],
+            kZhuyinRow2[9]
+        ],
+        @[
+            kZhuyinRow3[0],
+            kZhuyinRow3[1],
+            kZhuyinRow3[2],
+            kZhuyinRow3[3],
+            kZhuyinRow3[4],
+            kZhuyinRow3[5],
+            kZhuyinRow3[6],
+            kZhuyinRow3[7],
+            kZhuyinRow3[8],
+            kZhuyinRow3[9]
+        ],
+        @[
+            kZhuyinRow4[0],
+            kZhuyinRow4[1],
+            kZhuyinRow4[2],
+            kZhuyinRow4[3],
+            kZhuyinRow4[4],
+            kZhuyinRow4[5],
+            kZhuyinRow4[6],
+            kZhuyinRow4[7],
+            kZhuyinRow4[8],
+            @"ㄦ"
+        ],
+        @[ @"中/英", @"🌐", @"␣", @"⌫", @"⏎" ],
     ];
 
     NSMutableArray *keyboardRows = [NSMutableArray array];
@@ -221,8 +291,8 @@ static NSDictionary *kZhuyinToKey = nil;
     button.layer.shadowRadius = 1;
 
     /* Special key styling */
-    if ([title isEqualToString:@"⌫"] || [title isEqualToString:@"⏎"] ||
-        [title isEqualToString:@"🌐"] || [title isEqualToString:@"中/英"]) {
+    if ([title isEqualToString:@"⌫"] || [title isEqualToString:@"⏎"] || [title isEqualToString:@"🌐"] ||
+        [title isEqualToString:@"中/英"]) {
         button.backgroundColor = [UIColor colorWithRed:0.68 green:0.70 blue:0.73 alpha:1.0];
         button.titleLabel.font = [UIFont systemFontOfSize:16];
     }
@@ -279,7 +349,7 @@ static NSDictionary *kZhuyinToKey = nil;
         [button addTarget:self action:@selector(candidateTapped:) forControlEvents:UIControlEventTouchUpInside];
 
         /* Add number label */
-        NSString *labelText = [NSString stringWithFormat:@"%ld.%@", (long)(i + 1), candidates[i]];
+        NSString *labelText = [NSString stringWithFormat:@"%ld.%@", (long) (i + 1), candidates[i]];
         [button setTitle:labelText forState:UIControlStateNormal];
 
         [self.candidateStackView addArrangedSubview:button];
@@ -288,7 +358,8 @@ static NSDictionary *kZhuyinToKey = nil;
     /* Update page buttons */
     self.pageUpButton.enabled = self.controller.engine.currentPage > 0;
     self.pageDownButton.enabled = self.controller.engine.hasCandidates &&
-        (self.controller.engine.currentPage + 1) * self.controller.engine.candidatesPerPage < self.controller.engine.candidateCount;
+                                  (self.controller.engine.currentPage + 1) * self.controller.engine.candidatesPerPage <
+                                      self.controller.engine.candidateCount;
 }
 
 - (void)updateModeIndicator {

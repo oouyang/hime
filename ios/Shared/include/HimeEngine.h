@@ -13,10 +13,10 @@ NS_ASSUME_NONNULL_BEGIN
 
 /* Key processing result */
 typedef NS_ENUM(NSInteger, HimeKeyResultType) {
-    HimeKeyResultIgnored = 0,   /* Key not handled, pass through */
-    HimeKeyResultAbsorbed = 1,  /* Key handled, no output */
-    HimeKeyResultCommit = 2,    /* Key handled, commit string ready */
-    HimeKeyResultPreedit = 3    /* Key handled, preedit updated */
+    HimeKeyResultIgnored = 0,  /* Key not handled, pass through */
+    HimeKeyResultAbsorbed = 1, /* Key handled, no output */
+    HimeKeyResultCommit = 2,   /* Key handled, commit string ready */
+    HimeKeyResultPreedit = 3   /* Key handled, preedit updated */
 };
 
 /* Modifier flags */
@@ -30,8 +30,8 @@ typedef NS_OPTIONS(NSUInteger, HimeModifierFlags) {
 
 /* Character set type */
 typedef NS_ENUM(NSInteger, HimeCharsetType) {
-    HimeCharsetTraditional = 0,  /* Traditional Chinese */
-    HimeCharsetSimplified = 1    /* Simplified Chinese */
+    HimeCharsetTraditional = 0, /* Traditional Chinese */
+    HimeCharsetSimplified = 1   /* Simplified Chinese */
 };
 
 /* Candidate display style */
@@ -61,13 +61,13 @@ typedef NS_ENUM(NSInteger, HimeFeedbackEventType) {
 
 /* Keyboard layout type */
 typedef NS_ENUM(NSInteger, HimeKeyboardLayoutType) {
-    HimeKeyboardLayoutStandard = 0,  /* Standard Zhuyin (大千/標準注音) */
-    HimeKeyboardLayoutHSU = 1,       /* HSU layout (許氏鍵盤) */
-    HimeKeyboardLayoutETen = 2,      /* ETen layout (倚天鍵盤) */
-    HimeKeyboardLayoutETen26 = 3,    /* ETen 26-key layout */
-    HimeKeyboardLayoutIBM = 4,       /* IBM layout */
-    HimeKeyboardLayoutPinyin = 5,    /* Hanyu Pinyin layout */
-    HimeKeyboardLayoutDvorak = 6     /* Dvorak-based Zhuyin */
+    HimeKeyboardLayoutStandard = 0, /* Standard Zhuyin (大千/標準注音) */
+    HimeKeyboardLayoutHSU = 1,      /* HSU layout (許氏鍵盤) */
+    HimeKeyboardLayoutETen = 2,     /* ETen layout (倚天鍵盤) */
+    HimeKeyboardLayoutETen26 = 3,   /* ETen 26-key layout */
+    HimeKeyboardLayoutIBM = 4,      /* IBM layout */
+    HimeKeyboardLayoutPinyin = 5,   /* Hanyu Pinyin layout */
+    HimeKeyboardLayoutDvorak = 6    /* Dvorak-based Zhuyin */
 };
 
 /* Feedback callback block */
@@ -142,7 +142,7 @@ typedef void (^HimeFeedbackBlock)(HimeFeedbackEventType type);
 /* Sound/Vibration feedback */
 @property (nonatomic, assign) BOOL soundEnabled;
 @property (nonatomic, assign) BOOL vibrationEnabled;
-@property (nonatomic, assign) NSInteger vibrationDuration;  /* milliseconds */
+@property (nonatomic, assign) NSInteger vibrationDuration; /* milliseconds */
 @property (nonatomic, copy, nullable) HimeFeedbackBlock feedbackHandler;
 
 @end
