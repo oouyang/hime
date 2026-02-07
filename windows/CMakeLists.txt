@@ -1,15 +1,16 @@
-# HIME Windows IME Build Configuration
+# HIME Windows IME Build Configuration (MinGW-w64 Cross-Compiler)
 # Copyright (C) 2020 The HIME team, Taiwan
 # License: GNU LGPL v2.1
 #
-# Build instructions:
+# Cross-compilation from Linux:
 #   mkdir build && cd build
-#   cmake .. -G "Visual Studio 17 2022" -A x64
-#   cmake --build . --config Release
+#   cmake .. -DCMAKE_TOOLCHAIN_FILE=../mingw-w64-x86_64.cmake
+#   make -j$(nproc)
 #
-# Or for 32-bit:
-#   cmake .. -G "Visual Studio 17 2022" -A Win32
-#   cmake --build . --config Release
+# Native MinGW build on Windows:
+#   mkdir build && cd build
+#   cmake .. -G "MinGW Makefiles"
+#   mingw32-make
 
 cmake_minimum_required(VERSION 3.16)
 project(hime-ime VERSION 0.10.1 LANGUAGES C CXX)
@@ -24,14 +25,22 @@ set(CMAKE_C_STANDARD_REQUIRED ON)
 
 # Output directories
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
-set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
+set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 
-# Windows-specific settings
-if(WIN32)
-    add_definitions(-DUNICODE -D_UNICODE)
-    add_definitions(-DWIN32_LEAN_AND_MEAN)
-    add_definitions(-DNOMINMAX)
+# Windows-specific definitions
+add_definitions(-DUNICODE -D_UNICODE)
+add_definitions(-DWIN32_LEAN_AND_MEAN)
+add_definitions(-DNOMINMAX)
+
+# MinGW-specific settings
+if(MINGW)
+    # Enable static linking of GCC runtime
+    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -static-libgcc -static-libstdc++")
+    set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -static-libgcc -static-libstdc++")
+
+    # Disable console window for DLLs
+    set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -Wl,--enable-stdcall-fixup")
 endif()
 
 # ========== HIME Core Library ==========
@@ -47,18 +56,15 @@ target_compile_definitions(hime-core PRIVATE
     HIME_CORE_EXPORTS
 )
 
-# Export symbols for Windows DLL
-if(WIN32)
-    set_target_properties(hime-core PROPERTIES
-        WINDOWS_EXPORT_ALL_SYMBOLS OFF
-        OUTPUT_NAME "hime-core"
-    )
-endif()
+set_target_properties(hime-core PROPERTIES
+    PREFIX ""
+    OUTPUT_NAME "hime-core"
+)
 
 # ========== HIME TSF Text Service ==========
 add_library(hime-tsf SHARED
     src/hime-tsf.cpp
-    hime-tsf.def
+    src/hime-tsf.rc
 )
 
 target_include_directories(hime-tsf PRIVATE
@@ -70,23 +76,26 @@ target_link_libraries(hime-tsf PRIVATE
     ole32
     oleaut32
     uuid
+    advapi32
 )
 
 set_target_properties(hime-tsf PROPERTIES
+    PREFIX ""
     OUTPUT_NAME "hime-tsf"
 )
 
-# Module definition file for TSF exports
-if(WIN32)
+# Export DLL functions using .def file for MinGW
+if(MINGW)
     set_target_properties(hime-tsf PROPERTIES
-        LINK_FLAGS "/DEF:${CMAKE_CURRENT_SOURCE_DIR}/hime-tsf.def"
+        LINK_FLAGS "-Wl,--kill-at"
     )
+    target_sources(hime-tsf PRIVATE hime-tsf.def)
 endif()
 
 # ========== Installation ==========
 install(TARGETS hime-core hime-tsf
     RUNTIME DESTINATION bin
-    LIBRARY DESTINATION lib
+    LIBRARY DESTINATION bin
     ARCHIVE DESTINATION lib
 )
 
@@ -102,8 +111,7 @@ install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/../data/
     PATTERN "*.kbm"
 )
 
-# ========== Registration Helper ==========
-# Create a registration batch file
+# ========== Registration Scripts ==========
 file(WRITE ${CMAKE_BINARY_DIR}/register.bat
 "@echo off
 echo Registering HIME Text Service...
@@ -154,7 +162,10 @@ set(CPACK_PACKAGE_VENDOR "HIME Team")
 set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "HIME Input Method Editor for Windows")
 include(CPack)
 
+message(STATUS "")
 message(STATUS "HIME Windows IME configuration complete")
 message(STATUS "  Version: ${PROJECT_VERSION}")
 message(STATUS "  Build type: ${CMAKE_BUILD_TYPE}")
+message(STATUS "  Compiler: ${CMAKE_C_COMPILER}")
 message(STATUS "  Install prefix: ${CMAKE_INSTALL_PREFIX}")
+message(STATUS "")

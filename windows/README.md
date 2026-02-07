@@ -46,31 +46,52 @@ Windows TSF text service that:
 
 ## Building
 
+The build uses MinGW-w64 GCC cross-compiler, allowing you to build Windows binaries on Linux.
+
 ### Prerequisites
 
-- Windows 10 SDK or later
-- Visual Studio 2019/2022 (or CMake with MSVC)
-- CMake 3.16 or later
+**On Debian/Ubuntu:**
+```bash
+sudo apt-get install mingw-w64 cmake make
+```
 
-### Build Steps
+**On Fedora:**
+```bash
+sudo dnf install mingw64-gcc mingw64-gcc-c++ cmake make
+```
 
-```powershell
-# Clone the repository
-git clone https://github.com/hime-ime/hime.git
-cd hime/windows
+**On Arch Linux:**
+```bash
+sudo pacman -S mingw-w64-gcc cmake make
+```
 
-# Create build directory
-mkdir build
-cd build
+### Cross-Compile from Linux (64-bit)
 
-# Configure (64-bit)
-cmake .. -G "Visual Studio 17 2022" -A x64
+```bash
+cd windows
+mkdir build && cd build
+cmake .. -DCMAKE_TOOLCHAIN_FILE=../mingw-w64-x86_64.cmake
+make -j$(nproc)
+```
 
-# Or for 32-bit
-cmake .. -G "Visual Studio 17 2022" -A Win32
+### Cross-Compile from Linux (32-bit)
 
-# Build
-cmake --build . --config Release
+```bash
+cd windows
+mkdir build && cd build
+cmake .. -DCMAKE_TOOLCHAIN_FILE=../mingw-w64-i686.cmake
+make -j$(nproc)
+```
+
+### Native Build on Windows (MinGW)
+
+If you have MinGW-w64 installed on Windows:
+
+```cmd
+cd windows
+mkdir build && cd build
+cmake .. -G "MinGW Makefiles"
+mingw32-make
 ```
 
 ### Build Output
@@ -78,42 +99,42 @@ cmake --build . --config Release
 ```
 build/
 ├── bin/
-│   ├── hime-core.dll     # Core library
-│   ├── hime-tsf.dll      # TSF text service
-│   └── test-hime-core.exe # Test program
+│   ├── hime-core.dll       # Core library
+│   ├── hime-tsf.dll        # TSF text service
+│   └── test-hime-core.exe  # Test program
 ├── lib/
-│   ├── hime-core.lib     # Import library
-│   └── hime-tsf.lib      # Import library
-├── register.bat          # Registration script
-└── unregister.bat        # Unregistration script
+│   ├── libhime-core.dll.a  # Import library
+│   └── libhime-tsf.dll.a   # Import library
+├── register.bat            # Registration script
+└── unregister.bat          # Unregistration script
 ```
 
 ## Installation
 
+### Copy Files to Windows
+
+After cross-compiling, copy the following to your Windows machine:
+```
+build/bin/hime-core.dll    → C:\Program Files\HIME\bin\
+build/bin/hime-tsf.dll     → C:\Program Files\HIME\bin\
+build/register.bat         → C:\Program Files\HIME\
+build/unregister.bat       → C:\Program Files\HIME\
+data/pho.tab2              → C:\Program Files\HIME\data\
+```
+
 ### Register the IME
 
-1. Build the project as described above
-2. Copy build output to a permanent location (e.g., `C:\Program Files\HIME`)
-3. Copy data files:
-   ```
-   hime/data/pho.tab2 -> C:\Program Files\HIME\data\pho.tab2
-   ```
-4. Run `register.bat` as Administrator
-
-Or manually:
-```powershell
-# Run as Administrator
+Run `register.bat` as Administrator, or:
+```cmd
 regsvr32 "C:\Program Files\HIME\bin\hime-tsf.dll"
 ```
 
 ### Unregister the IME
 
-```powershell
-# Run as Administrator
+Run `unregister.bat` as Administrator, or:
+```cmd
 regsvr32 /u "C:\Program Files\HIME\bin\hime-tsf.dll"
 ```
-
-Or run `unregister.bat` as Administrator.
 
 ### Enabling the IME
 
@@ -167,16 +188,19 @@ After registration:
 
 ```
 windows/
-├── CMakeLists.txt       # Build configuration
-├── hime-tsf.def         # DLL export definitions
-├── README.md            # This file
+├── CMakeLists.txt            # Build configuration
+├── mingw-w64-x86_64.cmake    # 64-bit cross-compile toolchain
+├── mingw-w64-i686.cmake      # 32-bit cross-compile toolchain
+├── hime-tsf.def              # DLL export definitions
+├── README.md                 # This file
 ├── include/
-│   └── hime-core.h      # Core API header
+│   └── hime-core.h           # Core API header
 ├── src/
-│   ├── hime-core.c      # Core implementation
-│   └── hime-tsf.cpp     # TSF wrapper
+│   ├── hime-core.c           # Core implementation
+│   ├── hime-tsf.cpp          # TSF wrapper
+│   └── hime-tsf.rc           # Windows resource file
 └── tests/
-    └── test-hime-core.c # Core library tests
+    └── test-hime-core.c      # Core library tests
 ```
 
 ## API Reference
@@ -215,12 +239,20 @@ int hime_get_candidate(HimeContext *ctx, int index, char *buffer, int buffer_siz
 | Feature | PIME Integration | Standalone |
 |---------|-----------------|------------|
 | Language | Python | C/C++ |
-| Dependencies | PIME framework | Windows SDK only |
+| Build Tool | None (Python) | MinGW-w64 GCC |
+| Dependencies | PIME + Python | None (standalone) |
 | Size | ~500KB + Python | ~200KB |
 | Performance | Good | Better (native) |
-| Extensibility | Easy (Python) | Requires recompile |
+| Cross-compile | No | Yes (from Linux) |
 
 ## Troubleshooting
+
+### Build fails with "command not found"
+Ensure MinGW-w64 is installed:
+```bash
+# Check if cross-compiler is available
+x86_64-w64-mingw32-gcc --version
+```
 
 ### IME doesn't appear in language settings
 - Ensure registration completed without errors
@@ -228,13 +260,18 @@ int hime_get_candidate(HimeContext *ctx, int index, char *buffer, int buffer_siz
 - Verify DLLs are in a location accessible to all users
 
 ### IME crashes on startup
-- Ensure `pho.tab2` is in the `data` subdirectory
+- Ensure `pho.tab2` is in the `data` subdirectory relative to the DLL
 - Check Windows Event Viewer for details
-- Run `test-hime-core.exe` to verify core functionality
+- Run `test-hime-core.exe` on Windows to verify core functionality
 
 ### Characters not appearing
 - Verify the application supports TSF
 - Some legacy applications may not work with TSF
+
+### DLL registration fails
+- Run Command Prompt as Administrator
+- Ensure both `hime-core.dll` and `hime-tsf.dll` are in the same directory
+- Check that the DLLs are not blocked by Windows (right-click → Properties → Unblock)
 
 ## License
 
@@ -244,3 +281,4 @@ GNU LGPL v2.1, consistent with the main HIME project.
 
 - [HIME](https://github.com/hime-ime/hime) - Original input method engine
 - HIME Team for phonetic tables and algorithms
+- MinGW-w64 project for the cross-compiler toolchain
