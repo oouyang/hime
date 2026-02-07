@@ -768,6 +768,29 @@ PRs must pass:
 - Build compilation
 - Code formatting check (`make clang-format`)
 
+## Windows Support (PIME Integration)
+
+HIME can be used on Windows through the [PIME](https://github.com/nickmcmahon/PIME) framework. The PIME integration provides:
+
+- Bopomofo (Zhuyin) phonetic input
+- Standard keyboard layout support
+- Character candidate selection with frequency sorting
+
+### Installation on Windows
+
+1. Install PIME on Windows
+2. Copy the `pime/hime/` directory to:
+   ```
+   C:\Program Files (X86)\PIME\server\input_methods\hime\
+   ```
+3. Copy data files from HIME:
+   - `data/pho.tab2` → `hime/data/`
+   - `data/zo.kbm` → `hime/data/`
+4. Restart PIME or reboot
+5. Select "HIME 輸入法" from Windows language settings
+
+See `pime/hime/README.md` for detailed usage instructions.
+
 ## Resources
 
 - **Repository:** https://github.com/hime-ime/hime
