@@ -15,6 +15,7 @@ static void feedbackTrampoline(HimeFeedbackType type, void *userData);
     HimeContext *_ctx;
     HimeFeedbackBlock _feedbackBlock;
 }
+- (void)invokeFeedbackWithType:(HimeFeedbackEventType)type;
 @end
 
 @implementation HimeEngine
@@ -369,12 +370,18 @@ static void feedbackTrampoline(HimeFeedbackType type, void *userData);
     }
 }
 
+- (void)invokeFeedbackWithType:(HimeFeedbackEventType)type {
+    if (_feedbackBlock) {
+        _feedbackBlock(type);
+    }
+}
+
 @end
 
 /* C callback trampoline implementation */
 static void feedbackTrampoline(HimeFeedbackType type, void *userData) {
     HimeEngine *engine = (__bridge HimeEngine *) userData;
-    if (engine && engine->_feedbackBlock) {
-        engine->_feedbackBlock((HimeFeedbackEventType) type);
+    if (engine) {
+        [engine invokeFeedbackWithType:(HimeFeedbackEventType) type];
     }
 }
