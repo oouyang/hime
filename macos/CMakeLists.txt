@@ -111,6 +111,35 @@ if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/Resources/HIME.icns)
         MACOSX_BUNDLE_ICON_FILE HIME.icns)
 endif()
 
+# ========== Unit Tests ==========
+option(BUILD_TESTS "Build unit tests" OFF)
+
+if(BUILD_TESTS)
+    enable_testing()
+    find_library(XCTEST_FRAMEWORK XCTest REQUIRED)
+
+    add_executable(hime-tests
+        tests/HimeEngineTests.m
+        src/HimeEngine.m
+    )
+
+    target_link_libraries(hime-tests PRIVATE
+        hime-core-static
+        ${COCOA_FRAMEWORK}
+        ${XCTEST_FRAMEWORK}
+    )
+
+    target_include_directories(hime-tests PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/include
+    )
+
+    set_target_properties(hime-tests PROPERTIES
+        XCODE_ATTRIBUTE_CLANG_ENABLE_OBJC_ARC YES
+    )
+
+    add_test(NAME HimeEngineTests COMMAND hime-tests)
+endif()
+
 # ========== Installation ==========
 install(TARGETS ${HIME_BUNDLE_NAME}
     BUNDLE DESTINATION "/Library/Input Methods"
