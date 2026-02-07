@@ -1696,8 +1696,12 @@ HIME_API int hime_intcode_convert(HimeContext *ctx, const char *hex_code,
                                    char *buffer, int buffer_size) {
     if (!ctx || !hex_code || !buffer || buffer_size < 5) return 0;
 
+    /* Empty string or too short - invalid */
+    if (hex_code[0] == '\0') return 0;
+
     /* Parse hex code */
     uint32_t code = 0;
+    int digits = 0;
     for (const char *p = hex_code; *p; p++) {
         char c = *p;
         int digit;
@@ -1706,12 +1710,17 @@ HIME_API int hime_intcode_convert(HimeContext *ctx, const char *hex_code,
         else if (c >= 'a' && c <= 'f') digit = c - 'a' + 10;
         else return 0;  /* Invalid hex */
         code = (code << 4) | digit;
+        digits++;
     }
+
+    /* Must have valid hex code (at least 1 digit, max 8 digits) */
+    if (digits == 0 || digits > 8 || code == 0) return 0;
 
     /* Convert based on mode */
     uint32_t unicode;
     if (ctx->intcode_mode == HIME_INTCODE_BIG5) {
         unicode = big5_to_unicode((uint16_t)code);
+        if (unicode == 0) return 0;  /* Invalid Big5 code */
     } else {
         unicode = code;
     }
