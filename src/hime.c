@@ -503,7 +503,7 @@ static const MessageHandler message_handlers[] = {
 #endif
     {RELOAD_TSIN_DB, msg_reload_tsin},
     {HIME_EXIT_MESSAGE, msg_exit},
-    {NULL, NULL}  /* sentinel */
+    {NULL, NULL} /* sentinel */
 };
 
 void message_cb (char *message) {

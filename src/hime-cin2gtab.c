@@ -134,8 +134,8 @@ typedef struct {
 
 /* Temporary storage for raw key/arg pairs to avoid double file read */
 typedef struct {
-    char *keys;    /* key string */
-    char *args;    /* argument string */
+    char *keys; /* key string */
+    char *args; /* argument string */
 } RAW_ENTRY;
 
 #define MAX_K (500000)
