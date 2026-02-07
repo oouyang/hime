@@ -16,7 +16,7 @@
 #include <stdio.h>
 
 /* Version */
-#define HIME_VERSION "0.10.1-win"
+#define HIME_VERSION "0.10.1-android"
 
 /* Phonetic segment bit lengths */
 static const int TYP_PHO_LEN[] = {5, 2, 4, 3};
@@ -111,6 +111,25 @@ struct HimeContext {
 
     /* Selection keys */
     char sel_keys[16];
+
+    /* New features - Settings */
+    HimeCharset charset;                /* Simplified/Traditional */
+    HimeCandidateStyle candidate_style; /* Candidate display style */
+    HimeColorScheme color_scheme;       /* Light/Dark/System */
+    bool system_dark_mode;              /* System dark mode state */
+
+    /* Smart punctuation */
+    bool smart_punctuation;             /* Enable smart punctuation */
+    bool pinyin_annotation;             /* Show Pinyin hints */
+    bool quote_open_double;             /* Quote pairing state */
+    bool quote_open_single;             /* Single quote state */
+
+    /* Feedback settings */
+    bool sound_enabled;
+    bool vibration_enabled;
+    int vibration_duration_ms;
+    HimeFeedbackCallback feedback_callback;
+    void *feedback_user_data;
 };
 
 /* Global state */
@@ -119,6 +138,9 @@ static PhoTable g_pho_table = {0};
 static bool g_initialized = false;
 
 /* ========== Internal Functions ========== */
+
+/* Forward declaration for feedback trigger */
+static void trigger_feedback(HimeContext *ctx, HimeFeedbackType type);
 
 static hime_phokey_t pho2key(int typ_pho[4]) {
     hime_phokey_t key = typ_pho[0];
@@ -353,6 +375,23 @@ HIME_API HimeContext *hime_context_new(void) {
     ctx->candidates_per_page = 10;
     strcpy(ctx->sel_keys, "1234567890");
 
+    /* Initialize new feature settings with defaults */
+    ctx->charset = HIME_CHARSET_TRADITIONAL;
+    ctx->candidate_style = HIME_CAND_STYLE_HORIZONTAL;
+    ctx->color_scheme = HIME_COLOR_SCHEME_SYSTEM;
+    ctx->system_dark_mode = false;
+
+    ctx->smart_punctuation = false;
+    ctx->pinyin_annotation = false;
+    ctx->quote_open_double = false;
+    ctx->quote_open_single = false;
+
+    ctx->sound_enabled = false;
+    ctx->vibration_enabled = false;
+    ctx->vibration_duration_ms = 20;
+    ctx->feedback_callback = NULL;
+    ctx->feedback_user_data = NULL;
+
     return ctx;
 }
 
@@ -409,6 +448,8 @@ HIME_API HimeKeyResult hime_process_key(
     uint32_t charcode,
     uint32_t modifiers
 ) {
+    (void)modifiers;  /* Currently unused */
+
     if (!ctx || !ctx->chinese_mode) {
         return HIME_KEY_IGNORED;
     }
@@ -423,6 +464,7 @@ HIME_API HimeKeyResult hime_process_key(
             if (idx < ctx->candidate_count) {
                 strcpy(ctx->commit, ctx->candidates[idx]);
                 hime_context_reset(ctx);
+                trigger_feedback(ctx, HIME_FEEDBACK_CANDIDATE);
                 return HIME_KEY_COMMIT;
             }
         }
@@ -451,8 +493,15 @@ HIME_API HimeKeyResult hime_process_key(
             ctx->candidate_count = 0;
             ctx->candidate_page = 0;
             update_preedit(ctx);
+            trigger_feedback(ctx, HIME_FEEDBACK_KEY_DELETE);
             return HIME_KEY_PREEDIT;
         }
+        return HIME_KEY_IGNORED;
+    }
+
+    /* Handle Enter key */
+    if (keycode == 0x0D || charcode == 0x0D) {
+        trigger_feedback(ctx, HIME_FEEDBACK_KEY_ENTER);
         return HIME_KEY_IGNORED;
     }
 
@@ -483,10 +532,17 @@ HIME_API HimeKeyResult hime_process_key(
                     /* Auto-select single candidate */
                     strcpy(ctx->commit, ctx->candidates[0]);
                     hime_context_reset(ctx);
+                    trigger_feedback(ctx, HIME_FEEDBACK_CANDIDATE);
                     return HIME_KEY_COMMIT;
                 } else if (ctx->candidate_count > 0) {
+                    trigger_feedback(ctx, key == ' ' ? HIME_FEEDBACK_KEY_SPACE : HIME_FEEDBACK_KEY_PRESS);
                     return HIME_KEY_PREEDIT;
+                } else if (key == ' ') {
+                    /* Space pressed but no candidates - invalid input */
+                    trigger_feedback(ctx, HIME_FEEDBACK_ERROR);
                 }
+            } else {
+                trigger_feedback(ctx, HIME_FEEDBACK_KEY_PRESS);
             }
 
             return HIME_KEY_PREEDIT;
@@ -625,4 +681,248 @@ HIME_API void hime_set_candidates_per_page(HimeContext *ctx, int count) {
     if (count < 1) count = 1;
     if (count > 10) count = 10;
     ctx->candidates_per_page = count;
+}
+
+/* ========== Settings/Preferences Implementation ========== */
+
+HIME_API void hime_set_charset(HimeContext *ctx, HimeCharset charset) {
+    if (!ctx) return;
+    ctx->charset = charset;
+}
+
+HIME_API HimeCharset hime_get_charset(HimeContext *ctx) {
+    return ctx ? ctx->charset : HIME_CHARSET_TRADITIONAL;
+}
+
+HIME_API HimeCharset hime_toggle_charset(HimeContext *ctx) {
+    if (!ctx) return HIME_CHARSET_TRADITIONAL;
+    ctx->charset = (ctx->charset == HIME_CHARSET_TRADITIONAL)
+                   ? HIME_CHARSET_SIMPLIFIED
+                   : HIME_CHARSET_TRADITIONAL;
+    return ctx->charset;
+}
+
+HIME_API void hime_set_smart_punctuation(HimeContext *ctx, bool enabled) {
+    if (!ctx) return;
+    ctx->smart_punctuation = enabled;
+}
+
+HIME_API bool hime_get_smart_punctuation(HimeContext *ctx) {
+    return ctx ? ctx->smart_punctuation : false;
+}
+
+HIME_API void hime_set_pinyin_annotation(HimeContext *ctx, bool enabled) {
+    if (!ctx) return;
+    ctx->pinyin_annotation = enabled;
+}
+
+HIME_API bool hime_get_pinyin_annotation(HimeContext *ctx) {
+    return ctx ? ctx->pinyin_annotation : false;
+}
+
+HIME_API int hime_get_pinyin_for_char(
+    HimeContext *ctx,
+    const char *character,
+    char *buffer,
+    int buffer_size
+) {
+    /* TODO: Implement Pinyin lookup table */
+    (void)ctx;
+    (void)character;
+    if (buffer && buffer_size > 0) {
+        buffer[0] = '\0';
+    }
+    return 0;
+}
+
+HIME_API void hime_set_candidate_style(HimeContext *ctx, HimeCandidateStyle style) {
+    if (!ctx) return;
+    ctx->candidate_style = style;
+}
+
+HIME_API HimeCandidateStyle hime_get_candidate_style(HimeContext *ctx) {
+    return ctx ? ctx->candidate_style : HIME_CAND_STYLE_HORIZONTAL;
+}
+
+/* ========== Feedback Implementation ========== */
+
+HIME_API void hime_set_feedback_callback(
+    HimeContext *ctx,
+    HimeFeedbackCallback callback,
+    void *user_data
+) {
+    if (!ctx) return;
+    ctx->feedback_callback = callback;
+    ctx->feedback_user_data = user_data;
+}
+
+static void trigger_feedback(HimeContext *ctx, HimeFeedbackType type) {
+    if (ctx && ctx->feedback_callback) {
+        ctx->feedback_callback(type, ctx->feedback_user_data);
+    }
+}
+
+HIME_API void hime_set_sound_enabled(HimeContext *ctx, bool enabled) {
+    if (!ctx) return;
+    ctx->sound_enabled = enabled;
+}
+
+HIME_API bool hime_get_sound_enabled(HimeContext *ctx) {
+    return ctx ? ctx->sound_enabled : false;
+}
+
+HIME_API void hime_set_vibration_enabled(HimeContext *ctx, bool enabled) {
+    if (!ctx) return;
+    ctx->vibration_enabled = enabled;
+}
+
+HIME_API bool hime_get_vibration_enabled(HimeContext *ctx) {
+    return ctx ? ctx->vibration_enabled : false;
+}
+
+HIME_API void hime_set_vibration_duration(HimeContext *ctx, int duration_ms) {
+    if (!ctx) return;
+    if (duration_ms < 1) duration_ms = 1;
+    if (duration_ms > 500) duration_ms = 500;
+    ctx->vibration_duration_ms = duration_ms;
+}
+
+HIME_API int hime_get_vibration_duration(HimeContext *ctx) {
+    return ctx ? ctx->vibration_duration_ms : 20;
+}
+
+/* ========== Smart Punctuation Implementation ========== */
+
+/* Punctuation conversion table */
+typedef struct {
+    char ascii;
+    const char *chinese;
+    const char *chinese_alt;  /* Alternate for paired punctuation */
+} PunctuationEntry;
+
+static const PunctuationEntry PUNCTUATION_TABLE[] = {
+    {',', "，", NULL},
+    {'.', "。", NULL},
+    {'?', "？", NULL},
+    {'!', "！", NULL},
+    {':', "：", NULL},
+    {';', "；", NULL},
+    {'(', "（", NULL},
+    {')', "）", NULL},
+    {'[', "「", NULL},
+    {']', "」", NULL},
+    {'{', "『", NULL},
+    {'}', "』", NULL},
+    {'<', "《", NULL},
+    {'>', "》", NULL},
+    {'"', """, """},  /* Opening/closing double quotes */
+    {'\'', "'", "'"},  /* Opening/closing single quotes */
+    {'~', "～", NULL},
+    {'@', "＠", NULL},
+    {'#', "＃", NULL},
+    {'$', "￥", NULL},
+    {'%', "％", NULL},
+    {'^', "……", NULL},
+    {'&', "＆", NULL},
+    {'*', "×", NULL},
+    {'-', "—", NULL},
+    {'_', "——", NULL},
+    {'+', "＋", NULL},
+    {'=', "＝", NULL},
+    {'/', "、", NULL},
+    {'\\', "＼", NULL},
+    {'|', "｜", NULL},
+    {0, NULL, NULL}
+};
+
+HIME_API void hime_reset_punctuation_state(HimeContext *ctx) {
+    if (!ctx) return;
+    ctx->quote_open_double = false;
+    ctx->quote_open_single = false;
+}
+
+HIME_API int hime_convert_punctuation(
+    HimeContext *ctx,
+    char ascii,
+    char *buffer,
+    int buffer_size
+) {
+    if (!ctx || !buffer || buffer_size <= 0) return 0;
+    buffer[0] = '\0';
+
+    if (!ctx->smart_punctuation) return 0;
+
+    for (int i = 0; PUNCTUATION_TABLE[i].ascii != 0; i++) {
+        if (PUNCTUATION_TABLE[i].ascii == ascii) {
+            const char *result = PUNCTUATION_TABLE[i].chinese;
+
+            /* Handle paired punctuation (quotes) */
+            if (ascii == '"' && PUNCTUATION_TABLE[i].chinese_alt) {
+                if (ctx->quote_open_double) {
+                    result = PUNCTUATION_TABLE[i].chinese_alt;
+                }
+                ctx->quote_open_double = !ctx->quote_open_double;
+            } else if (ascii == '\'' && PUNCTUATION_TABLE[i].chinese_alt) {
+                if (ctx->quote_open_single) {
+                    result = PUNCTUATION_TABLE[i].chinese_alt;
+                }
+                ctx->quote_open_single = !ctx->quote_open_single;
+            }
+
+            if (result) {
+                int len = strlen(result);
+                if (len < buffer_size) {
+                    strcpy(buffer, result);
+                    return len;
+                }
+            }
+            break;
+        }
+    }
+
+    return 0;
+}
+
+/* ========== Theme/Color Implementation ========== */
+
+HIME_API void hime_set_color_scheme(HimeContext *ctx, HimeColorScheme scheme) {
+    if (!ctx) return;
+    ctx->color_scheme = scheme;
+}
+
+HIME_API HimeColorScheme hime_get_color_scheme(HimeContext *ctx) {
+    return ctx ? ctx->color_scheme : HIME_COLOR_SCHEME_LIGHT;
+}
+
+HIME_API void hime_set_system_dark_mode(HimeContext *ctx, bool is_dark) {
+    if (!ctx) return;
+    ctx->system_dark_mode = is_dark;
+}
+
+/* ========== Extended Candidate Info ========== */
+
+HIME_API int hime_get_candidate_with_annotation(
+    HimeContext *ctx,
+    int index,
+    char *text_buffer,
+    int text_size,
+    char *annotation_buffer,
+    int annotation_size
+) {
+    if (!ctx || !text_buffer || text_size <= 0) return -1;
+
+    /* Get the candidate text */
+    int len = hime_get_candidate(ctx, index, text_buffer, text_size);
+    if (len < 0) return -1;
+
+    /* Get annotation if requested and enabled */
+    if (annotation_buffer && annotation_size > 0) {
+        if (ctx->pinyin_annotation) {
+            hime_get_pinyin_for_char(ctx, text_buffer, annotation_buffer, annotation_size);
+        } else {
+            annotation_buffer[0] = '\0';
+        }
+    }
+
+    return len;
 }

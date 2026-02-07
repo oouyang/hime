@@ -8,8 +8,12 @@
 #import "HimeEngine.h"
 #include "hime-core.h"
 
+/* C callback trampoline */
+static void feedbackTrampoline(HimeFeedbackType type, void *userData);
+
 @interface HimeEngine () {
     HimeContext *_ctx;
+    HimeFeedbackBlock _feedbackBlock;
 }
 @end
 
@@ -191,4 +195,162 @@
     }
 }
 
+#pragma mark - Character Set
+
+- (HimeCharsetType)charset {
+    return _ctx ? (HimeCharsetType)hime_get_charset(_ctx) : HimeCharsetTraditional;
+}
+
+- (void)setCharset:(HimeCharsetType)charset {
+    if (_ctx) {
+        hime_set_charset(_ctx, (HimeCharset)charset);
+    }
+}
+
+- (HimeCharsetType)toggleCharset {
+    if (_ctx) {
+        return (HimeCharsetType)hime_toggle_charset(_ctx);
+    }
+    return HimeCharsetTraditional;
+}
+
+#pragma mark - Smart Punctuation
+
+- (BOOL)smartPunctuation {
+    return _ctx ? hime_get_smart_punctuation(_ctx) : NO;
+}
+
+- (void)setSmartPunctuation:(BOOL)smartPunctuation {
+    if (_ctx) {
+        hime_set_smart_punctuation(_ctx, smartPunctuation);
+    }
+}
+
+- (nullable NSString *)convertPunctuation:(char)ascii {
+    if (!_ctx) return nil;
+
+    char buffer[16];
+    int len = hime_convert_punctuation(_ctx, ascii, buffer, sizeof(buffer));
+    if (len <= 0) return nil;
+
+    return [[NSString alloc] initWithBytes:buffer
+                                    length:len
+                                  encoding:NSUTF8StringEncoding];
+}
+
+- (void)resetPunctuationState {
+    if (_ctx) {
+        hime_reset_punctuation_state(_ctx);
+    }
+}
+
+#pragma mark - Pinyin Annotation
+
+- (BOOL)pinyinAnnotation {
+    return _ctx ? hime_get_pinyin_annotation(_ctx) : NO;
+}
+
+- (void)setPinyinAnnotation:(BOOL)pinyinAnnotation {
+    if (_ctx) {
+        hime_set_pinyin_annotation(_ctx, pinyinAnnotation);
+    }
+}
+
+- (nullable NSString *)pinyinForCharacter:(NSString *)character {
+    if (!_ctx || !character.length) return nil;
+
+    char buffer[64];
+    int len = hime_get_pinyin_for_char(_ctx, [character UTF8String], buffer, sizeof(buffer));
+    if (len <= 0) return nil;
+
+    return [[NSString alloc] initWithBytes:buffer
+                                    length:len
+                                  encoding:NSUTF8StringEncoding];
+}
+
+#pragma mark - Candidate Style
+
+- (HimeCandidateStyleType)candidateStyle {
+    return _ctx ? (HimeCandidateStyleType)hime_get_candidate_style(_ctx) : HimeCandidateStyleHorizontal;
+}
+
+- (void)setCandidateStyle:(HimeCandidateStyleType)candidateStyle {
+    if (_ctx) {
+        hime_set_candidate_style(_ctx, (HimeCandidateStyle)candidateStyle);
+    }
+}
+
+#pragma mark - Color Scheme
+
+- (HimeColorSchemeType)colorScheme {
+    return _ctx ? (HimeColorSchemeType)hime_get_color_scheme(_ctx) : HimeColorSchemeLight;
+}
+
+- (void)setColorScheme:(HimeColorSchemeType)colorScheme {
+    if (_ctx) {
+        hime_set_color_scheme(_ctx, (HimeColorScheme)colorScheme);
+    }
+}
+
+- (void)setSystemDarkMode:(BOOL)isDark {
+    if (_ctx) {
+        hime_set_system_dark_mode(_ctx, isDark);
+    }
+}
+
+#pragma mark - Feedback
+
+- (BOOL)soundEnabled {
+    return _ctx ? hime_get_sound_enabled(_ctx) : NO;
+}
+
+- (void)setSoundEnabled:(BOOL)soundEnabled {
+    if (_ctx) {
+        hime_set_sound_enabled(_ctx, soundEnabled);
+    }
+}
+
+- (BOOL)vibrationEnabled {
+    return _ctx ? hime_get_vibration_enabled(_ctx) : NO;
+}
+
+- (void)setVibrationEnabled:(BOOL)vibrationEnabled {
+    if (_ctx) {
+        hime_set_vibration_enabled(_ctx, vibrationEnabled);
+    }
+}
+
+- (NSInteger)vibrationDuration {
+    return _ctx ? hime_get_vibration_duration(_ctx) : 20;
+}
+
+- (void)setVibrationDuration:(NSInteger)vibrationDuration {
+    if (_ctx) {
+        hime_set_vibration_duration(_ctx, (int)vibrationDuration);
+    }
+}
+
+- (HimeFeedbackBlock)feedbackHandler {
+    return _feedbackBlock;
+}
+
+- (void)setFeedbackHandler:(HimeFeedbackBlock)feedbackHandler {
+    _feedbackBlock = [feedbackHandler copy];
+    if (_ctx) {
+        if (_feedbackBlock) {
+            hime_set_feedback_callback(_ctx, feedbackTrampoline, (__bridge void *)self);
+        } else {
+            hime_set_feedback_callback(_ctx, NULL, NULL);
+        }
+    }
+}
+
 @end
+
+/* C callback trampoline implementation */
+static void feedbackTrampoline(HimeFeedbackType type, void *userData) {
+    HimeEngine *engine = (__bridge HimeEngine *)userData;
+    if (engine && engine->_feedbackBlock) {
+        engine->_feedbackBlock((HimeFeedbackEventType)type);
+    }
+}
