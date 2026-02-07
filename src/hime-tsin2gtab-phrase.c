@@ -19,26 +19,25 @@
 
 #include "gtab.h"
 #include "pho.h"
-// #include "gtab-phrase-db.h"
 #include "lang.h"
 #include "tsin.h"
 
 #define MAX_K (500000)
 
-ITEM it[MAX_K];
-ITEM64 it64[MAX_K];
-gboolean key64;
-int itN;
+static ITEM it[MAX_K];
+static ITEM64 it64[MAX_K];
+static gboolean key64;
+static int itN;
 
-int qcmp_ch (const void *aa, const void *bb) {
-    return memcmp (((ITEM *) aa)->ch, ((ITEM *) bb)->ch, CH_SZ);
+static int qcmp_ch (const void *aa, const void *bb) {
+    return memcmp (((const ITEM *) aa)->ch, ((const ITEM *) bb)->ch, CH_SZ);
 }
 
-int qcmp_ch64 (const void *aa, const void *bb) {
-    return memcmp (((ITEM64 *) aa)->ch, ((ITEM64 *) bb)->ch, CH_SZ);
+static int qcmp_ch64 (const void *aa, const void *bb) {
+    return memcmp (((const ITEM64 *) aa)->ch, ((const ITEM64 *) bb)->ch, CH_SZ);
 }
 
-ITEM *find_ch (char *s, int *N) {
+static ITEM *find_ch (char *s, int *N) {
     ITEM t;
 
     memset (t.ch, 0, CH_SZ);
@@ -64,7 +63,7 @@ ITEM *find_ch (char *s, int *N) {
     return p;
 }
 
-ITEM64 *find_ch64 (char *s, int *N) {
+static ITEM64 *find_ch64 (char *s, int *N) {
     ITEM64 t;
 
     memset (t.ch, 0, CH_SZ);
@@ -294,9 +293,9 @@ int main (int argc, char **argv) {
             }
 
             char kstr[512];
-            kstr[0] = 0;
+            int kstr_len = 0;
 
-            for (i = 0; i < clen; i++) {
+            for (int i = 0; i < clen; i++) {
                 char tkey[16];
                 u_int64_t k = 0;
 
@@ -310,9 +309,14 @@ int main (int argc, char **argv) {
 
                 get_keymap_str (k, keymap, th.keybits, tkey);
 
-                strcat (kstr, tkey);
-                strcat (kstr, " ");
+                int tkey_len = strlen (tkey);
+                if (kstr_len + tkey_len + 2 < (int) sizeof (kstr)) {
+                    memcpy (kstr + kstr_len, tkey, tkey_len);
+                    kstr_len += tkey_len;
+                    kstr[kstr_len++] = ' ';
+                }
             }
+            kstr[kstr_len] = '\0';
 
             fprintf (fp_out, "%s %s%d\n", str, kstr, usecount);
         }

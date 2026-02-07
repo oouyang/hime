@@ -24,7 +24,7 @@
 #include "pho.h"
 #include "tsin.h"
 
-char txt[128];
+static char txt[128];
 
 extern char *current_tsin_fname;
 typedef unsigned int u_int32_t;
@@ -35,28 +35,28 @@ void init_gtab (int inmdno);
 gboolean init_tsin_table_fname (INMD *p, char *fname);
 void load_tsin_db0 (char *infname, gboolean is_gtab_i);
 
-GtkWidget *vbox_top;
+static GtkWidget *vbox_top;
 INMD *pinmd;
 char gtab_tsin_fname[256];
 char is_gtab;
 
 char *phokey2pinyin (phokey_t k);
-gboolean b_pinyin;
-GtkWidget *hbox_buttons;
-char current_str[MAX_PHRASE_LEN * CH_SZ + 1];
+static gboolean b_pinyin;
+static GtkWidget *hbox_buttons;
+static char current_str[MAX_PHRASE_LEN * CH_SZ + 1];
 
-GtkWidget *mainwin;
+static GtkWidget *mainwin;
 
 static int *ts_idx;
-int tsN;
-int page_ofs, select_cursor;
-GtkWidget *labels[PAGE_LEN];
-GtkWidget *button_check[PAGE_LEN];
-GtkWidget *last_row, *find_textentry, *label_page_ofs;
-int del_ofs[1024];
-int del_ofsN;
+static int tsN;
+static int page_ofs, select_cursor;
+static GtkWidget *labels[PAGE_LEN];
+static GtkWidget *button_check[PAGE_LEN];
+static GtkWidget *last_row, *find_textentry, *label_page_ofs;
+static int del_ofs[1024];
+static int del_ofsN;
 
-void cp_ph_key (void *in, int idx, void *dest) {
+static void cp_ph_key (void *in, int idx, void *dest) {
     if (ph_key_sz == 2) {
         phokey_t *pharr = (phokey_t *) in;
         in = &pharr[idx];
@@ -71,7 +71,7 @@ void cp_ph_key (void *in, int idx, void *dest) {
     memcpy (dest, in, ph_key_sz);
 }
 
-void *get_ph_key_ptr (void *in, int idx) {
+static void *get_ph_key_ptr (void *in, int idx) {
     if (ph_key_sz == 2) {
         phokey_t *pharr = (phokey_t *) in;
         return &pharr[idx];
@@ -86,7 +86,7 @@ void *get_ph_key_ptr (void *in, int idx) {
     return &pharr8[idx];
 }
 
-int lookup_gtab_key (char *ch, void *out) {
+static int lookup_gtab_key (char *ch, void *out) {
     int outN = 0;
     INMD *tinmd = &inmd[default_input_method];
 
@@ -173,7 +173,7 @@ stop:
 }
 
 int gtab_key2name (INMD *tinmd, u_int64_t key, char *t, int *rtlen);
-void get_key_str (void *key, int idx, char *out_str) {
+static void get_key_str (void *key, int idx, char *out_str) {
     char t[128];
     char *phostr = NULL;
 
@@ -200,18 +200,18 @@ void get_key_str (void *key, int idx, char *out_str) {
 
 void load_tsin_entry0 (char *len, usecount_t *usecount, void *pho, u_char *ch);
 
-void load_tsin_at_ts_idx (int ts_row,
-                          char *len,
-                          usecount_t *usecount,
-                          void *pho,
-                          u_char *ch) {
+static void load_tsin_at_ts_idx (int ts_row,
+                                 char *len,
+                                 usecount_t *usecount,
+                                 void *pho,
+                                 u_char *ch) {
     int ofs = ts_idx[ts_row];
     fseek (fph, ofs, SEEK_SET);
 
     load_tsin_entry0 (len, usecount, pho, ch);
 }
 
-void disp_page (void) {
+static void disp_page (void) {
     for (int li = 0; li < PAGE_LEN; li++) {
         char line[256];
         int ts_row = page_ofs + li;
@@ -381,7 +381,7 @@ static int bigphoN;
 
 static GtkWidget *hbox_pho_sel;
 
-void destroy_pho_sel_area (void) {
+static void destroy_pho_sel_area (void) {
     gtk_widget_destroy (hbox_pho_sel);
 }
 
@@ -403,7 +403,7 @@ static void cb_button_ok (GtkButton *button, gpointer user_data) {
 static void cb_button_cancel (GtkButton *button, gpointer user_data) {
 }
 
-GtkWidget *create_pho_sel_area (void) {
+static GtkWidget *create_pho_sel_area (void) {
     hbox_pho_sel = gtk_box_new (GTK_ORIENTATION_HORIZONTAL, 0);
 
     for (int i = 0; i < bigphoN; i++) {
@@ -458,12 +458,12 @@ GtkWidget *create_pho_sel_area (void) {
 
 static Display *display;
 
-void do_exit (void) {
+static void do_exit (void) {
     send_hime_message (display, RELOAD_TSIN_DB);
     exit (0);
 }
 
-void load_tsin_db ();
+void load_tsin_db (void);
 void set_window_hime_icon (GtkWidget *window);
 
 #if 0
