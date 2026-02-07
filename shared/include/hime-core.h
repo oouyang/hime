@@ -907,6 +907,225 @@ HIME_API int hime_convert_to_output_variant (
  */
 HIME_API void hime_convert_candidates_to_variant (HimeContext *ctx);
 
+/* ========== Typing Practice ========== */
+
+/**
+ * Practice text difficulty level
+ */
+typedef enum {
+    HIME_PRACTICE_EASY = 1,   /* Short, common characters */
+    HIME_PRACTICE_MEDIUM = 2, /* Medium length, varied vocabulary */
+    HIME_PRACTICE_HARD = 3    /* Long, complex characters */
+} HimePracticeDifficulty;
+
+/**
+ * Practice text category
+ */
+typedef enum {
+    HIME_PRACTICE_CAT_ENGLISH = 0, /* English text */
+    HIME_PRACTICE_CAT_ZHUYIN = 1,  /* Traditional Chinese (Zhuyin/Bopomofo) */
+    HIME_PRACTICE_CAT_PINYIN = 2,  /* Simplified Chinese (Pinyin) */
+    HIME_PRACTICE_CAT_CANGJIE = 3, /* Traditional Chinese (Cangjie) */
+    HIME_PRACTICE_CAT_MIXED = 4,   /* Mixed English and Chinese */
+    HIME_PRACTICE_CAT_COUNT
+} HimePracticeCategory;
+
+/**
+ * Typing practice statistics
+ */
+typedef struct {
+    int total_characters;     /* Total characters to type */
+    int typed_characters;     /* Characters typed so far */
+    int correct_characters;   /* Correctly typed characters */
+    int incorrect_characters; /* Incorrectly typed characters */
+    int total_keystrokes;     /* Total keystrokes made */
+    double accuracy;          /* Accuracy percentage (0.0-100.0) */
+    double chars_per_minute;  /* Typing speed (characters/minute) */
+    uint64_t start_time_ms;   /* Session start timestamp (milliseconds) */
+    uint64_t elapsed_time_ms; /* Elapsed time (milliseconds) */
+    bool completed;           /* Whether practice is completed */
+} HimeTypingStats;
+
+/**
+ * Practice text entry
+ */
+typedef struct {
+    int id;                            /* Unique practice text ID */
+    char text[512];                    /* Practice text (UTF-8) */
+    char hint[256];                    /* Pinyin/pronunciation hint (optional) */
+    HimePracticeCategory category;     /* Text category */
+    HimePracticeDifficulty difficulty; /* Difficulty level */
+    int char_count;                    /* Number of characters */
+} HimePracticeText;
+
+/* ========== Typing Practice Session Management ========== */
+
+/**
+ * Start a new typing practice session
+ * @param ctx Context handle
+ * @param practice_text UTF-8 text to practice typing
+ * @return 0 on success, negative on error
+ */
+HIME_API int hime_typing_start_session (HimeContext *ctx, const char *practice_text);
+
+/**
+ * End current typing practice session
+ * @param ctx Context handle
+ * @return 0 on success, negative on error
+ */
+HIME_API int hime_typing_end_session (HimeContext *ctx);
+
+/**
+ * Reset current typing practice session (restart from beginning)
+ * @param ctx Context handle
+ * @return 0 on success, negative on error
+ */
+HIME_API int hime_typing_reset_session (HimeContext *ctx);
+
+/**
+ * Check if a typing practice session is active
+ * @param ctx Context handle
+ * @return true if session is active
+ */
+HIME_API bool hime_typing_is_active (HimeContext *ctx);
+
+/* ========== Typing Practice Progress Tracking ========== */
+
+/**
+ * Submit a typed character for comparison
+ * @param ctx Context handle
+ * @param typed_char UTF-8 character that was typed
+ * @return 1 if correct, 0 if incorrect, negative on error
+ */
+HIME_API int hime_typing_submit_char (HimeContext *ctx, const char *typed_char);
+
+/**
+ * Submit multiple characters (for commit string)
+ * @param ctx Context handle
+ * @param typed_str UTF-8 string that was committed
+ * @return Number of correct characters, negative on error
+ */
+HIME_API int hime_typing_submit_string (HimeContext *ctx, const char *typed_str);
+
+/**
+ * Get current typing practice statistics
+ * @param ctx Context handle
+ * @param stats Output structure for statistics
+ * @return 0 on success, negative on error
+ */
+HIME_API int hime_typing_get_stats (HimeContext *ctx, HimeTypingStats *stats);
+
+/**
+ * Get current position in practice text (character index)
+ * @param ctx Context handle
+ * @return Current position (0-based), negative on error
+ */
+HIME_API int hime_typing_get_position (HimeContext *ctx);
+
+/**
+ * Get the expected character at current position
+ * @param ctx Context handle
+ * @param buffer Output buffer for UTF-8 character
+ * @param buffer_size Size of buffer
+ * @return Length of character, 0 if at end, negative on error
+ */
+HIME_API int hime_typing_get_expected_char (
+    HimeContext *ctx,
+    char *buffer,
+    int buffer_size);
+
+/**
+ * Get the full practice text
+ * @param ctx Context handle
+ * @param buffer Output buffer for UTF-8 text
+ * @param buffer_size Size of buffer
+ * @return Length of text, negative on error
+ */
+HIME_API int hime_typing_get_practice_text (
+    HimeContext *ctx,
+    char *buffer,
+    int buffer_size);
+
+/**
+ * Record a keystroke (for keystroke counting)
+ * Call this for every key press during practice
+ * @param ctx Context handle
+ */
+HIME_API void hime_typing_record_keystroke (HimeContext *ctx);
+
+/* ========== Practice Text Library ========== */
+
+/**
+ * Get number of practice texts for a category
+ * @param category Practice category
+ * @return Number of texts available
+ */
+HIME_API int hime_typing_get_text_count (HimePracticeCategory category);
+
+/**
+ * Get practice texts by category
+ * @param category Practice category
+ * @param texts Output array for practice texts
+ * @param max_count Maximum number of texts to return
+ * @return Number of texts returned
+ */
+HIME_API int hime_typing_get_texts_by_category (
+    HimePracticeCategory category,
+    HimePracticeText *texts,
+    int max_count);
+
+/**
+ * Get practice texts by difficulty
+ * @param difficulty Difficulty level
+ * @param texts Output array for practice texts
+ * @param max_count Maximum number of texts to return
+ * @return Number of texts returned
+ */
+HIME_API int hime_typing_get_texts_by_difficulty (
+    HimePracticeDifficulty difficulty,
+    HimePracticeText *texts,
+    int max_count);
+
+/**
+ * Get a random practice text from a category
+ * @param category Practice category
+ * @param text Output structure for practice text
+ * @return 0 on success, negative on error
+ */
+HIME_API int hime_typing_get_random_text (
+    HimePracticeCategory category,
+    HimePracticeText *text);
+
+/**
+ * Get practice text by ID
+ * @param id Practice text ID
+ * @param text Output structure for practice text
+ * @return 0 on success, negative if not found
+ */
+HIME_API int hime_typing_get_text_by_id (int id, HimePracticeText *text);
+
+/**
+ * Get all practice texts
+ * @param texts Output array for practice texts
+ * @param max_count Maximum number of texts to return
+ * @return Number of texts returned
+ */
+HIME_API int hime_typing_get_all_texts (HimePracticeText *texts, int max_count);
+
+/**
+ * Get category display name
+ * @param category Practice category
+ * @return Display name string (UTF-8)
+ */
+HIME_API const char *hime_typing_get_category_name (HimePracticeCategory category);
+
+/**
+ * Get difficulty display name
+ * @param difficulty Difficulty level
+ * @return Display name string
+ */
+HIME_API const char *hime_typing_get_difficulty_name (HimePracticeDifficulty difficulty);
+
 #ifdef __cplusplus
 }
 #endif
