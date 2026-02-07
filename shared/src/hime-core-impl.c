@@ -2042,4 +2042,570 @@ HIME_API int hime_get_candidate_with_annotation(
     return len;
 }
 
+/* ========== Input Method Search Implementation ========== */
+
+/* Case-insensitive string search for both ASCII and UTF-8 */
+static int utf8_char_len(unsigned char c) {
+    if ((c & 0x80) == 0) return 1;
+    if ((c & 0xE0) == 0xC0) return 2;
+    if ((c & 0xF0) == 0xE0) return 3;
+    if ((c & 0xF8) == 0xF0) return 4;
+    return 1;
+}
+
+static char ascii_tolower(char c) {
+    if (c >= 'A' && c <= 'Z') return c + 32;
+    return c;
+}
+
+/* Check if query matches name (case-insensitive for ASCII, exact for UTF-8) */
+static int calculate_match_score(const char *name, const char *query) {
+    if (!query || !query[0]) return 100;  /* Empty query matches all */
+    if (!name || !name[0]) return 0;
+
+    const char *n = name;
+    const char *q = query;
+    int score = 0;
+    int match_start = -1;
+
+    /* Try to find query in name */
+    while (*n) {
+        const char *ns = n;
+        const char *qs = q;
+        int matched = 0;
+
+        while (*ns && *qs) {
+            int n_len = utf8_char_len((unsigned char)*ns);
+            int q_len = utf8_char_len((unsigned char)*qs);
+
+            if (n_len == 1 && q_len == 1) {
+                /* ASCII comparison - case insensitive */
+                if (ascii_tolower(*ns) != ascii_tolower(*qs)) break;
+                ns++;
+                qs++;
+                matched++;
+            } else if (n_len == q_len) {
+                /* UTF-8 multi-byte - exact match */
+                if (memcmp(ns, qs, n_len) != 0) break;
+                ns += n_len;
+                qs += q_len;
+                matched++;
+            } else {
+                break;
+            }
+        }
+
+        if (*qs == '\0') {
+            /* Full query matched */
+            if (match_start < 0) match_start = n - name;
+            score = 100 - match_start;  /* Earlier match = higher score */
+            if (match_start == 0) score += 50;  /* Bonus for prefix match */
+            return score > 0 ? score : 1;
+        }
+
+        /* Move to next character */
+        n += utf8_char_len((unsigned char)*n);
+    }
+
+    return 0;  /* No match */
+}
+
+HIME_API int hime_search_methods(
+    const HimeSearchFilter *filter,
+    HimeSearchResult *results,
+    int max_results
+) {
+    if (!results || max_results <= 0) return 0;
+
+    int count = 0;
+    const char *query = filter ? filter->query : NULL;
+    HimeInputMethod method_filter = filter ? filter->method_type : (HimeInputMethod)-1;
+
+    /* Add built-in methods */
+    for (int i = 0; i < HIME_IM_COUNT && count < max_results; i++) {
+        if (method_filter != (HimeInputMethod)-1 && method_filter != i) continue;
+
+        int score = calculate_match_score(INPUT_METHOD_NAMES[i], query);
+        if (score > 0) {
+            results[count].index = i;
+            strncpy(results[count].name, INPUT_METHOD_NAMES[i], sizeof(results[count].name) - 1);
+            results[count].name[sizeof(results[count].name) - 1] = '\0';
+            results[count].filename[0] = '\0';
+            results[count].method_type = (HimeInputMethod)i;
+            results[count].gtab_id = HIME_GTAB_CUSTOM;
+            results[count].match_score = score;
+            count++;
+        }
+    }
+
+    /* Add GTAB tables if method filter allows */
+    if (method_filter == (HimeInputMethod)-1 || method_filter == HIME_IM_GTAB) {
+        for (int i = 0; GTAB_REGISTRY[i].filename[0] != '\0' && count < max_results; i++) {
+            int score = calculate_match_score(GTAB_REGISTRY[i].name, query);
+            if (score > 0) {
+                results[count].index = HIME_IM_COUNT + i;
+                strncpy(results[count].name, GTAB_REGISTRY[i].name, sizeof(results[count].name) - 1);
+                results[count].name[sizeof(results[count].name) - 1] = '\0';
+                strncpy(results[count].filename, GTAB_REGISTRY[i].filename, sizeof(results[count].filename) - 1);
+                results[count].filename[sizeof(results[count].filename) - 1] = '\0';
+                results[count].method_type = HIME_IM_GTAB;
+                results[count].gtab_id = GTAB_REGISTRY[i].id;
+                results[count].match_score = score;
+                count++;
+            }
+        }
+    }
+
+    /* Sort by match score (simple bubble sort for small arrays) */
+    for (int i = 0; i < count - 1; i++) {
+        for (int j = i + 1; j < count; j++) {
+            if (results[j].match_score > results[i].match_score) {
+                HimeSearchResult tmp = results[i];
+                results[i] = results[j];
+                results[j] = tmp;
+            }
+        }
+    }
+
+    return count;
+}
+
+HIME_API int hime_gtab_search_tables(
+    const char *query,
+    HimeGtabInfo *results,
+    int max_results
+) {
+    if (!results || max_results <= 0) return 0;
+
+    int count = 0;
+
+    for (int i = 0; GTAB_REGISTRY[i].filename[0] != '\0' && count < max_results; i++) {
+        int score = calculate_match_score(GTAB_REGISTRY[i].name, query);
+        if (score > 0) {
+            strncpy(results[count].name, GTAB_REGISTRY[i].name, sizeof(results[count].name) - 1);
+            results[count].name[sizeof(results[count].name) - 1] = '\0';
+            strncpy(results[count].filename, GTAB_REGISTRY[i].filename, sizeof(results[count].filename) - 1);
+            results[count].filename[sizeof(results[count].filename) - 1] = '\0';
+            strncpy(results[count].icon, GTAB_REGISTRY[i].icon, sizeof(results[count].icon) - 1);
+            results[count].icon[sizeof(results[count].icon) - 1] = '\0';
+            results[count].loaded = false;
+
+            /* Check if loaded */
+            for (int j = 0; j < g_gtab_table_count; j++) {
+                if (strcmp(g_gtab_tables[j].filename, GTAB_REGISTRY[i].filename) == 0) {
+                    results[count].loaded = true;
+                    results[count].key_count = g_gtab_tables[j].key_count;
+                    results[count].max_keystrokes = g_gtab_tables[j].max_press;
+                    strncpy(results[count].selkey, g_gtab_tables[j].selkey, sizeof(results[count].selkey) - 1);
+                    break;
+                }
+            }
+            count++;
+        }
+    }
+
+    return count;
+}
+
+HIME_API int hime_find_method_by_name(const char *name) {
+    if (!name) return -1;
+
+    /* Check built-in methods */
+    for (int i = 0; i < HIME_IM_COUNT; i++) {
+        if (strcmp(INPUT_METHOD_NAMES[i], name) == 0) {
+            return i;
+        }
+    }
+
+    /* Check GTAB tables */
+    for (int i = 0; GTAB_REGISTRY[i].filename[0] != '\0'; i++) {
+        if (strcmp(GTAB_REGISTRY[i].name, name) == 0) {
+            return HIME_IM_COUNT + i;
+        }
+    }
+
+    return -1;
+}
+
+HIME_API int hime_get_all_methods(
+    HimeSearchResult *results,
+    int max_results
+) {
+    HimeSearchFilter filter = {NULL, (HimeInputMethod)-1, false};
+    return hime_search_methods(&filter, results, max_results);
+}
+
+/* ========== Simplified/Traditional Chinese Conversion ========== */
+
+/*
+ * Simplified Chinese to Traditional Chinese conversion table
+ * This is a subset of commonly used characters
+ * Format: {Simplified (UTF-8), Traditional (UTF-8)}
+ */
+typedef struct {
+    const char *simp;
+    const char *trad;
+} CharConversion;
+
+/* Common S2T conversion pairs (subset - full table would have ~8000 entries) */
+static const CharConversion S2T_TABLE[] = {
+    /* Common simplified -> traditional */
+    {"与", "與"}, {"丑", "醜"}, {"专", "專"}, {"业", "業"}, {"丛", "叢"},
+    {"东", "東"}, {"丝", "絲"}, {"丢", "丟"}, {"两", "兩"}, {"严", "嚴"},
+    {"丧", "喪"}, {"个", "個"}, {"临", "臨"}, {"为", "為"}, {"丽", "麗"},
+    {"举", "舉"}, {"么", "麼"}, {"义", "義"}, {"乌", "烏"}, {"乐", "樂"},
+    {"乔", "喬"}, {"习", "習"}, {"乡", "鄉"}, {"书", "書"}, {"买", "買"},
+    {"乱", "亂"}, {"争", "爭"}, {"于", "於"}, {"亏", "虧"}, {"云", "雲"},
+    {"亚", "亞"}, {"产", "產"}, {"亩", "畝"}, {"亲", "親"}, {"亿", "億"},
+    {"仅", "僅"}, {"从", "從"}, {"仑", "侖"}, {"仓", "倉"}, {"仪", "儀"},
+    {"们", "們"}, {"价", "價"}, {"众", "眾"}, {"优", "優"}, {"伙", "夥"},
+    {"会", "會"}, {"伟", "偉"}, {"传", "傳"}, {"伤", "傷"}, {"伦", "倫"},
+    {"伪", "偽"}, {"伫", "佇"}, {"体", "體"}, {"余", "餘"}, {"佣", "傭"},
+    {"侠", "俠"}, {"侣", "侶"}, {"侥", "僥"}, {"侦", "偵"}, {"侧", "側"},
+    {"侨", "僑"}, {"俣", "俁"}, {"俭", "儉"}, {"债", "債"}, {"倾", "傾"},
+    {"偿", "償"}, {"傥", "儻"}, {"儿", "兒"}, {"兑", "兌"}, {"党", "黨"},
+    {"兰", "蘭"}, {"关", "關"}, {"兴", "興"}, {"养", "養"}, {"兹", "茲"},
+    {"内", "內"}, {"冈", "岡"}, {"册", "冊"}, {"写", "寫"}, {"军", "軍"},
+    {"农", "農"}, {"冯", "馮"}, {"冲", "沖"}, {"决", "決"}, {"况", "況"},
+    {"冻", "凍"}, {"净", "淨"}, {"凉", "涼"}, {"减", "減"}, {"凑", "湊"},
+    {"凤", "鳳"}, {"凭", "憑"}, {"击", "擊"}, {"凿", "鑿"}, {"刍", "芻"},
+    {"划", "劃"}, {"则", "則"}, {"刚", "剛"}, {"创", "創"}, {"别", "別"},
+    {"刮", "颳"}, {"制", "製"}, {"刹", "剎"}, {"刽", "劊"}, {"剂", "劑"},
+    {"剑", "劍"}, {"剥", "剝"}, {"剧", "劇"}, {"劝", "勸"}, {"办", "辦"},
+    {"务", "務"}, {"动", "動"}, {"励", "勵"}, {"劲", "勁"}, {"势", "勢"},
+    {"华", "華"}, {"协", "協"}, {"单", "單"}, {"卖", "賣"}, {"卢", "盧"},
+    {"卧", "臥"}, {"卫", "衛"}, {"却", "卻"}, {"历", "歷"}, {"厂", "廠"},
+    {"厅", "廳"}, {"厉", "厲"}, {"压", "壓"}, {"厌", "厭"}, {"厢", "廂"},
+    {"厦", "廈"}, {"县", "縣"}, {"参", "參"}, {"双", "雙"}, {"发", "發"},
+    {"变", "變"}, {"叙", "敘"}, {"叠", "疊"}, {"台", "臺"}, {"号", "號"},
+    {"叶", "葉"}, {"吁", "籲"}, {"吓", "嚇"}, {"听", "聽"}, {"吴", "吳"},
+    {"吕", "呂"}, {"呒", "嘸"}, {"员", "員"}, {"呜", "嗚"}, {"周", "週"},
+    {"咏", "詠"}, {"响", "響"}, {"唤", "喚"}, {"啸", "嘯"}, {"喷", "噴"},
+    {"嘘", "噓"}, {"团", "團"}, {"园", "園"}, {"围", "圍"}, {"国", "國"},
+    {"图", "圖"}, {"圆", "圓"}, {"圣", "聖"}, {"场", "場"}, {"坏", "壞"},
+    {"块", "塊"}, {"坚", "堅"}, {"坛", "壇"}, {"坝", "壩"}, {"坟", "墳"},
+    {"坠", "墜"}, {"垄", "壟"}, {"垒", "壘"}, {"垦", "墾"}, {"垫", "墊"},
+    {"埚", "堝"}, {"堕", "墮"}, {"墙", "牆"}, {"壮", "壯"}, {"声", "聲"},
+    {"处", "處"}, {"备", "備"}, {"复", "復"}, {"夸", "誇"}, {"头", "頭"},
+    {"夹", "夾"}, {"夺", "奪"}, {"奂", "奐"}, {"奇", "奇"}, {"奋", "奮"},
+    {"奖", "獎"}, {"套", "套"}, {"妆", "妝"}, {"妇", "婦"}, {"妈", "媽"},
+    {"姗", "姍"}, {"娄", "婁"}, {"娱", "娛"}, {"学", "學"}, {"宁", "寧"},
+    {"宝", "寶"}, {"实", "實"}, {"宠", "寵"}, {"审", "審"}, {"宪", "憲"},
+    {"宫", "宮"}, {"对", "對"}, {"导", "導"}, {"寻", "尋"}, {"将", "將"},
+    {"尔", "爾"}, {"尘", "塵"}, {"层", "層"}, {"届", "屆"}, {"属", "屬"},
+    {"岁", "歲"}, {"岂", "豈"}, {"岛", "島"}, {"岭", "嶺"}, {"峡", "峽"},
+    {"币", "幣"}, {"师", "師"}, {"帅", "帥"}, {"帐", "帳"}, {"带", "帶"},
+    {"帜", "幟"}, {"帮", "幫"}, {"广", "廣"}, {"庆", "慶"}, {"库", "庫"},
+    {"应", "應"}, {"庐", "廬"}, {"废", "廢"}, {"开", "開"}, {"异", "異"},
+    {"弃", "棄"}, {"张", "張"}, {"弥", "彌"}, {"弯", "彎"}, {"当", "當"},
+    {"录", "錄"}, {"形", "形"}, {"彻", "徹"}, {"径", "徑"}, {"征", "徵"},
+    {"忆", "憶"}, {"态", "態"}, {"怀", "懷"}, {"恳", "懇"}, {"恼", "惱"},
+    {"恶", "惡"}, {"悬", "懸"}, {"惊", "驚"}, {"惧", "懼"}, {"惨", "慘"},
+    {"惯", "慣"}, {"惫", "憊"}, {"愤", "憤"}, {"战", "戰"}, {"戏", "戲"},
+    {"户", "戶"}, {"扑", "撲"}, {"执", "執"}, {"扩", "擴"}, {"扫", "掃"},
+    {"扬", "揚"}, {"扰", "擾"}, {"抚", "撫"}, {"抛", "拋"}, {"抢", "搶"},
+    {"护", "護"}, {"报", "報"}, {"拟", "擬"}, {"拥", "擁"}, {"择", "擇"},
+    {"挂", "掛"}, {"挡", "擋"}, {"挤", "擠"}, {"挥", "揮"}, {"损", "損"},
+    {"捞", "撈"}, {"据", "據"}, {"掳", "擄"}, {"掷", "擲"}, {"揽", "攬"},
+    {"搁", "擱"}, {"携", "攜"}, {"摄", "攝"}, {"摆", "擺"}, {"摇", "搖"},
+    {"摊", "攤"}, {"撑", "撐"}, {"敌", "敵"}, {"敛", "斂"}, {"数", "數"},
+    {"文", "文"}, {"斩", "斬"}, {"断", "斷"}, {"无", "無"}, {"旧", "舊"},
+    {"时", "時"}, {"旷", "曠"}, {"昼", "晝"}, {"显", "顯"}, {"晓", "曉"},
+    {"晕", "暈"}, {"暂", "暫"}, {"曲", "曲"}, {"术", "術"}, {"机", "機"},
+    {"杀", "殺"}, {"杂", "雜"}, {"权", "權"}, {"杨", "楊"}, {"极", "極"},
+    {"构", "構"}, {"枪", "槍"}, {"柜", "櫃"}, {"样", "樣"}, {"栏", "欄"},
+    {"标", "標"}, {"栈", "棧"}, {"栋", "棟"}, {"树", "樹"}, {"桥", "橋"},
+    {"桩", "樁"}, {"梦", "夢"}, {"检", "檢"}, {"楼", "樓"}, {"榄", "欖"},
+    {"欢", "歡"}, {"欧", "歐"}, {"殴", "毆"}, {"残", "殘"}, {"毁", "毀"},
+    {"毕", "畢"}, {"毙", "斃"}, {"气", "氣"}, {"汇", "匯"}, {"汉", "漢"},
+    {"污", "汙"}, {"汤", "湯"}, {"汹", "洶"}, {"沟", "溝"}, {"没", "沒"},
+    {"沪", "滬"}, {"沿", "沿"}, {"泪", "淚"}, {"泼", "潑"}, {"泽", "澤"},
+    {"济", "濟"}, {"浅", "淺"}, {"浆", "漿"}, {"测", "測"}, {"济", "濟"},
+    {"浊", "濁"}, {"浑", "渾"}, {"涂", "塗"}, {"涛", "濤"}, {"涡", "渦"},
+    {"润", "潤"}, {"涨", "漲"}, {"涩", "澀"}, {"淀", "澱"}, {"渊", "淵"},
+    {"渐", "漸"}, {"渔", "漁"}, {"渗", "滲"}, {"温", "溫"}, {"湾", "灣"},
+    {"溃", "潰"}, {"滚", "滾"}, {"满", "滿"}, {"滤", "濾"}, {"滥", "濫"},
+    {"灭", "滅"}, {"灯", "燈"}, {"灵", "靈"}, {"灶", "竈"}, {"灿", "燦"},
+    {"炉", "爐"}, {"炜", "煒"}, {"炼", "煉"}, {"烁", "爍"}, {"烂", "爛"},
+    {"烟", "煙"}, {"烦", "煩"}, {"烧", "燒"}, {"烫", "燙"}, {"热", "熱"},
+    {"焕", "煥"}, {"焰", "燄"}, {"爱", "愛"}, {"爷", "爺"}, {"片", "片"},
+    {"牺", "犧"}, {"犹", "猶"}, {"狈", "狽"}, {"独", "獨"}, {"狭", "狹"},
+    {"狮", "獅"}, {"狱", "獄"}, {"猎", "獵"}, {"猛", "猛"}, {"猪", "豬"},
+    {"献", "獻"}, {"猫", "貓"}, {"猬", "蝟"}, {"环", "環"}, {"现", "現"},
+    {"玛", "瑪"}, {"玩", "玩"}, {"珐", "琺"}, {"珑", "瓏"}, {"班", "班"},
+    {"球", "球"}, {"琐", "瑣"}, {"电", "電"}, {"画", "畫"}, {"畅", "暢"},
+    {"疗", "療"}, {"疡", "瘍"}, {"症", "症"}, {"痴", "癡"}, {"痹", "痺"},
+    {"瘪", "癟"}, {"瘫", "癱"}, {"皑", "皚"}, {"监", "監"}, {"盖", "蓋"},
+    {"盘", "盤"}, {"县", "縣"}, {"眯", "瞇"}, {"睁", "睜"}, {"睑", "瞼"},
+    {"矫", "矯"}, {"码", "碼"}, {"础", "礎"}, {"硕", "碩"}, {"确", "確"},
+    {"祸", "禍"}, {"礼", "禮"}, {"祭", "祭"}, {"离", "離"}, {"种", "種"},
+    {"积", "積"}, {"称", "稱"}, {"穷", "窮"}, {"窍", "竅"}, {"窜", "竄"},
+    {"窝", "窩"}, {"窥", "窺"}, {"竖", "豎"}, {"笔", "筆"}, {"笼", "籠"},
+    {"筑", "築"}, {"签", "簽"}, {"简", "簡"}, {"类", "類"}, {"籁", "籟"},
+    {"粮", "糧"}, {"系", "系"}, {"纠", "糾"}, {"红", "紅"}, {"约", "約"},
+    {"级", "級"}, {"纪", "紀"}, {"纫", "紉"}, {"纬", "緯"}, {"纯", "純"},
+    {"纲", "綱"}, {"纳", "納"}, {"纵", "縱"}, {"纷", "紛"}, {"纸", "紙"},
+    {"纹", "紋"}, {"纺", "紡"}, {"终", "終"}, {"组", "組"}, {"细", "細"},
+    {"织", "織"}, {"绅", "紳"}, {"经", "經"}, {"绍", "紹"}, {"结", "結"},
+    {"绑", "綁"}, {"绒", "絨"}, {"绕", "繞"}, {"给", "給"}, {"络", "絡"},
+    {"统", "統"}, {"丝", "絲"}, {"绝", "絕"}, {"绞", "絞"}, {"绢", "絹"},
+    {"绣", "繡"}, {"继", "繼"}, {"绩", "績"}, {"绪", "緒"}, {"续", "續"},
+    {"绰", "綽"}, {"绳", "繩"}, {"维", "維"}, {"绵", "綿"}, {"综", "綜"},
+    {"绷", "繃"}, {"绸", "綢"}, {"缀", "綴"}, {"练", "練"}, {"缄", "緘"},
+    {"缅", "緬"}, {"缆", "纜"}, {"缉", "緝"}, {"缎", "緞"}, {"缓", "緩"},
+    {"编", "編"}, {"缘", "緣"}, {"缚", "縛"}, {"缝", "縫"}, {"缠", "纏"},
+    {"缤", "繽"}, {"缨", "纓"}, {"缩", "縮"}, {"缪", "繆"}, {"缭", "繚"},
+    {"罗", "羅"}, {"罚", "罰"}, {"罢", "罷"}, {"羁", "羈"}, {"翘", "翹"},
+    {"耀", "耀"}, {"聂", "聶"}, {"联", "聯"}, {"聪", "聰"}, {"肃", "肅"},
+    {"胀", "脹"}, {"胁", "脅"}, {"胆", "膽"}, {"胜", "勝"}, {"脉", "脈"},
+    {"脏", "髒"}, {"脑", "腦"}, {"脱", "脫"}, {"腊", "臘"}, {"腻", "膩"},
+    {"腾", "騰"}, {"膝", "膝"}, {"舆", "輿"}, {"舰", "艦"}, {"艰", "艱"},
+    {"艺", "藝"}, {"节", "節"}, {"芜", "蕪"}, {"芦", "蘆"}, {"苍", "蒼"},
+    {"苏", "蘇"}, {"范", "範"}, {"茎", "莖"}, {"茧", "繭"}, {"荐", "薦"},
+    {"药", "藥"}, {"荡", "蕩"}, {"荣", "榮"}, {"荤", "葷"}, {"荧", "熒"},
+    {"莱", "萊"}, {"莲", "蓮"}, {"获", "獲"}, {"营", "營"}, {"萧", "蕭"},
+    {"萨", "薩"}, {"葱", "蔥"}, {"蒋", "蔣"}, {"蓝", "藍"}, {"蔷", "薔"},
+    {"蘖", "櫱"}, {"虏", "虜"}, {"虑", "慮"}, {"虫", "蟲"}, {"虾", "蝦"},
+    {"蚀", "蝕"}, {"蚕", "蠶"}, {"蛮", "蠻"}, {"蜡", "蠟"}, {"蝇", "蠅"},
+    {"补", "補"}, {"表", "錶"}, {"袜", "襪"}, {"衬", "襯"}, {"裤", "褲"},
+    {"视", "視"}, {"览", "覽"}, {"觉", "覺"}, {"观", "觀"}, {"订", "訂"},
+    {"认", "認"}, {"讨", "討"}, {"让", "讓"}, {"训", "訓"}, {"议", "議"},
+    {"讯", "訊"}, {"记", "記"}, {"讲", "講"}, {"讳", "諱"}, {"设", "設"},
+    {"许", "許"}, {"论", "論"}, {"讽", "諷"}, {"证", "證"}, {"评", "評"},
+    {"识", "識"}, {"诈", "詐"}, {"诉", "訴"}, {"词", "詞"}, {"译", "譯"},
+    {"诊", "診"}, {"详", "詳"}, {"该", "該"}, {"诗", "詩"}, {"话", "話"},
+    {"诚", "誠"}, {"请", "請"}, {"诧", "詫"}, {"诫", "誡"}, {"诬", "誣"},
+    {"语", "語"}, {"误", "誤"}, {"说", "說"}, {"谁", "誰"}, {"调", "調"},
+    {"谅", "諒"}, {"谈", "談"}, {"谊", "誼"}, {"谋", "謀"}, {"谎", "謊"},
+    {"谐", "諧"}, {"谢", "謝"}, {"谣", "謠"}, {"谤", "謗"}, {"谦", "謙"},
+    {"谨", "謹"}, {"谬", "謬"}, {"谱", "譜"}, {"谴", "譴"}, {"谷", "穀"},
+    {"贝", "貝"}, {"负", "負"}, {"贡", "貢"}, {"财", "財"}, {"责", "責"},
+    {"贤", "賢"}, {"败", "敗"}, {"账", "賬"}, {"货", "貨"}, {"质", "質"},
+    {"贪", "貪"}, {"贫", "貧"}, {"购", "購"}, {"贯", "貫"}, {"贱", "賤"},
+    {"贴", "貼"}, {"贵", "貴"}, {"贷", "貸"}, {"贸", "貿"}, {"费", "費"},
+    {"贺", "賀"}, {"贼", "賊"}, {"资", "資"}, {"赋", "賦"}, {"赌", "賭"},
+    {"赏", "賞"}, {"赐", "賜"}, {"赔", "賠"}, {"赖", "賴"}, {"赚", "賺"},
+    {"赛", "賽"}, {"赞", "讚"}, {"赠", "贈"}, {"走", "走"}, {"赶", "趕"},
+    {"起", "起"}, {"趋", "趨"}, {"跃", "躍"}, {"践", "踐"}, {"踊", "踴"},
+    {"踪", "蹤"}, {"蹿", "躥"}, {"躯", "軀"}, {"转", "轉"}, {"轧", "軋"},
+    {"轨", "軌"}, {"轩", "軒"}, {"轮", "輪"}, {"软", "軟"}, {"轰", "轟"},
+    {"轴", "軸"}, {"轻", "輕"}, {"载", "載"}, {"较", "較"}, {"辆", "輛"},
+    {"辉", "輝"}, {"输", "輸"}, {"辕", "轅"}, {"辖", "轄"}, {"辙", "轍"},
+    {"辞", "辭"}, {"办", "辦"}, {"边", "邊"}, {"辽", "遼"}, {"达", "達"},
+    {"迁", "遷"}, {"过", "過"}, {"运", "運"}, {"进", "進"}, {"远", "遠"},
+    {"违", "違"}, {"连", "連"}, {"迟", "遲"}, {"选", "選"}, {"逊", "遜"},
+    {"递", "遞"}, {"逻", "邏"}, {"遗", "遺"}, {"邓", "鄧"}, {"邮", "郵"},
+    {"邻", "鄰"}, {"郑", "鄭"}, {"酝", "醞"}, {"酱", "醬"}, {"酿", "釀"},
+    {"释", "釋"}, {"钉", "釘"}, {"钊", "釗"}, {"钎", "釺"}, {"钏", "釧"},
+    {"钒", "釩"}, {"钓", "釣"}, {"钗", "釵"}, {"钝", "鈍"}, {"钞", "鈔"},
+    {"钟", "鐘"}, {"钠", "鈉"}, {"钢", "鋼"}, {"钥", "鑰"}, {"钦", "欽"},
+    {"钧", "鈞"}, {"钩", "鉤"}, {"钮", "鈕"}, {"钱", "錢"}, {"钳", "鉗"},
+    {"铁", "鐵"}, {"铃", "鈴"}, {"铅", "鉛"}, {"铆", "鉚"}, {"铎", "鐸"},
+    {"铛", "鐺"}, {"铜", "銅"}, {"铝", "鋁"}, {"铭", "銘"}, {"铲", "鏟"},
+    {"银", "銀"}, {"铸", "鑄"}, {"链", "鏈"}, {"锁", "鎖"}, {"锄", "鋤"},
+    {"锅", "鍋"}, {"锈", "鏽"}, {"错", "錯"}, {"锋", "鋒"}, {"锌", "鋅"},
+    {"锐", "銳"}, {"锡", "錫"}, {"锤", "錘"}, {"锥", "錐"}, {"锦", "錦"},
+    {"键", "鍵"}, {"锭", "錠"}, {"锰", "錳"}, {"锹", "鍬"}, {"锻", "鍛"},
+    {"镀", "鍍"}, {"镁", "鎂"}, {"镇", "鎮"}, {"镐", "鎬"}, {"镑", "鎊"},
+    {"镖", "鏢"}, {"镜", "鏡"}, {"长", "長"}, {"门", "門"}, {"闭", "閉"},
+    {"问", "問"}, {"闯", "闖"}, {"闰", "閏"}, {"闲", "閒"}, {"间", "間"},
+    {"闷", "悶"}, {"闸", "閘"}, {"闹", "鬧"}, {"闻", "聞"}, {"阁", "閣"},
+    {"阂", "閡"}, {"阅", "閱"}, {"阔", "闊"}, {"阕", "闋"}, {"阖", "闔"},
+    {"阙", "闕"}, {"队", "隊"}, {"阳", "陽"}, {"阴", "陰"}, {"阵", "陣"},
+    {"阶", "階"}, {"际", "際"}, {"陆", "陸"}, {"陈", "陳"}, {"险", "險"},
+    {"随", "隨"}, {"隐", "隱"}, {"隶", "隸"}, {"雀", "雀"}, {"难", "難"},
+    {"雾", "霧"}, {"霁", "霽"}, {"靓", "靚"}, {"静", "靜"}, {"面", "麵"},
+    {"革", "革"}, {"靴", "靴"}, {"鞑", "韃"}, {"韧", "韌"}, {"韩", "韓"},
+    {"页", "頁"}, {"顶", "頂"}, {"顷", "頃"}, {"项", "項"}, {"顺", "順"},
+    {"须", "須"}, {"顽", "頑"}, {"顾", "顧"}, {"顿", "頓"}, {"颁", "頒"},
+    {"颂", "頌"}, {"预", "預"}, {"颅", "顱"}, {"领", "領"}, {"颇", "頗"},
+    {"颈", "頸"}, {"颊", "頰"}, {"频", "頻"}, {"颗", "顆"}, {"题", "題"},
+    {"颜", "顏"}, {"额", "額"}, {"颠", "顛"}, {"颤", "顫"}, {"风", "風"},
+    {"飘", "飄"}, {"飙", "飆"}, {"飞", "飛"}, {"饥", "飢"}, {"饪", "飪"},
+    {"饭", "飯"}, {"饮", "飲"}, {"饰", "飾"}, {"饱", "飽"}, {"饲", "飼"},
+    {"饺", "餃"}, {"饼", "餅"}, {"饿", "餓"}, {"馆", "館"}, {"馈", "饋"},
+    {"马", "馬"}, {"驰", "馳"}, {"驱", "驅"}, {"驳", "駁"}, {"驴", "驢"},
+    {"驻", "駐"}, {"驼", "駝"}, {"驾", "駕"}, {"骂", "駡"}, {"骄", "驕"},
+    {"验", "驗"}, {"骆", "駱"}, {"骇", "駭"}, {"骑", "騎"}, {"骗", "騙"},
+    {"骚", "騷"}, {"骤", "驟"}, {"骨", "骨"}, {"髅", "髏"}, {"鬓", "鬢"},
+    {"鬼", "鬼"}, {"魂", "魂"}, {"鱼", "魚"}, {"鲁", "魯"}, {"鲜", "鮮"},
+    {"鲤", "鯉"}, {"鲸", "鯨"}, {"鳄", "鱷"}, {"鸟", "鳥"}, {"鸡", "雞"},
+    {"鸣", "鳴"}, {"鸥", "鷗"}, {"鸦", "鴉"}, {"鸭", "鴨"}, {"鸳", "鴛"},
+    {"鸵", "鴕"}, {"鸽", "鴿"}, {"鸾", "鸞"}, {"鹃", "鵑"}, {"鹅", "鵝"},
+    {"鹉", "鵡"}, {"鹊", "鵲"}, {"鹏", "鵬"}, {"鹤", "鶴"}, {"鹦", "鸚"},
+    {"鹰", "鷹"}, {"鹿", "鹿"}, {"麦", "麥"}, {"麸", "麩"}, {"黄", "黃"},
+    {"黑", "黑"}, {"默", "默"}, {"鼓", "鼓"}, {"鼠", "鼠"}, {"鼻", "鼻"},
+    {"齐", "齊"}, {"齿", "齒"}, {"龙", "龍"}, {"龟", "龜"},
+    /* Additional common characters */
+    {"车", "車"}, {"辆", "輛"}, {"轮", "輪"}, {"轴", "軸"}, {"轨", "軌"},
+    {"轿", "轎"}, {"较", "較"}, {"载", "載"}, {"辆", "輛"}, {"辐", "輻"},
+    {NULL, NULL}  /* Sentinel */
+};
+
+/* Find conversion in table */
+static const char *find_s2t(const char *simp) {
+    for (int i = 0; S2T_TABLE[i].simp != NULL; i++) {
+        if (strcmp(S2T_TABLE[i].simp, simp) == 0) {
+            return S2T_TABLE[i].trad;
+        }
+    }
+    return NULL;
+}
+
+static const char *find_t2s(const char *trad) {
+    for (int i = 0; S2T_TABLE[i].trad != NULL; i++) {
+        if (strcmp(S2T_TABLE[i].trad, trad) == 0) {
+            return S2T_TABLE[i].simp;
+        }
+    }
+    return NULL;
+}
+
+HIME_API int hime_convert_trad_to_simp(
+    const char *input,
+    char *output,
+    int output_size
+) {
+    if (!input || !output || output_size <= 0) return -1;
+
+    int out_pos = 0;
+    const char *p = input;
+
+    while (*p && out_pos < output_size - 4) {
+        int char_len = utf8_char_len((unsigned char)*p);
+
+        /* Copy character to temp buffer */
+        char ch[5] = {0};
+        for (int i = 0; i < char_len && p[i]; i++) {
+            ch[i] = p[i];
+        }
+
+        /* Try to convert */
+        const char *converted = find_t2s(ch);
+        if (converted) {
+            int conv_len = strlen(converted);
+            if (out_pos + conv_len < output_size) {
+                strcpy(output + out_pos, converted);
+                out_pos += conv_len;
+            } else {
+                break;
+            }
+        } else {
+            /* No conversion, copy original */
+            for (int i = 0; i < char_len && out_pos < output_size - 1; i++) {
+                output[out_pos++] = p[i];
+            }
+        }
+
+        p += char_len;
+    }
+
+    output[out_pos] = '\0';
+    return out_pos;
+}
+
+HIME_API int hime_convert_simp_to_trad(
+    const char *input,
+    char *output,
+    int output_size
+) {
+    if (!input || !output || output_size <= 0) return -1;
+
+    int out_pos = 0;
+    const char *p = input;
+
+    while (*p && out_pos < output_size - 4) {
+        int char_len = utf8_char_len((unsigned char)*p);
+
+        /* Copy character to temp buffer */
+        char ch[5] = {0};
+        for (int i = 0; i < char_len && p[i]; i++) {
+            ch[i] = p[i];
+        }
+
+        /* Try to convert */
+        const char *converted = find_s2t(ch);
+        if (converted) {
+            int conv_len = strlen(converted);
+            if (out_pos + conv_len < output_size) {
+                strcpy(output + out_pos, converted);
+                out_pos += conv_len;
+            } else {
+                break;
+            }
+        } else {
+            /* No conversion, copy original */
+            for (int i = 0; i < char_len && out_pos < output_size - 1; i++) {
+                output[out_pos++] = p[i];
+            }
+        }
+
+        p += char_len;
+    }
+
+    output[out_pos] = '\0';
+    return out_pos;
+}
+
+HIME_API void hime_set_output_variant(HimeContext *ctx, HimeOutputVariant variant) {
+    if (!ctx) return;
+    /* Store in charset field - reuse existing field for simplicity */
+    /* 0 = Traditional, 1 = Simplified */
+    if (variant == HIME_OUTPUT_SIMPLIFIED) {
+        ctx->charset = HIME_CHARSET_SIMPLIFIED;
+    } else {
+        ctx->charset = HIME_CHARSET_TRADITIONAL;
+    }
+}
+
+HIME_API HimeOutputVariant hime_get_output_variant(HimeContext *ctx) {
+    if (!ctx) return HIME_OUTPUT_TRADITIONAL;
+    return (ctx->charset == HIME_CHARSET_SIMPLIFIED)
+           ? HIME_OUTPUT_SIMPLIFIED
+           : HIME_OUTPUT_TRADITIONAL;
+}
+
+HIME_API HimeOutputVariant hime_toggle_output_variant(HimeContext *ctx) {
+    if (!ctx) return HIME_OUTPUT_TRADITIONAL;
+    if (ctx->charset == HIME_CHARSET_TRADITIONAL) {
+        ctx->charset = HIME_CHARSET_SIMPLIFIED;
+        return HIME_OUTPUT_SIMPLIFIED;
+    } else {
+        ctx->charset = HIME_CHARSET_TRADITIONAL;
+        return HIME_OUTPUT_TRADITIONAL;
+    }
+}
+
+HIME_API int hime_convert_to_output_variant(
+    HimeContext *ctx,
+    const char *input,
+    char *output,
+    int output_size
+) {
+    if (!ctx || !input || !output || output_size <= 0) return -1;
+
+    if (ctx->charset == HIME_CHARSET_SIMPLIFIED) {
+        return hime_convert_trad_to_simp(input, output, output_size);
+    } else {
+        /* Traditional - copy as-is or convert from simplified */
+        /* Assume input might be in simplified, convert to traditional */
+        return hime_convert_simp_to_trad(input, output, output_size);
+    }
+}
+
+HIME_API void hime_convert_candidates_to_variant(HimeContext *ctx) {
+    if (!ctx) return;
+    if (ctx->charset == HIME_CHARSET_TRADITIONAL) return;  /* No conversion needed */
+
+    /* Convert each candidate to simplified */
+    for (int i = 0; i < ctx->candidate_count; i++) {
+        char converted[HIME_MAX_CANDIDATE_LEN];
+        int len = hime_convert_trad_to_simp(ctx->candidates[i], converted, sizeof(converted));
+        if (len > 0) {
+            strncpy(ctx->candidates[i], converted, HIME_MAX_CANDIDATE_LEN - 1);
+            ctx->candidates[i][HIME_MAX_CANDIDATE_LEN - 1] = '\0';
+        }
+    }
+}
+
 #endif /* HIME_CORE_IMPL_C */

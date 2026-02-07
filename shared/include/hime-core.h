@@ -782,6 +782,151 @@ HIME_API int hime_get_candidate_with_annotation(
     int annotation_size
 );
 
+/* ========== Input Method Search (UI Support) ========== */
+
+/**
+ * Search filter for input methods
+ */
+typedef struct {
+    const char *query;           /* Search query (name pattern, case-insensitive) */
+    HimeInputMethod method_type; /* Filter by method type (-1 for all) */
+    bool include_disabled;       /* Include disabled methods */
+} HimeSearchFilter;
+
+/**
+ * Search result entry
+ */
+typedef struct {
+    int index;                   /* Index in registry */
+    char name[64];               /* Display name (UTF-8) */
+    char filename[128];          /* Table/module filename */
+    HimeInputMethod method_type; /* Input method type */
+    HimeGtabTable gtab_id;       /* GTAB table ID (if applicable) */
+    int match_score;             /* Match quality (higher = better) */
+} HimeSearchResult;
+
+/**
+ * Search input methods by name pattern
+ * @param filter Search filter criteria
+ * @param results Output array for search results
+ * @param max_results Maximum number of results to return
+ * @return Number of results found
+ */
+HIME_API int hime_search_methods(
+    const HimeSearchFilter *filter,
+    HimeSearchResult *results,
+    int max_results
+);
+
+/**
+ * Search GTAB tables by name pattern
+ * @param query Search string (case-insensitive, partial match)
+ * @param results Output array for matching table info
+ * @param max_results Maximum number of results
+ * @return Number of results found
+ */
+HIME_API int hime_gtab_search_tables(
+    const char *query,
+    HimeGtabInfo *results,
+    int max_results
+);
+
+/**
+ * Find input method by exact name (UTF-8)
+ * @param name Method name to find
+ * @return Method index or -1 if not found
+ */
+HIME_API int hime_find_method_by_name(const char *name);
+
+/**
+ * Get all input methods for display in UI
+ * @param results Output array for results
+ * @param max_results Maximum results to return
+ * @return Number of methods returned
+ */
+HIME_API int hime_get_all_methods(
+    HimeSearchResult *results,
+    int max_results
+);
+
+/* ========== Simplified/Traditional Chinese Conversion ========== */
+
+/**
+ * Output Chinese variant mode
+ */
+typedef enum {
+    HIME_OUTPUT_TRADITIONAL = 0,   /* Output Traditional Chinese (default) */
+    HIME_OUTPUT_SIMPLIFIED = 1,    /* Output Simplified Chinese */
+    HIME_OUTPUT_BOTH = 2           /* Show both variants in candidates */
+} HimeOutputVariant;
+
+/**
+ * Set output Chinese variant
+ * @param ctx Context handle
+ * @param variant Output variant mode
+ */
+HIME_API void hime_set_output_variant(HimeContext *ctx, HimeOutputVariant variant);
+
+/**
+ * Get current output variant
+ */
+HIME_API HimeOutputVariant hime_get_output_variant(HimeContext *ctx);
+
+/**
+ * Toggle between Simplified and Traditional output
+ * @param ctx Context handle
+ * @return New output variant
+ */
+HIME_API HimeOutputVariant hime_toggle_output_variant(HimeContext *ctx);
+
+/**
+ * Convert Traditional Chinese string to Simplified Chinese
+ * @param input UTF-8 Traditional Chinese string
+ * @param output Output buffer for Simplified Chinese
+ * @param output_size Size of output buffer
+ * @return Length of output string, or negative on error
+ */
+HIME_API int hime_convert_trad_to_simp(
+    const char *input,
+    char *output,
+    int output_size
+);
+
+/**
+ * Convert Simplified Chinese string to Traditional Chinese
+ * @param input UTF-8 Simplified Chinese string
+ * @param output Output buffer for Traditional Chinese
+ * @param output_size Size of output buffer
+ * @return Length of output string, or negative on error
+ */
+HIME_API int hime_convert_simp_to_trad(
+    const char *input,
+    char *output,
+    int output_size
+);
+
+/**
+ * Convert string based on current output variant setting
+ * @param ctx Context handle
+ * @param input UTF-8 input string
+ * @param output Output buffer
+ * @param output_size Size of output buffer
+ * @return Length of output string
+ */
+HIME_API int hime_convert_to_output_variant(
+    HimeContext *ctx,
+    const char *input,
+    char *output,
+    int output_size
+);
+
+/**
+ * Apply output variant conversion to all current candidates
+ * Call this after candidates are generated to convert them
+ * @param ctx Context handle
+ */
+HIME_API void hime_convert_candidates_to_variant(HimeContext *ctx);
+
 #ifdef __cplusplus
 }
 #endif
