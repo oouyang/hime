@@ -310,6 +310,245 @@ HIME_API void hime_set_selection_keys(HimeContext *ctx, const char *keys);
  */
 HIME_API void hime_set_candidates_per_page(HimeContext *ctx, int count);
 
+/* ========== Settings/Preferences (New Features) ========== */
+
+/**
+ * Character set type for Simplified/Traditional Chinese
+ */
+typedef enum {
+    HIME_CHARSET_TRADITIONAL = 0,  /* Traditional Chinese (Big5 ordering) */
+    HIME_CHARSET_SIMPLIFIED = 1    /* Simplified Chinese (GB ordering) */
+} HimeCharset;
+
+/**
+ * Candidate display style
+ */
+typedef enum {
+    HIME_CAND_STYLE_HORIZONTAL = 0,  /* Horizontal inline bar */
+    HIME_CAND_STYLE_VERTICAL = 1,    /* Vertical list */
+    HIME_CAND_STYLE_POPUP = 2        /* Floating popup window */
+} HimeCandidateStyle;
+
+/**
+ * Feedback event types
+ */
+typedef enum {
+    HIME_FEEDBACK_KEY_PRESS = 0,     /* Regular key press */
+    HIME_FEEDBACK_KEY_DELETE = 1,    /* Delete/backspace */
+    HIME_FEEDBACK_KEY_ENTER = 2,     /* Enter/return */
+    HIME_FEEDBACK_KEY_SPACE = 3,     /* Space bar */
+    HIME_FEEDBACK_CANDIDATE = 4,     /* Candidate selection */
+    HIME_FEEDBACK_MODE_CHANGE = 5,   /* Mode switch */
+    HIME_FEEDBACK_ERROR = 6          /* Invalid input */
+} HimeFeedbackType;
+
+/**
+ * Feedback callback function type
+ * @param type Feedback event type
+ * @param user_data User-provided data pointer
+ */
+typedef void (*HimeFeedbackCallback)(HimeFeedbackType type, void *user_data);
+
+/**
+ * Set Simplified/Traditional Chinese mode
+ * @param ctx Context handle
+ * @param charset Character set to use
+ */
+HIME_API void hime_set_charset(HimeContext *ctx, HimeCharset charset);
+
+/**
+ * Get current character set
+ */
+HIME_API HimeCharset hime_get_charset(HimeContext *ctx);
+
+/**
+ * Toggle between Simplified and Traditional
+ * @return New character set value
+ */
+HIME_API HimeCharset hime_toggle_charset(HimeContext *ctx);
+
+/**
+ * Enable/disable smart punctuation conversion
+ * When enabled, ASCII punctuation is auto-converted to Chinese punctuation
+ * @param ctx Context handle
+ * @param enabled true to enable smart punctuation
+ */
+HIME_API void hime_set_smart_punctuation(HimeContext *ctx, bool enabled);
+
+/**
+ * Check if smart punctuation is enabled
+ */
+HIME_API bool hime_get_smart_punctuation(HimeContext *ctx);
+
+/**
+ * Enable/disable Pinyin annotation display
+ * When enabled, candidates show pronunciation hints
+ * @param ctx Context handle
+ * @param enabled true to show Pinyin annotations
+ */
+HIME_API void hime_set_pinyin_annotation(HimeContext *ctx, bool enabled);
+
+/**
+ * Check if Pinyin annotation is enabled
+ */
+HIME_API bool hime_get_pinyin_annotation(HimeContext *ctx);
+
+/**
+ * Get Pinyin annotation for a character
+ * @param ctx Context handle
+ * @param character UTF-8 character to look up
+ * @param buffer Output buffer for Pinyin string
+ * @param buffer_size Size of buffer
+ * @return Length of Pinyin string, or 0 if not found
+ */
+HIME_API int hime_get_pinyin_for_char(
+    HimeContext *ctx,
+    const char *character,
+    char *buffer,
+    int buffer_size
+);
+
+/**
+ * Set candidate display style
+ * @param ctx Context handle
+ * @param style Display style to use
+ */
+HIME_API void hime_set_candidate_style(HimeContext *ctx, HimeCandidateStyle style);
+
+/**
+ * Get current candidate display style
+ */
+HIME_API HimeCandidateStyle hime_get_candidate_style(HimeContext *ctx);
+
+/**
+ * Register feedback callback for sound/vibration
+ * @param ctx Context handle
+ * @param callback Function to call on feedback events
+ * @param user_data User data passed to callback
+ */
+HIME_API void hime_set_feedback_callback(
+    HimeContext *ctx,
+    HimeFeedbackCallback callback,
+    void *user_data
+);
+
+/**
+ * Enable/disable sound feedback
+ * @param ctx Context handle
+ * @param enabled true to enable sound
+ */
+HIME_API void hime_set_sound_enabled(HimeContext *ctx, bool enabled);
+
+/**
+ * Check if sound feedback is enabled
+ */
+HIME_API bool hime_get_sound_enabled(HimeContext *ctx);
+
+/**
+ * Enable/disable vibration feedback
+ * @param ctx Context handle
+ * @param enabled true to enable vibration
+ */
+HIME_API void hime_set_vibration_enabled(HimeContext *ctx, bool enabled);
+
+/**
+ * Check if vibration feedback is enabled
+ */
+HIME_API bool hime_get_vibration_enabled(HimeContext *ctx);
+
+/**
+ * Set vibration duration in milliseconds
+ * @param ctx Context handle
+ * @param duration_ms Duration (typically 10-50ms)
+ */
+HIME_API void hime_set_vibration_duration(HimeContext *ctx, int duration_ms);
+
+/**
+ * Get vibration duration
+ */
+HIME_API int hime_get_vibration_duration(HimeContext *ctx);
+
+/* ========== Smart Punctuation Conversion ========== */
+
+/**
+ * Punctuation pairs for smart conversion
+ * These maintain state for paired punctuation like quotes
+ */
+
+/**
+ * Reset punctuation pairing state
+ * Call when focus changes to new text field
+ */
+HIME_API void hime_reset_punctuation_state(HimeContext *ctx);
+
+/**
+ * Convert ASCII punctuation to Chinese punctuation
+ * @param ctx Context handle
+ * @param ascii ASCII punctuation character
+ * @param buffer Output buffer for UTF-8 Chinese punctuation
+ * @param buffer_size Size of buffer
+ * @return Length of converted string, or 0 if no conversion
+ */
+HIME_API int hime_convert_punctuation(
+    HimeContext *ctx,
+    char ascii,
+    char *buffer,
+    int buffer_size
+);
+
+/* ========== Theme/Color Support ========== */
+
+/**
+ * Color scheme type
+ */
+typedef enum {
+    HIME_COLOR_SCHEME_LIGHT = 0,
+    HIME_COLOR_SCHEME_DARK = 1,
+    HIME_COLOR_SCHEME_SYSTEM = 2   /* Follow system setting */
+} HimeColorScheme;
+
+/**
+ * Set color scheme
+ * @param ctx Context handle
+ * @param scheme Color scheme to use
+ */
+HIME_API void hime_set_color_scheme(HimeContext *ctx, HimeColorScheme scheme);
+
+/**
+ * Get current color scheme
+ */
+HIME_API HimeColorScheme hime_get_color_scheme(HimeContext *ctx);
+
+/**
+ * Notify library of system dark mode state
+ * Used when HIME_COLOR_SCHEME_SYSTEM is set
+ * @param ctx Context handle
+ * @param is_dark true if system is in dark mode
+ */
+HIME_API void hime_set_system_dark_mode(HimeContext *ctx, bool is_dark);
+
+/* ========== Extended Candidate Info ========== */
+
+/**
+ * Get candidate with annotation
+ * Returns candidate text along with optional Pinyin annotation
+ * @param ctx Context handle
+ * @param index Candidate index
+ * @param text_buffer Output buffer for candidate text
+ * @param text_size Size of text buffer
+ * @param annotation_buffer Output buffer for annotation (can be NULL)
+ * @param annotation_size Size of annotation buffer
+ * @return Length of candidate text, or negative on error
+ */
+HIME_API int hime_get_candidate_with_annotation(
+    HimeContext *ctx,
+    int index,
+    char *text_buffer,
+    int text_size,
+    char *annotation_buffer,
+    int annotation_size
+);
+
 #ifdef __cplusplus
 }
 #endif

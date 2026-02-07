@@ -36,7 +36,36 @@ public class HimeEngine {
     /* Candidates per page */
     public static final int CANDIDATES_PER_PAGE = 10;
 
+    /* Character set constants */
+    public static final int CHARSET_TRADITIONAL = 0;
+    public static final int CHARSET_SIMPLIFIED = 1;
+
+    /* Candidate style constants */
+    public static final int CANDIDATE_STYLE_HORIZONTAL = 0;
+    public static final int CANDIDATE_STYLE_VERTICAL = 1;
+    public static final int CANDIDATE_STYLE_POPUP = 2;
+
+    /* Color scheme constants */
+    public static final int COLOR_SCHEME_LIGHT = 0;
+    public static final int COLOR_SCHEME_DARK = 1;
+    public static final int COLOR_SCHEME_SYSTEM = 2;
+
+    /* Feedback type constants */
+    public static final int FEEDBACK_KEY_PRESS = 0;
+    public static final int FEEDBACK_KEY_DELETE = 1;
+    public static final int FEEDBACK_KEY_ENTER = 2;
+    public static final int FEEDBACK_KEY_SPACE = 3;
+    public static final int FEEDBACK_CANDIDATE = 4;
+    public static final int FEEDBACK_MODE_CHANGE = 5;
+    public static final int FEEDBACK_ERROR = 6;
+
+    /* Feedback listener interface */
+    public interface FeedbackListener {
+        void onFeedback(int feedbackType);
+    }
+
     private boolean initialized = false;
+    private FeedbackListener feedbackListener = null;
 
     static {
         System.loadLibrary("hime-jni");
@@ -194,6 +223,206 @@ public class HimeEngine {
         return getInputMode() == MODE_CHINESE;
     }
 
+    /* ========== Character Set ========== */
+
+    /**
+     * Get current character set (Traditional/Simplified).
+     */
+    public int getCharset() {
+        if (!initialized) return CHARSET_TRADITIONAL;
+        return nativeGetCharset();
+    }
+
+    /**
+     * Set character set.
+     */
+    public void setCharset(int charset) {
+        if (initialized) {
+            nativeSetCharset(charset);
+        }
+    }
+
+    /**
+     * Toggle between Traditional and Simplified.
+     */
+    public int toggleCharset() {
+        if (!initialized) return CHARSET_TRADITIONAL;
+        return nativeToggleCharset();
+    }
+
+    /* ========== Smart Punctuation ========== */
+
+    /**
+     * Get smart punctuation enabled state.
+     */
+    public boolean isSmartPunctuationEnabled() {
+        if (!initialized) return false;
+        return nativeGetSmartPunctuation();
+    }
+
+    /**
+     * Enable/disable smart punctuation.
+     */
+    public void setSmartPunctuation(boolean enabled) {
+        if (initialized) {
+            nativeSetSmartPunctuation(enabled);
+        }
+    }
+
+    /**
+     * Convert ASCII punctuation to Chinese punctuation.
+     * @return Converted string, or null if no conversion
+     */
+    public String convertPunctuation(char ascii) {
+        if (!initialized) return null;
+        return nativeConvertPunctuation(ascii);
+    }
+
+    /**
+     * Reset punctuation pairing state.
+     */
+    public void resetPunctuationState() {
+        if (initialized) {
+            nativeResetPunctuationState();
+        }
+    }
+
+    /* ========== Pinyin Annotation ========== */
+
+    /**
+     * Get Pinyin annotation enabled state.
+     */
+    public boolean isPinyinAnnotationEnabled() {
+        if (!initialized) return false;
+        return nativeGetPinyinAnnotation();
+    }
+
+    /**
+     * Enable/disable Pinyin annotation.
+     */
+    public void setPinyinAnnotation(boolean enabled) {
+        if (initialized) {
+            nativeSetPinyinAnnotation(enabled);
+        }
+    }
+
+    /* ========== Candidate Style ========== */
+
+    /**
+     * Get candidate display style.
+     */
+    public int getCandidateStyle() {
+        if (!initialized) return CANDIDATE_STYLE_HORIZONTAL;
+        return nativeGetCandidateStyle();
+    }
+
+    /**
+     * Set candidate display style.
+     */
+    public void setCandidateStyle(int style) {
+        if (initialized) {
+            nativeSetCandidateStyle(style);
+        }
+    }
+
+    /* ========== Color Scheme ========== */
+
+    /**
+     * Get color scheme.
+     */
+    public int getColorScheme() {
+        if (!initialized) return COLOR_SCHEME_LIGHT;
+        return nativeGetColorScheme();
+    }
+
+    /**
+     * Set color scheme.
+     */
+    public void setColorScheme(int scheme) {
+        if (initialized) {
+            nativeSetColorScheme(scheme);
+        }
+    }
+
+    /**
+     * Notify of system dark mode state.
+     */
+    public void setSystemDarkMode(boolean isDark) {
+        if (initialized) {
+            nativeSetSystemDarkMode(isDark);
+        }
+    }
+
+    /* ========== Feedback ========== */
+
+    /**
+     * Get sound feedback enabled state.
+     */
+    public boolean isSoundEnabled() {
+        if (!initialized) return false;
+        return nativeGetSoundEnabled();
+    }
+
+    /**
+     * Enable/disable sound feedback.
+     */
+    public void setSoundEnabled(boolean enabled) {
+        if (initialized) {
+            nativeSetSoundEnabled(enabled);
+        }
+    }
+
+    /**
+     * Get vibration feedback enabled state.
+     */
+    public boolean isVibrationEnabled() {
+        if (!initialized) return false;
+        return nativeGetVibrationEnabled();
+    }
+
+    /**
+     * Enable/disable vibration feedback.
+     */
+    public void setVibrationEnabled(boolean enabled) {
+        if (initialized) {
+            nativeSetVibrationEnabled(enabled);
+        }
+    }
+
+    /**
+     * Get vibration duration in milliseconds.
+     */
+    public int getVibrationDuration() {
+        if (!initialized) return 20;
+        return nativeGetVibrationDuration();
+    }
+
+    /**
+     * Set vibration duration in milliseconds.
+     */
+    public void setVibrationDuration(int durationMs) {
+        if (initialized) {
+            nativeSetVibrationDuration(durationMs);
+        }
+    }
+
+    /**
+     * Set feedback listener.
+     */
+    public void setFeedbackListener(FeedbackListener listener) {
+        this.feedbackListener = listener;
+    }
+
+    /**
+     * Called from native code when feedback event occurs.
+     */
+    @SuppressWarnings("unused")
+    private void onNativeFeedback(int feedbackType) {
+        if (feedbackListener != null) {
+            feedbackListener.onFeedback(feedbackType);
+        }
+    }
+
     /* Copy data files from assets to internal storage */
     private String copyDataFiles(Context context) {
         File dataDir = new File(context.getFilesDir(), "hime_data");
@@ -256,4 +485,36 @@ public class HimeEngine {
     private native void nativeReset();
     private native void nativeSetInputMode(int mode);
     private native int nativeGetInputMode();
+
+    /* Character set native methods */
+    private native int nativeGetCharset();
+    private native void nativeSetCharset(int charset);
+    private native int nativeToggleCharset();
+
+    /* Smart punctuation native methods */
+    private native boolean nativeGetSmartPunctuation();
+    private native void nativeSetSmartPunctuation(boolean enabled);
+    private native String nativeConvertPunctuation(char ascii);
+    private native void nativeResetPunctuationState();
+
+    /* Pinyin annotation native methods */
+    private native boolean nativeGetPinyinAnnotation();
+    private native void nativeSetPinyinAnnotation(boolean enabled);
+
+    /* Candidate style native methods */
+    private native int nativeGetCandidateStyle();
+    private native void nativeSetCandidateStyle(int style);
+
+    /* Color scheme native methods */
+    private native int nativeGetColorScheme();
+    private native void nativeSetColorScheme(int scheme);
+    private native void nativeSetSystemDarkMode(boolean isDark);
+
+    /* Feedback native methods */
+    private native boolean nativeGetSoundEnabled();
+    private native void nativeSetSoundEnabled(boolean enabled);
+    private native boolean nativeGetVibrationEnabled();
+    private native void nativeSetVibrationEnabled(boolean enabled);
+    private native int nativeGetVibrationDuration();
+    private native void nativeSetVibrationDuration(int durationMs);
 }
