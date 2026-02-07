@@ -16,6 +16,7 @@
  */
 
 #include <stdio.h>
+
 #include <sys/stat.h>
 
 #include "hime.h"
@@ -107,8 +108,7 @@ static int table_lookup (const T2SCache *cache, const char *s, char *out) {
  * Translate string using the specified translation table.
  * Uses cached table for fast lookups and exponential buffer growth.
  */
-static int translate (const char *fname, T2SCache *cache,
-                      const char *str, int strN, char **out) {
+static int translate (const char *fname, T2SCache *cache, const char *str, int strN, char **out) {
     load_table (fname, cache);
 
     /* Allocate output buffer with exponential growth strategy */

@@ -100,9 +100,7 @@ static void usage (void) {
  * Write a single chardef entry to the output file.
  * Handles both single characters and phrases.
  */
-static void write_chardef_entry (FILE *fw, u_int64_t key, const unsigned char *ch,
-                                 const char *keymap, const struct TableHead *th,
-                                 int bits_per_key, const int *phridx, const char *phrbuf) {
+static void write_chardef_entry (FILE *fw, u_int64_t key, const unsigned char *ch, const char *keymap, const struct TableHead *th, int bits_per_key, const int *phridx, const char *phrbuf) {
     u_int64_t mask = ((u_int64_t) 1 << th->keybits) - 1;
 
     /* Output the key sequence */

@@ -18,8 +18,8 @@
 #include "hime.h"
 
 #include "gtab.h"
-#include "pho.h"
 #include "lang.h"
+#include "pho.h"
 #include "tsin.h"
 
 #define MAX_K (500000)

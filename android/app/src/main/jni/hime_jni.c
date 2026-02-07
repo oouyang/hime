@@ -7,9 +7,11 @@
  * License: GNU LGPL v2.1
  */
 
-#include <jni.h>
-#include <string.h>
 #include <stdlib.h>
+#include <string.h>
+
+#include <jni.h>
+
 #include "hime-core.h"
 
 /* Global context - one per app instance */
@@ -22,46 +24,49 @@ static jobject g_engine_ref = NULL;
 /*
  * Helper: Convert Java string to C string
  */
-static char *jstring_to_cstr(JNIEnv *env, jstring jstr) {
-    if (jstr == NULL) return NULL;
-    const char *str = (*env)->GetStringUTFChars(env, jstr, NULL);
-    char *result = strdup(str);
-    (*env)->ReleaseStringUTFChars(env, jstr, str);
+static char *jstring_to_cstr (JNIEnv *env, jstring jstr) {
+    if (jstr == NULL)
+        return NULL;
+    const char *str = (*env)->GetStringUTFChars (env, jstr, NULL);
+    char *result = strdup (str);
+    (*env)->ReleaseStringUTFChars (env, jstr, str);
     return result;
 }
 
 /*
  * Helper: Convert C string to Java string
  */
-static jstring cstr_to_jstring(JNIEnv *env, const char *str) {
-    if (str == NULL) return NULL;
-    return (*env)->NewStringUTF(env, str);
+static jstring cstr_to_jstring (JNIEnv *env, const char *str) {
+    if (str == NULL)
+        return NULL;
+    return (*env)->NewStringUTF (env, str);
 }
 
 /*
  * Feedback callback - called from hime-core
  */
-static void feedback_callback(HimeFeedbackType type, void *userData) {
-    if (g_jvm == NULL || g_engine_ref == NULL) return;
+static void feedback_callback (HimeFeedbackType type, void *userData) {
+    if (g_jvm == NULL || g_engine_ref == NULL)
+        return;
 
     JNIEnv *env;
     int attached = 0;
 
-    if ((*g_jvm)->GetEnv(g_jvm, (void**)&env, JNI_VERSION_1_6) != JNI_OK) {
-        if ((*g_jvm)->AttachCurrentThread(g_jvm, &env, NULL) != JNI_OK) {
+    if ((*g_jvm)->GetEnv (g_jvm, (void **) &env, JNI_VERSION_1_6) != JNI_OK) {
+        if ((*g_jvm)->AttachCurrentThread (g_jvm, &env, NULL) != JNI_OK) {
             return;
         }
         attached = 1;
     }
 
-    jclass cls = (*env)->GetObjectClass(env, g_engine_ref);
-    jmethodID method = (*env)->GetMethodID(env, cls, "onNativeFeedback", "(I)V");
+    jclass cls = (*env)->GetObjectClass (env, g_engine_ref);
+    jmethodID method = (*env)->GetMethodID (env, cls, "onNativeFeedback", "(I)V");
     if (method != NULL) {
-        (*env)->CallVoidMethod(env, g_engine_ref, method, (jint)type);
+        (*env)->CallVoidMethod (env, g_engine_ref, method, (jint) type);
     }
 
     if (attached) {
-        (*g_jvm)->DetachCurrentThread(g_jvm);
+        (*g_jvm)->DetachCurrentThread (g_jvm);
     }
 }
 
@@ -71,36 +76,36 @@ static void feedback_callback(HimeFeedbackType type, void *userData) {
  * Signature: (Ljava/lang/String;)Z
  */
 JNIEXPORT jboolean JNICALL
-Java_org_hime_android_core_HimeEngine_nativeInit(JNIEnv *env, jobject thiz, jstring dataPath) {
+Java_org_hime_android_core_HimeEngine_nativeInit (JNIEnv *env, jobject thiz, jstring dataPath) {
     /* Store JVM reference for callbacks */
-    (*env)->GetJavaVM(env, &g_jvm);
+    (*env)->GetJavaVM (env, &g_jvm);
 
     /* Store engine reference for callbacks */
     if (g_engine_ref != NULL) {
-        (*env)->DeleteGlobalRef(env, g_engine_ref);
+        (*env)->DeleteGlobalRef (env, g_engine_ref);
     }
-    g_engine_ref = (*env)->NewGlobalRef(env, thiz);
+    g_engine_ref = (*env)->NewGlobalRef (env, thiz);
 
     if (g_context != NULL) {
-        hime_context_free(g_context);
+        hime_context_free (g_context);
         g_context = NULL;
     }
 
-    char *path = jstring_to_cstr(env, dataPath);
-    int result = hime_init(path);
-    free(path);
+    char *path = jstring_to_cstr (env, dataPath);
+    int result = hime_init (path);
+    free (path);
 
     if (result != 0) {
         return JNI_FALSE;
     }
 
-    g_context = hime_context_new();
+    g_context = hime_context_new ();
     if (g_context == NULL) {
         return JNI_FALSE;
     }
 
     /* Set up feedback callback */
-    hime_set_feedback_callback(g_context, feedback_callback, NULL);
+    hime_set_feedback_callback (g_context, feedback_callback, NULL);
 
     return JNI_TRUE;
 }
@@ -111,15 +116,15 @@ Java_org_hime_android_core_HimeEngine_nativeInit(JNIEnv *env, jobject thiz, jstr
  * Signature: ()V
  */
 JNIEXPORT void JNICALL
-Java_org_hime_android_core_HimeEngine_nativeDestroy(JNIEnv *env, jobject thiz) {
+Java_org_hime_android_core_HimeEngine_nativeDestroy (JNIEnv *env, jobject thiz) {
     if (g_context != NULL) {
-        hime_context_free(g_context);
+        hime_context_free (g_context);
         g_context = NULL;
     }
-    hime_cleanup();
+    hime_cleanup ();
 
     if (g_engine_ref != NULL) {
-        (*env)->DeleteGlobalRef(env, g_engine_ref);
+        (*env)->DeleteGlobalRef (env, g_engine_ref);
         g_engine_ref = NULL;
     }
 }
@@ -130,10 +135,10 @@ Java_org_hime_android_core_HimeEngine_nativeDestroy(JNIEnv *env, jobject thiz) {
  * Signature: (CI)I
  */
 JNIEXPORT jint JNICALL
-Java_org_hime_android_core_HimeEngine_nativeProcessKey(JNIEnv *env, jobject thiz,
-                                                        jchar keyChar, jint modifiers) {
-    if (g_context == NULL) return HIME_KEY_IGNORED;
-    return hime_process_key(g_context, 0, (uint32_t)keyChar, (uint32_t)modifiers);
+Java_org_hime_android_core_HimeEngine_nativeProcessKey (JNIEnv *env, jobject thiz, jchar keyChar, jint modifiers) {
+    if (g_context == NULL)
+        return HIME_KEY_IGNORED;
+    return hime_process_key (g_context, 0, (uint32_t) keyChar, (uint32_t) modifiers);
 }
 
 /*
@@ -142,14 +147,16 @@ Java_org_hime_android_core_HimeEngine_nativeProcessKey(JNIEnv *env, jobject thiz
  * Signature: ()Ljava/lang/String;
  */
 JNIEXPORT jstring JNICALL
-Java_org_hime_android_core_HimeEngine_nativeGetPreedit(JNIEnv *env, jobject thiz) {
-    if (g_context == NULL) return NULL;
+Java_org_hime_android_core_HimeEngine_nativeGetPreedit (JNIEnv *env, jobject thiz) {
+    if (g_context == NULL)
+        return NULL;
 
     char buffer[HIME_MAX_PREEDIT];
-    int len = hime_get_preedit(g_context, buffer, sizeof(buffer));
-    if (len <= 0) return NULL;
+    int len = hime_get_preedit (g_context, buffer, sizeof (buffer));
+    if (len <= 0)
+        return NULL;
 
-    return cstr_to_jstring(env, buffer);
+    return cstr_to_jstring (env, buffer);
 }
 
 /*
@@ -158,14 +165,16 @@ Java_org_hime_android_core_HimeEngine_nativeGetPreedit(JNIEnv *env, jobject thiz
  * Signature: ()Ljava/lang/String;
  */
 JNIEXPORT jstring JNICALL
-Java_org_hime_android_core_HimeEngine_nativeGetCommit(JNIEnv *env, jobject thiz) {
-    if (g_context == NULL) return NULL;
+Java_org_hime_android_core_HimeEngine_nativeGetCommit (JNIEnv *env, jobject thiz) {
+    if (g_context == NULL)
+        return NULL;
 
     char buffer[HIME_MAX_PREEDIT];
-    int len = hime_get_commit(g_context, buffer, sizeof(buffer));
-    if (len <= 0) return NULL;
+    int len = hime_get_commit (g_context, buffer, sizeof (buffer));
+    if (len <= 0)
+        return NULL;
 
-    return cstr_to_jstring(env, buffer);
+    return cstr_to_jstring (env, buffer);
 }
 
 /*
@@ -174,28 +183,32 @@ Java_org_hime_android_core_HimeEngine_nativeGetCommit(JNIEnv *env, jobject thiz)
  * Signature: (I)[Ljava/lang/String;
  */
 JNIEXPORT jobjectArray JNICALL
-Java_org_hime_android_core_HimeEngine_nativeGetCandidates(JNIEnv *env, jobject thiz, jint page) {
-    if (g_context == NULL) return NULL;
+Java_org_hime_android_core_HimeEngine_nativeGetCandidates (JNIEnv *env, jobject thiz, jint page) {
+    if (g_context == NULL)
+        return NULL;
 
-    int total = hime_get_candidate_count(g_context);
-    if (total == 0) return NULL;
+    int total = hime_get_candidate_count (g_context);
+    if (total == 0)
+        return NULL;
 
-    int per_page = hime_get_candidates_per_page(g_context);
+    int per_page = hime_get_candidates_per_page (g_context);
     int start = page * per_page;
     int count = total - start;
-    if (count > per_page) count = per_page;
-    if (count <= 0) return NULL;
+    if (count > per_page)
+        count = per_page;
+    if (count <= 0)
+        return NULL;
 
-    jclass stringClass = (*env)->FindClass(env, "java/lang/String");
-    jobjectArray result = (*env)->NewObjectArray(env, count, stringClass, NULL);
+    jclass stringClass = (*env)->FindClass (env, "java/lang/String");
+    jobjectArray result = (*env)->NewObjectArray (env, count, stringClass, NULL);
 
     char buffer[HIME_MAX_CANDIDATE_LEN];
     for (int i = 0; i < count; i++) {
-        int len = hime_get_candidate(g_context, start + i, buffer, sizeof(buffer));
+        int len = hime_get_candidate (g_context, start + i, buffer, sizeof (buffer));
         if (len > 0) {
-            jstring str = cstr_to_jstring(env, buffer);
-            (*env)->SetObjectArrayElement(env, result, i, str);
-            (*env)->DeleteLocalRef(env, str);
+            jstring str = cstr_to_jstring (env, buffer);
+            (*env)->SetObjectArrayElement (env, result, i, str);
+            (*env)->DeleteLocalRef (env, str);
         }
     }
 
@@ -208,9 +221,10 @@ Java_org_hime_android_core_HimeEngine_nativeGetCandidates(JNIEnv *env, jobject t
  * Signature: ()I
  */
 JNIEXPORT jint JNICALL
-Java_org_hime_android_core_HimeEngine_nativeGetCandidateCount(JNIEnv *env, jobject thiz) {
-    if (g_context == NULL) return 0;
-    return hime_get_candidate_count(g_context);
+Java_org_hime_android_core_HimeEngine_nativeGetCandidateCount (JNIEnv *env, jobject thiz) {
+    if (g_context == NULL)
+        return 0;
+    return hime_get_candidate_count (g_context);
 }
 
 /*
@@ -219,9 +233,10 @@ Java_org_hime_android_core_HimeEngine_nativeGetCandidateCount(JNIEnv *env, jobje
  * Signature: (I)Z
  */
 JNIEXPORT jboolean JNICALL
-Java_org_hime_android_core_HimeEngine_nativeSelectCandidate(JNIEnv *env, jobject thiz, jint index) {
-    if (g_context == NULL) return JNI_FALSE;
-    return hime_select_candidate(g_context, index) == HIME_KEY_COMMIT ? JNI_TRUE : JNI_FALSE;
+Java_org_hime_android_core_HimeEngine_nativeSelectCandidate (JNIEnv *env, jobject thiz, jint index) {
+    if (g_context == NULL)
+        return JNI_FALSE;
+    return hime_select_candidate (g_context, index) == HIME_KEY_COMMIT ? JNI_TRUE : JNI_FALSE;
 }
 
 /*
@@ -230,9 +245,9 @@ Java_org_hime_android_core_HimeEngine_nativeSelectCandidate(JNIEnv *env, jobject
  * Signature: ()V
  */
 JNIEXPORT void JNICALL
-Java_org_hime_android_core_HimeEngine_nativeClearPreedit(JNIEnv *env, jobject thiz) {
+Java_org_hime_android_core_HimeEngine_nativeClearPreedit (JNIEnv *env, jobject thiz) {
     if (g_context != NULL) {
-        hime_context_reset(g_context);
+        hime_context_reset (g_context);
     }
 }
 
@@ -242,9 +257,9 @@ Java_org_hime_android_core_HimeEngine_nativeClearPreedit(JNIEnv *env, jobject th
  * Signature: ()V
  */
 JNIEXPORT void JNICALL
-Java_org_hime_android_core_HimeEngine_nativeReset(JNIEnv *env, jobject thiz) {
+Java_org_hime_android_core_HimeEngine_nativeReset (JNIEnv *env, jobject thiz) {
     if (g_context != NULL) {
-        hime_context_reset(g_context);
+        hime_context_reset (g_context);
     }
 }
 
@@ -254,9 +269,9 @@ Java_org_hime_android_core_HimeEngine_nativeReset(JNIEnv *env, jobject thiz) {
  * Signature: (I)V
  */
 JNIEXPORT void JNICALL
-Java_org_hime_android_core_HimeEngine_nativeSetInputMode(JNIEnv *env, jobject thiz, jint mode) {
+Java_org_hime_android_core_HimeEngine_nativeSetInputMode (JNIEnv *env, jobject thiz, jint mode) {
     if (g_context != NULL) {
-        hime_set_chinese_mode(g_context, mode == 0);  /* 0 = Chinese */
+        hime_set_chinese_mode (g_context, mode == 0); /* 0 = Chinese */
     }
 }
 
@@ -266,179 +281,194 @@ Java_org_hime_android_core_HimeEngine_nativeSetInputMode(JNIEnv *env, jobject th
  * Signature: ()I
  */
 JNIEXPORT jint JNICALL
-Java_org_hime_android_core_HimeEngine_nativeGetInputMode(JNIEnv *env, jobject thiz) {
-    if (g_context == NULL) return 0;
-    return hime_is_chinese_mode(g_context) ? 0 : 1;  /* 0 = Chinese, 1 = English */
+Java_org_hime_android_core_HimeEngine_nativeGetInputMode (JNIEnv *env, jobject thiz) {
+    if (g_context == NULL)
+        return 0;
+    return hime_is_chinese_mode (g_context) ? 0 : 1; /* 0 = Chinese, 1 = English */
 }
 
 /* ========== Character Set ========== */
 
 JNIEXPORT jint JNICALL
-Java_org_hime_android_core_HimeEngine_nativeGetCharset(JNIEnv *env, jobject thiz) {
-    if (g_context == NULL) return 0;
-    return (jint)hime_get_charset(g_context);
+Java_org_hime_android_core_HimeEngine_nativeGetCharset (JNIEnv *env, jobject thiz) {
+    if (g_context == NULL)
+        return 0;
+    return (jint) hime_get_charset (g_context);
 }
 
 JNIEXPORT void JNICALL
-Java_org_hime_android_core_HimeEngine_nativeSetCharset(JNIEnv *env, jobject thiz, jint charset) {
+Java_org_hime_android_core_HimeEngine_nativeSetCharset (JNIEnv *env, jobject thiz, jint charset) {
     if (g_context != NULL) {
-        hime_set_charset(g_context, (HimeCharset)charset);
+        hime_set_charset (g_context, (HimeCharset) charset);
     }
 }
 
 JNIEXPORT jint JNICALL
-Java_org_hime_android_core_HimeEngine_nativeToggleCharset(JNIEnv *env, jobject thiz) {
-    if (g_context == NULL) return 0;
-    return (jint)hime_toggle_charset(g_context);
+Java_org_hime_android_core_HimeEngine_nativeToggleCharset (JNIEnv *env, jobject thiz) {
+    if (g_context == NULL)
+        return 0;
+    return (jint) hime_toggle_charset (g_context);
 }
 
 /* ========== Smart Punctuation ========== */
 
 JNIEXPORT jboolean JNICALL
-Java_org_hime_android_core_HimeEngine_nativeGetSmartPunctuation(JNIEnv *env, jobject thiz) {
-    if (g_context == NULL) return JNI_FALSE;
-    return hime_get_smart_punctuation(g_context) ? JNI_TRUE : JNI_FALSE;
+Java_org_hime_android_core_HimeEngine_nativeGetSmartPunctuation (JNIEnv *env, jobject thiz) {
+    if (g_context == NULL)
+        return JNI_FALSE;
+    return hime_get_smart_punctuation (g_context) ? JNI_TRUE : JNI_FALSE;
 }
 
 JNIEXPORT void JNICALL
-Java_org_hime_android_core_HimeEngine_nativeSetSmartPunctuation(JNIEnv *env, jobject thiz, jboolean enabled) {
+Java_org_hime_android_core_HimeEngine_nativeSetSmartPunctuation (JNIEnv *env, jobject thiz, jboolean enabled) {
     if (g_context != NULL) {
-        hime_set_smart_punctuation(g_context, enabled == JNI_TRUE);
+        hime_set_smart_punctuation (g_context, enabled == JNI_TRUE);
     }
 }
 
 JNIEXPORT jstring JNICALL
-Java_org_hime_android_core_HimeEngine_nativeConvertPunctuation(JNIEnv *env, jobject thiz, jchar ascii) {
-    if (g_context == NULL) return NULL;
+Java_org_hime_android_core_HimeEngine_nativeConvertPunctuation (JNIEnv *env, jobject thiz, jchar ascii) {
+    if (g_context == NULL)
+        return NULL;
 
     char buffer[16];
-    int len = hime_convert_punctuation(g_context, (char)ascii, buffer, sizeof(buffer));
-    if (len <= 0) return NULL;
+    int len = hime_convert_punctuation (g_context, (char) ascii, buffer, sizeof (buffer));
+    if (len <= 0)
+        return NULL;
 
-    return cstr_to_jstring(env, buffer);
+    return cstr_to_jstring (env, buffer);
 }
 
 JNIEXPORT void JNICALL
-Java_org_hime_android_core_HimeEngine_nativeResetPunctuationState(JNIEnv *env, jobject thiz) {
+Java_org_hime_android_core_HimeEngine_nativeResetPunctuationState (JNIEnv *env, jobject thiz) {
     if (g_context != NULL) {
-        hime_reset_punctuation_state(g_context);
+        hime_reset_punctuation_state (g_context);
     }
 }
 
 /* ========== Pinyin Annotation ========== */
 
 JNIEXPORT jboolean JNICALL
-Java_org_hime_android_core_HimeEngine_nativeGetPinyinAnnotation(JNIEnv *env, jobject thiz) {
-    if (g_context == NULL) return JNI_FALSE;
-    return hime_get_pinyin_annotation(g_context) ? JNI_TRUE : JNI_FALSE;
+Java_org_hime_android_core_HimeEngine_nativeGetPinyinAnnotation (JNIEnv *env, jobject thiz) {
+    if (g_context == NULL)
+        return JNI_FALSE;
+    return hime_get_pinyin_annotation (g_context) ? JNI_TRUE : JNI_FALSE;
 }
 
 JNIEXPORT void JNICALL
-Java_org_hime_android_core_HimeEngine_nativeSetPinyinAnnotation(JNIEnv *env, jobject thiz, jboolean enabled) {
+Java_org_hime_android_core_HimeEngine_nativeSetPinyinAnnotation (JNIEnv *env, jobject thiz, jboolean enabled) {
     if (g_context != NULL) {
-        hime_set_pinyin_annotation(g_context, enabled == JNI_TRUE);
+        hime_set_pinyin_annotation (g_context, enabled == JNI_TRUE);
     }
 }
 
 /* ========== Candidate Style ========== */
 
 JNIEXPORT jint JNICALL
-Java_org_hime_android_core_HimeEngine_nativeGetCandidateStyle(JNIEnv *env, jobject thiz) {
-    if (g_context == NULL) return 0;
-    return (jint)hime_get_candidate_style(g_context);
+Java_org_hime_android_core_HimeEngine_nativeGetCandidateStyle (JNIEnv *env, jobject thiz) {
+    if (g_context == NULL)
+        return 0;
+    return (jint) hime_get_candidate_style (g_context);
 }
 
 JNIEXPORT void JNICALL
-Java_org_hime_android_core_HimeEngine_nativeSetCandidateStyle(JNIEnv *env, jobject thiz, jint style) {
+Java_org_hime_android_core_HimeEngine_nativeSetCandidateStyle (JNIEnv *env, jobject thiz, jint style) {
     if (g_context != NULL) {
-        hime_set_candidate_style(g_context, (HimeCandidateStyle)style);
+        hime_set_candidate_style (g_context, (HimeCandidateStyle) style);
     }
 }
 
 /* ========== Color Scheme ========== */
 
 JNIEXPORT jint JNICALL
-Java_org_hime_android_core_HimeEngine_nativeGetColorScheme(JNIEnv *env, jobject thiz) {
-    if (g_context == NULL) return 0;
-    return (jint)hime_get_color_scheme(g_context);
+Java_org_hime_android_core_HimeEngine_nativeGetColorScheme (JNIEnv *env, jobject thiz) {
+    if (g_context == NULL)
+        return 0;
+    return (jint) hime_get_color_scheme (g_context);
 }
 
 JNIEXPORT void JNICALL
-Java_org_hime_android_core_HimeEngine_nativeSetColorScheme(JNIEnv *env, jobject thiz, jint scheme) {
+Java_org_hime_android_core_HimeEngine_nativeSetColorScheme (JNIEnv *env, jobject thiz, jint scheme) {
     if (g_context != NULL) {
-        hime_set_color_scheme(g_context, (HimeColorScheme)scheme);
+        hime_set_color_scheme (g_context, (HimeColorScheme) scheme);
     }
 }
 
 JNIEXPORT void JNICALL
-Java_org_hime_android_core_HimeEngine_nativeSetSystemDarkMode(JNIEnv *env, jobject thiz, jboolean isDark) {
+Java_org_hime_android_core_HimeEngine_nativeSetSystemDarkMode (JNIEnv *env, jobject thiz, jboolean isDark) {
     if (g_context != NULL) {
-        hime_set_system_dark_mode(g_context, isDark == JNI_TRUE);
+        hime_set_system_dark_mode (g_context, isDark == JNI_TRUE);
     }
 }
 
 /* ========== Feedback Settings ========== */
 
 JNIEXPORT jboolean JNICALL
-Java_org_hime_android_core_HimeEngine_nativeGetSoundEnabled(JNIEnv *env, jobject thiz) {
-    if (g_context == NULL) return JNI_FALSE;
-    return hime_get_sound_enabled(g_context) ? JNI_TRUE : JNI_FALSE;
+Java_org_hime_android_core_HimeEngine_nativeGetSoundEnabled (JNIEnv *env, jobject thiz) {
+    if (g_context == NULL)
+        return JNI_FALSE;
+    return hime_get_sound_enabled (g_context) ? JNI_TRUE : JNI_FALSE;
 }
 
 JNIEXPORT void JNICALL
-Java_org_hime_android_core_HimeEngine_nativeSetSoundEnabled(JNIEnv *env, jobject thiz, jboolean enabled) {
+Java_org_hime_android_core_HimeEngine_nativeSetSoundEnabled (JNIEnv *env, jobject thiz, jboolean enabled) {
     if (g_context != NULL) {
-        hime_set_sound_enabled(g_context, enabled == JNI_TRUE);
+        hime_set_sound_enabled (g_context, enabled == JNI_TRUE);
     }
 }
 
 JNIEXPORT jboolean JNICALL
-Java_org_hime_android_core_HimeEngine_nativeGetVibrationEnabled(JNIEnv *env, jobject thiz) {
-    if (g_context == NULL) return JNI_FALSE;
-    return hime_get_vibration_enabled(g_context) ? JNI_TRUE : JNI_FALSE;
+Java_org_hime_android_core_HimeEngine_nativeGetVibrationEnabled (JNIEnv *env, jobject thiz) {
+    if (g_context == NULL)
+        return JNI_FALSE;
+    return hime_get_vibration_enabled (g_context) ? JNI_TRUE : JNI_FALSE;
 }
 
 JNIEXPORT void JNICALL
-Java_org_hime_android_core_HimeEngine_nativeSetVibrationEnabled(JNIEnv *env, jobject thiz, jboolean enabled) {
+Java_org_hime_android_core_HimeEngine_nativeSetVibrationEnabled (JNIEnv *env, jobject thiz, jboolean enabled) {
     if (g_context != NULL) {
-        hime_set_vibration_enabled(g_context, enabled == JNI_TRUE);
+        hime_set_vibration_enabled (g_context, enabled == JNI_TRUE);
     }
 }
 
 JNIEXPORT jint JNICALL
-Java_org_hime_android_core_HimeEngine_nativeGetVibrationDuration(JNIEnv *env, jobject thiz) {
-    if (g_context == NULL) return 20;
-    return hime_get_vibration_duration(g_context);
+Java_org_hime_android_core_HimeEngine_nativeGetVibrationDuration (JNIEnv *env, jobject thiz) {
+    if (g_context == NULL)
+        return 20;
+    return hime_get_vibration_duration (g_context);
 }
 
 JNIEXPORT void JNICALL
-Java_org_hime_android_core_HimeEngine_nativeSetVibrationDuration(JNIEnv *env, jobject thiz, jint durationMs) {
+Java_org_hime_android_core_HimeEngine_nativeSetVibrationDuration (JNIEnv *env, jobject thiz, jint durationMs) {
     if (g_context != NULL) {
-        hime_set_vibration_duration(g_context, durationMs);
+        hime_set_vibration_duration (g_context, durationMs);
     }
 }
 
 /* ========== Keyboard Layout ========== */
 
 JNIEXPORT jint JNICALL
-Java_org_hime_android_core_HimeEngine_nativeGetKeyboardLayout(JNIEnv *env, jobject thiz) {
-    if (g_context == NULL) return 0;
-    return (jint)hime_get_keyboard_layout(g_context);
+Java_org_hime_android_core_HimeEngine_nativeGetKeyboardLayout (JNIEnv *env, jobject thiz) {
+    if (g_context == NULL)
+        return 0;
+    return (jint) hime_get_keyboard_layout (g_context);
 }
 
 JNIEXPORT jint JNICALL
-Java_org_hime_android_core_HimeEngine_nativeSetKeyboardLayout(JNIEnv *env, jobject thiz, jint layout) {
-    if (g_context == NULL) return -1;
-    return hime_set_keyboard_layout(g_context, (HimeKeyboardLayout)layout);
+Java_org_hime_android_core_HimeEngine_nativeSetKeyboardLayout (JNIEnv *env, jobject thiz, jint layout) {
+    if (g_context == NULL)
+        return -1;
+    return hime_set_keyboard_layout (g_context, (HimeKeyboardLayout) layout);
 }
 
 JNIEXPORT jint JNICALL
-Java_org_hime_android_core_HimeEngine_nativeSetKeyboardLayoutByName(JNIEnv *env, jobject thiz, jstring layoutName) {
-    if (g_context == NULL || layoutName == NULL) return -1;
+Java_org_hime_android_core_HimeEngine_nativeSetKeyboardLayoutByName (JNIEnv *env, jobject thiz, jstring layoutName) {
+    if (g_context == NULL || layoutName == NULL)
+        return -1;
 
-    char *name = jstring_to_cstr(env, layoutName);
-    int result = hime_set_keyboard_layout_by_name(g_context, name);
-    free(name);
+    char *name = jstring_to_cstr (env, layoutName);
+    int result = hime_set_keyboard_layout_by_name (g_context, name);
+    free (name);
 
     return result;
 }
