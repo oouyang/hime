@@ -826,6 +826,26 @@ regsvr32 hime-tsf.dll
 
 See `windows/README.md` for detailed build and installation instructions.
 
+### macOS Build (Native)
+
+For macOS, HIME uses the Input Method Kit framework. Build natively on macOS:
+
+```bash
+cd macos
+mkdir build && cd build
+cmake ..
+make
+```
+
+Install to system:
+```bash
+sudo cp -r HIME.app /Library/Input\ Methods/
+```
+
+Then enable in **System Preferences** → **Keyboard** → **Input Sources**.
+
+See `macos/README.md` for detailed build and installation instructions.
+
 ## Resources
 
 - **Repository:** https://github.com/hime-ime/hime
