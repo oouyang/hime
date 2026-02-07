@@ -20,6 +20,26 @@ Hime 是一個極好用的輸入法框架，輕巧、穩定、功能強大且支
 - 亂倉打鳥
 - 酷音等....
 
+### 支援平台 / Supported Platforms
+
+| 平台 Platform | 框架 Framework | 說明 Description |
+|---------------|----------------|------------------|
+| **Linux** | GTK2, GTK3, Qt5, Qt6, XIM | 原生支援 / Native support |
+| **Windows** | TSF (Text Services Framework) | 跨平台編譯 / Cross-compile with MinGW-w64 |
+| **macOS** | Input Method Kit | 原生 Cocoa 應用 / Native Cocoa app |
+| **iOS** | UIInputViewController | 鍵盤擴充套件 / Keyboard extension |
+| **Android** | InputMethodService | Android IME 服務 / Android IME service |
+
+各平台詳細說明請參考：
+
+| Platform | Documentation |
+|----------|---------------|
+| Linux | [DEVELOPMENT.md](DEVELOPMENT.md) |
+| Windows | [windows/README.md](windows/README.md) |
+| macOS | [macos/README.md](macos/README.md) |
+| iOS | [ios/README.md](ios/README.md) |
+| Android | [android/README.md](android/README.md) |
+
 #### 特色
 
 - 支援多種輸入法, 使用者選擇多
