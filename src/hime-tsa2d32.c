@@ -32,19 +32,17 @@
 phokey_t pinyin2phokey (char *s);
 
 static char *bf;
-// static int bfN_a = 0;
 static gboolean b_pinyin;
 
-int *phidx, *sidx, phcount;
-int bfsize, phidxsize;
-u_char *sf;
-gboolean is_gtab, gtabkey64;
-int phsz, hash_shift;
-int (*key_cmp) (char *a, char *b, char len);
+static int *phidx, *sidx, phcount;
+static int bfsize, phidxsize;
+static u_char *sf;
+static gboolean is_gtab, gtabkey64;
+static int phsz, hash_shift;
+static int (*key_cmp) (const char *a, const char *b, int len);
 
-int key_cmp16 (char *a, char *b, char len) {
-    u_char i;
-    for (i = 0; i < len; i++) {
+static int key_cmp16 (const char *a, const char *b, int len) {
+    for (int i = 0; i < len; i++) {
         phokey_t ka, kb;
         memcpy (&ka, a, 2);
         memcpy (&kb, b, 2);
@@ -55,13 +53,11 @@ int key_cmp16 (char *a, char *b, char len) {
         a += 2;
         b += 2;
     }
-
     return 0;
 }
 
-int key_cmp32 (char *a, char *b, char len) {
-    u_char i;
-    for (i = 0; i < len; i++) {
+static int key_cmp32 (const char *a, const char *b, int len) {
+    for (int i = 0; i < len; i++) {
         u_int ka, kb;
         memcpy (&ka, a, 4);
         memcpy (&kb, b, 4);
@@ -75,9 +71,8 @@ int key_cmp32 (char *a, char *b, char len) {
     return 0;
 }
 
-int key_cmp64 (char *a, char *b, char len) {
-    u_char i;
-    for (i = 0; i < len; i++) {
+static int key_cmp64 (const char *a, const char *b, int len) {
+    for (int i = 0; i < len; i++) {
         u_int64_t ka, kb;
         memcpy (&ka, a, 8);
         memcpy (&kb, b, 8);
@@ -543,7 +538,7 @@ int main (int argc, char **argv) {
     fclose (fw);
 
     char outfileidx[512];
-    strcat (strcpy (outfileidx, outfile), ".idx");
+    snprintf (outfileidx, sizeof (outfileidx), "%s.idx", outfile);
 
     dbg ("Writing data %s\n", outfileidx);
     if ((fw = fopen (outfileidx, "wb")) == NULL) {
@@ -564,5 +559,5 @@ int main (int argc, char **argv) {
         send_hime_message (GDK_DISPLAY (), RELOAD_TSIN_DB);
     }
 
-    exit (0);
+    return 0;
 }

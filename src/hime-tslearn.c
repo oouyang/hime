@@ -36,17 +36,17 @@ char gtab_tsin_fname[256];
 char is_gtab;
 
 char *phokey2pinyin (phokey_t k);
-gboolean b_pinyin;
-GtkWidget *hbox_buttons;
-char current_str[MAX_PHRASE_LEN * CH_SZ + 1];
+static gboolean b_pinyin;
+static GtkWidget *hbox_buttons;
+static char current_str[MAX_PHRASE_LEN * CH_SZ + 1];
 
-GtkWidget *mainwin;
-GtkTextBuffer *buffer;
+static GtkWidget *mainwin;
+static GtkTextBuffer *buffer;
 
 static char **phrase;
 static int phraseN = 0;
 
-void cp_ph_key (void *in, int idx, void *dest) {
+static void cp_ph_key (void *in, int idx, void *dest) {
     if (ph_key_sz == 2) {
         phokey_t *pharr = (phokey_t *) in;
         in = &pharr[idx];
@@ -61,7 +61,7 @@ void cp_ph_key (void *in, int idx, void *dest) {
     memcpy (dest, in, ph_key_sz);
 }
 
-void *get_ph_key_ptr (void *in, int idx) {
+static void *get_ph_key_ptr (void *in, int idx) {
     if (ph_key_sz == 2) {
         phokey_t *pharr = (phokey_t *) in;
         return &pharr[idx];
@@ -74,7 +74,7 @@ void *get_ph_key_ptr (void *in, int idx) {
     }
 }
 
-int lookup_gtab_key (char *ch, void *out) {
+static int lookup_gtab_key (char *ch, void *out) {
     int outN = 0;
     INMD *tinmd = &inmd[default_input_method];
 
@@ -107,11 +107,10 @@ static int qcmp_str (const void *aa, const void *bb) {
 
 extern FILE *fph;
 
-void load_ts_phrase () {
+static void load_ts_phrase (void) {
     FILE *fp = fph;
 
-    int i;
-    for (i = 0; i < phraseN; i++)
+    for (int i = 0; i < phraseN; i++)
         free (phrase[i]);
     free (phrase);
     phrase = NULL;
@@ -139,7 +138,7 @@ void load_ts_phrase () {
         fread (phbuf, ph_key_sz, clen, fp);
         int tlen = 0;
 
-        for (i = 0; i < clen; i++) {
+        for (int i = 0; i < clen; i++) {
             int n = fread (&chbuf[tlen], 1, 1, fp);
             if (n <= 0)
                 goto stop;
@@ -166,11 +165,11 @@ stop:
     dbg ("phraseN: %d\n", phraseN);
 }
 
-gboolean pharse_search (char *s) {
+static gboolean phrase_search (char *s) {
     return bsearch (&s, phrase, phraseN, sizeof (char *), qcmp_str) != NULL;
 }
 
-void all_wrap () {
+static void all_wrap (void) {
     GtkTextIter mstart, mend;
 
     gtk_text_buffer_get_bounds (buffer, &mstart, &mend);
@@ -221,7 +220,7 @@ static void cb_button_parse (GtkButton *button, gpointer user_data) {
 
             txt[txtN] = 0;
             //      dbg("try len:%d txtN:%d %s\n", len, txtN, txt);
-            if (!pharse_search ((char *) txt))
+            if (!phrase_search ((char *) txt))
                 continue;
 
             //      dbg("match .... %d %d\n", i, len);
@@ -257,15 +256,14 @@ static int bigphoN;
 
 static GtkWidget *hbox_pho_sel;
 
-void destroy_pho_sel_area () {
+static void destroy_pho_sel_area (void) {
     gtk_widget_destroy (hbox_pho_sel);
 }
 
 static void cb_button_ok (GtkButton *button, gpointer user_data) {
     u_int64_t pharr8[MAX_PHRASE_LEN];
 
-    int i;
-    for (i = 0; i < bigphoN; i++) {
+    for (int i = 0; i < bigphoN; i++) {
         int idx = gtk_combo_box_get_active (GTK_COMBO_BOX (bigpho[i].opt_menu));
         void *dest = get_ph_key_ptr (pharr8, i);
 
@@ -287,17 +285,14 @@ static void cb_button_cancel (GtkButton *button, gpointer user_data) {
 }
 
 int gtab_key2name (INMD *tinmd, u_int64_t key, char *t, int *rtlen);
-GtkWidget *create_pho_sel_area () {
+static GtkWidget *create_pho_sel_area (void) {
     hbox_pho_sel = gtk_box_new (GTK_ORIENTATION_HORIZONTAL, 0);
 
-    int i;
-
-    for (i = 0; i < bigphoN; i++) {
+    for (int i = 0; i < bigphoN; i++) {
         bigpho[i].opt_menu = gtk_combo_box_text_new ();
         gtk_box_pack_start (GTK_BOX (hbox_pho_sel), bigpho[i].opt_menu, FALSE, FALSE, 0);
 
-        int j;
-        for (j = 0; j < bigpho[i].phokeysN; j++) {
+        for (int j = 0; j < bigpho[i].phokeysN; j++) {
             char t[128];
             char *phostr;
 
@@ -377,15 +372,15 @@ static void cb_button_add (GtkButton *button, gpointer user_data) {
 
 static Display *display;
 
-void do_exit () {
+static void do_exit (void) {
     send_hime_message (display, RELOAD_TSIN_DB);
     exit (0);
 }
 
-void load_tsin_db ();
+void load_tsin_db (void);
 void set_window_hime_icon (GtkWidget *window);
 
-gboolean is_pinyin_kbm ();
+gboolean is_pinyin_kbm (void);
 
 int main (int argc, char **argv) {
     init_TableDir ();

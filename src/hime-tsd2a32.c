@@ -20,21 +20,19 @@
 #include "pho.h"
 #include "tsin.h"
 
-int phcount;
+/* External function declarations */
 void prph2 (FILE *fp, phokey_t kk);
-
 void get_keymap_str (u_int64_t k, char *keymap, int keybits, char tkey[]);
 char *phokey2pinyin (phokey_t k);
-gboolean is_pinyin_kbm ();
-char *sys_err_strA ();
+gboolean is_pinyin_kbm (void);
+char *sys_err_strA (void);
 
 int main (int argc, char **argv) {
     FILE *fp;
-    int i;
-    char clen;
+    signed char clen;
     usecount_t usecount;
     gboolean pr_usecount = TRUE;
-    char *fname;
+    char *fname = NULL;
     char *fname_out = NULL;
 
     if (argc <= 1) {
@@ -46,7 +44,7 @@ int main (int argc, char **argv) {
 
     gboolean b_pinyin = is_pinyin_kbm ();
 
-    for (i = 1; i < argc;) {
+    for (int i = 1; i < argc;) {
         if (!strcmp (argv[i], "-nousecount")) {
             i++;
             pr_usecount = FALSE;
@@ -121,7 +119,7 @@ int main (int argc, char **argv) {
         char tt[512];
         int ttlen = 0;
         tt[0] = 0;
-        for (i = 0; i < clen; i++) {
+        for (int i = 0; i < clen; i++) {
             char ch[CH_SZ];
 
             int n = fread (ch, 1, 1, fp);
@@ -145,11 +143,10 @@ int main (int argc, char **argv) {
 
         fprintf (fp_out, "%s ", tt);
 
-        for (i = 0; i < clen; i++) {
+        for (int i = 0; i < clen; i++) {
             if (phsz == 2) {
                 if (b_pinyin) {
                     char *t = phokey2pinyin (phbuf[i]);
-                    //          dbg("z %s\n", t);
                     fprintf (fp_out, "%s", t);
                 } else
                     prph2 (fp_out, phbuf[i]);
@@ -174,7 +171,8 @@ int main (int argc, char **argv) {
 
 stop:
     fclose (fp);
-    fclose (fp_out);
+    if (fname_out)
+        fclose (fp_out);
 
-    exit (0);
+    return 0;
 }
