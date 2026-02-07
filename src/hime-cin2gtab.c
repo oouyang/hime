@@ -132,7 +132,15 @@ typedef struct {
     int oseq;
 } ITEM2_64;
 
+/* Temporary storage for raw key/arg pairs to avoid double file read */
+typedef struct {
+    char *keys;    /* key string */
+    char *args;    /* argument string */
+} RAW_ENTRY;
+
 #define MAX_K (500000)
+#define INITIAL_RAW_CAP 4096
+#define INITIAL_PHR_CAP 65536
 
 static ITEM2 itar[MAX_K];
 static ITEM2_64 itar64[MAX_K];
@@ -177,12 +185,15 @@ int main (int argc, char **argv) {
     printf ("-- hime-cin2gtab encoding UTF-8 --\n");
     printf ("--- please use iconv -f big5 -t utf-8 if your file is in big5 encoding\n");
 
-    char fname[64];
+    char fname[256];
     if (argc <= 1) {
         printf ("Enter table file name [.cin] : ");
-        scanf ("%s", fname);
+        if (scanf ("%255s", fname) != 1) {
+            p_err ("Failed to read filename\n");
+        }
     } else {
-        strncpy (fname, argv[1], sizeof (fname));
+        strncpy (fname, argv[1], sizeof (fname) - 1);
+        fname[sizeof (fname) - 1] = '\0';
     }
 
     if (!strcmp (fname, "-v") || !strcmp (fname, "--version")) {
@@ -195,12 +206,10 @@ int main (int argc, char **argv) {
         *p = 0;
     }
 
-    char fname_cin[64];
-    char fname_tab[64];
-    strncpy (fname_cin, fname, sizeof (fname_cin));
-    strncpy (fname_tab, fname, sizeof (fname_tab));
-    strcat (fname_cin, ".cin");
-    strcat (fname_tab, ".gtab");
+    char fname_cin[512];
+    char fname_tab[512];
+    snprintf (fname_cin, sizeof (fname_cin), "%s.cin", fname);
+    snprintf (fname_tab, sizeof (fname_tab), "%s.gtab", fname);
 
     if ((fr = fopen (fname_cin, "rb")) == NULL) {
         p_err ("Cannot open %s\n", fname_cin);
@@ -380,34 +389,55 @@ int main (int argc, char **argv) {
         }
     }
 
-    const long pos = ftell (fr);
-    const int olineno = lineno;
+    /* Single-pass: read all entries into temporary storage to determine key64 */
     gboolean key64 = FALSE;
     int max_key_len = 0;
 
-    while (!feof (fr)) {
+    /* Temporary storage for raw entries - avoids double file read */
+    int raw_cap = INITIAL_RAW_CAP;
+    int raw_count = 0;
+    char **raw_keys = (char **) malloc (raw_cap * sizeof (char *));
+    char **raw_args = (char **) malloc (raw_cap * sizeof (char *));
+    if (!raw_keys || !raw_args) {
+        p_err ("Memory allocation failed\n");
+    }
 
+    /* Single pass: collect all entries and find max_key_len */
+    while (!feof (fr)) {
         cmd_arg (&cmd, &arg);
         if (!cmd[0] || !arg[0])
             continue;
 
         if (!strcmp (cmd, "%chardef")) {
-            if (!strcmp (arg, "end")) {
+            if (!strcmp (arg, "end"))
                 break;
-            } else {
+            else
                 continue;
-            }
         }
 
         int len = strlen (cmd);
+        if (len > 10)
+            p_err ("%d:  only <= 10 keys is allowed '%s'", lineno, cmd);
 
-        if (max_key_len < len) {
+        if (len > max_key_len) {
             max_key_len = len;
         }
-    }
 
-    fseek (fr, pos, SEEK_SET);
-    lineno = olineno;
+        /* Grow arrays if needed (exponential growth) */
+        if (raw_count >= raw_cap) {
+            raw_cap *= 2;
+            raw_keys = (char **) realloc (raw_keys, raw_cap * sizeof (char *));
+            raw_args = (char **) realloc (raw_args, raw_cap * sizeof (char *));
+            if (!raw_keys || !raw_args) {
+                p_err ("Memory allocation failed\n");
+            }
+        }
+
+        raw_keys[raw_count] = strdup (cmd);
+        raw_args[raw_count] = strdup (arg);
+        raw_count++;
+    }
+    fclose (fr);
 
     INMD inmd, *cur_inmd = &inmd;
 
@@ -435,45 +465,37 @@ int main (int argc, char **argv) {
     cur_inmd->last_k_bitn = (((cur_inmd->key64 ? 64 : 32) / cur_inmd->keybits) - 1) * cur_inmd->keybits;
 
     puts ("char def");
-    int chno = 0;
+
+    /* Pre-allocate phrase buffer with exponential growth */
     int *phridx = NULL;
     int phr_cou = 0;
+    int phr_cap = 0;
     char *phrbuf = NULL;
     int prbf_cou = 0;
-    while (!feof (fr)) {
+    int prbf_cap = 0;
 
-        cmd_arg (&cmd, &arg);
-        if (!cmd[0] || !arg[0])
-            continue;
+    /* Process collected entries */
+    int chno = 0;
+    for (int entry = 0; entry < raw_count; entry++) {
+        char *key_str = raw_keys[entry];
+        char *arg_str = raw_args[entry];
 
-        if (!strcmp (cmd, "%chardef")) {
-            if (!strcmp (arg, "end"))
-                break;
-            else
-                continue;
-        }
-
-        int len = strlen (cmd);
+        int len = strlen (key_str);
         if (len > th.MaxPress) {
             th.MaxPress = len;
         }
 
-        if (len > 10)
-            p_err ("%d:  only <= 10 keys is allowed '%s'", lineno, cmd);
-
         u_int64_t kk = 0;
         for (int i = 0; i < len; i++) {
-            int key = BITON (th.flag, FLAG_KEEP_KEY_CASE) ? cmd[i] : mtolower (cmd[i]);
+            int key = BITON (th.flag, FLAG_KEEP_KEY_CASE) ? key_str[i] : mtolower (key_str[i]);
 
             int k = kno[key];
             if (!k) {
-                p_err ("%d: key undefined in keyname '%c'\n", lineno, cmd[i]);
+                p_err ("key undefined in keyname '%c'\n", key_str[i]);
             }
 
             kk |= (u_int64_t) k << (LAST_K_bitN - i * th.keybits);
         }
-
-        //    dbg("%s kk:%llx\n", cmd, kk);
 
         if (key64) {
             memcpy (&itar64[chno].key, &kk, 8);
@@ -484,11 +506,12 @@ int main (int argc, char **argv) {
             itar[chno].oseq = chno;
         }
 
-        if ((len = strlen (arg)) <= CH_SZ && (arg[0] & 0x80)) {
+        int arg_len = strlen (arg_str);
+        if (arg_len <= CH_SZ && (arg_str[0] & 0x80)) {
             char out[CH_SZ + 1];
 
             memset (out, 0, sizeof (out));
-            memcpy (out, arg, len);
+            memcpy (out, arg_str, arg_len);
 
             if (key64)
                 bchcpy (itar64[chno].ch, out);
@@ -506,20 +529,43 @@ int main (int argc, char **argv) {
                 itar[chno].ch[2] = phr_cou & 0xff;
             }
 
-            if (len > MAX_CIN_PHR)
-                p_err ("phrase too long: %s  max:%d bytes\n", arg, MAX_CIN_PHR);
+            if (arg_len > MAX_CIN_PHR)
+                p_err ("phrase too long: %s  max:%d bytes\n", arg_str, MAX_CIN_PHR);
 
-            phridx = trealloc (phridx, int, phr_cou + 1);
+            /* Exponential growth for phrase index array */
+            if (phr_cou >= phr_cap) {
+                phr_cap = phr_cap ? phr_cap * 2 : INITIAL_RAW_CAP;
+                phridx = (int *) realloc (phridx, phr_cap * sizeof (int));
+                if (!phridx) {
+                    p_err ("Memory allocation failed\n");
+                }
+            }
             phridx[phr_cou++] = prbf_cou;
-            phrbuf = (char *) realloc (phrbuf, prbf_cou + len + 1);
-            strcpy (&phrbuf[prbf_cou], arg);
-            //      printf("phrase:%d  len:%d'%s'\n", phr_cou, len, arg);
-            prbf_cou += len;
+
+            /* Exponential growth for phrase buffer */
+            if (prbf_cou + arg_len + 1 > prbf_cap) {
+                prbf_cap = prbf_cap ? prbf_cap * 2 : INITIAL_PHR_CAP;
+                while (prbf_cou + arg_len + 1 > prbf_cap) {
+                    prbf_cap *= 2;
+                }
+                phrbuf = (char *) realloc (phrbuf, prbf_cap);
+                if (!phrbuf) {
+                    p_err ("Memory allocation failed\n");
+                }
+            }
+            strcpy (&phrbuf[prbf_cou], arg_str);
+            prbf_cou += arg_len;
         }
 
+        /* Free temporary strings */
+        free (key_str);
+        free (arg_str);
         chno++;
     }
-    fclose (fr);
+
+    /* Free temporary arrays */
+    free (raw_keys);
+    free (raw_args);
 
 #define _sort qsort
 
