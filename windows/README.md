@@ -245,6 +245,16 @@ int hime_get_candidate(HimeContext *ctx, int index, char *buffer, int buffer_siz
 | Performance | Good | Better (native) |
 | Cross-compile | No | Yes (from Linux) |
 
+## Differences from Other Platforms
+
+| Feature | Linux (GTK) | Windows (TSF) | macOS (IMK) | iOS | Android |
+|---------|-------------|---------------|-------------|-----|---------|
+| Framework | IBus/XIM | TSF | Input Method Kit | UIKit Extension | InputMethodService |
+| Language | C | C++ | Objective-C | Objective-C | Java + JNI |
+| Build | autotools | MinGW CMake | CMake | Xcode | Gradle |
+| UI | System | System | System | Custom | Custom |
+| Candidate | System | System | System | Custom View | Custom View |
+
 ## Troubleshooting
 
 ### Build fails with "command not found"

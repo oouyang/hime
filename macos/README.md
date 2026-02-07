@@ -171,12 +171,13 @@ macos/
 
 ## Differences from Other Platforms
 
-| Feature | Linux (GTK) | Windows (TSF) | macOS (IMK) |
-|---------|-------------|---------------|-------------|
-| Framework | IBus/XIM | TSF | Input Method Kit |
-| Language | C | C++ | Objective-C |
-| Build | autotools | MinGW CMake | CMake |
-| Integration | System-wide | Per-user | Per-user or System |
+| Feature | Linux (GTK) | Windows (TSF) | macOS (IMK) | iOS | Android |
+|---------|-------------|---------------|-------------|-----|---------|
+| Framework | IBus/XIM | TSF | Input Method Kit | UIKit Extension | InputMethodService |
+| Language | C | C++ | Objective-C | Objective-C | Java + JNI |
+| Build | autotools | MinGW CMake | CMake | Xcode | Gradle |
+| UI | System | System | System | Custom | Custom |
+| Candidate | System | System | System | Custom View | Custom View |
 
 ## Troubleshooting
 

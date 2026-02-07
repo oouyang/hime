@@ -126,14 +126,24 @@ ios/
 
 ### Keyboard Layout (Standard Zhuyin)
 
+The keyboard follows the standard Taiwan Zhuyin layout:
+
 ```
-┌────────────────────────────────────────────────────┐
-│ ㄅ  ㄉ  ˇ  ˋ  ㄓ  ˊ  ˙  ㄚ  ㄞ  ㄢ  │
-│ ㄆ  ㄊ  ㄍ  ㄐ  ㄔ  ㄗ  ㄧ  ㄛ  ㄟ  ㄣ  │
-│ ㄇ  ㄋ  ㄎ  ㄑ  ㄕ  ㄘ  ㄨ  ㄜ  ㄠ  ㄤ  │
-│ ㄈ  ㄌ  ㄏ  ㄒ  ㄖ  ㄙ  ㄩ  ㄝ  ㄡ  ㄥ  │
-│ 中/英   🌐       ␣       ⌫    ⏎   │
-└────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────┐
+│  1   q   2   w   3   e   4   r   5   t   6   y   7   u  │
+│  ㄅ  ㄆ  ㄉ  ㄊ  ˇ  ㄍ  ˋ  ㄐ  ㄓ  ㄔ  ˊ  ㄗ  ˙  ㄧ  │
+├─────────────────────────────────────────────────────────┤
+│  a   s   d   f   g   h   j   k   l   ;                  │
+│  ㄇ  ㄋ  ㄎ  ㄑ  ㄕ  ㄘ  ㄨ  ㄜ  ㄠ  ㄤ                │
+├─────────────────────────────────────────────────────────┤
+│  z   x   c   v   b   n   m   ,   .   /                  │
+│  ㄈ  ㄌ  ㄏ  ㄒ  ㄖ  ㄙ  ㄩ  ㄝ  ㄡ  ㄥ                │
+├─────────────────────────────────────────────────────────┤
+│  8   9   0   -                                           │
+│  ㄚ  ㄞ  ㄢ  ㄦ                                          │
+├─────────────────────────────────────────────────────────┤
+│ 中/英 │  🌐  │        ␣         │   ⌫   │   ⏎   │
+└─────────────────────────────────────────────────────────┘
 ```
 
 ### Special Keys
@@ -142,9 +152,21 @@ ios/
 |-----|----------|
 | `中/英` | Toggle Chinese/English mode |
 | `🌐` | Switch to next keyboard |
-| `␣` (Space) | First tone / confirm selection |
+| `Space` | First tone / confirm selection |
+| `3` | Second tone (ˊ) |
+| `4` | Third tone (ˇ) |
+| `6` | Fourth tone (ˋ) |
+| `7` | Neutral tone (˙) |
+| `1-9, 0` | Select candidate |
 | `⌫` | Backspace / delete last symbol |
 | `⏎` | Return / commit preedit |
+
+### Input Flow
+
+1. Type Bopomofo symbols using the keyboard
+2. Press a tone key (3, 4, 6, 7) or Space (1st tone)
+3. Select a character from candidates using number keys or tap
+4. Press `中/英` to toggle Chinese/English mode
 
 ### Candidate Selection
 
@@ -178,12 +200,13 @@ To share data between app and extension:
 
 ## Differences from Other Platforms
 
-| Feature | Linux (GTK) | Windows (TSF) | macOS (IMK) | iOS |
-|---------|-------------|---------------|-------------|-----|
-| Framework | IBus/XIM | TSF | Input Method Kit | UIKit Extension |
-| Language | C | C++ | Objective-C | Objective-C |
-| UI | System | System | System | Custom |
-| Candidate | System | System | System | Custom View |
+| Feature | Linux (GTK) | Windows (TSF) | macOS (IMK) | iOS | Android |
+|---------|-------------|---------------|-------------|-----|---------|
+| Framework | IBus/XIM | TSF | Input Method Kit | UIKit Extension | InputMethodService |
+| Language | C | C++ | Objective-C | Objective-C | Java + JNI |
+| Build | autotools | MinGW CMake | CMake | Xcode | Gradle |
+| UI | System | System | System | Custom | Custom |
+| Candidate | System | System | System | Custom View | Custom View |
 
 ## Troubleshooting
 
@@ -208,5 +231,4 @@ GNU LGPL v2.1, consistent with the main HIME project.
 ## Credits
 
 - [HIME](https://github.com/hime-ime/hime) - Original input method engine
-- [OpenHeInput-iOS](https://github.com/) - Reference implementation
 - HIME Team for phonetic tables and algorithms
