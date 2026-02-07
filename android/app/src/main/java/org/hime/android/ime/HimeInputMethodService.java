@@ -10,23 +10,20 @@
 package org.hime.android.ime;
 
 import android.inputmethodservice.InputMethodService;
+import android.util.Log;
 import android.view.KeyEvent;
 import android.view.View;
 import android.view.inputmethod.EditorInfo;
 import android.view.inputmethod.InputConnection;
-import android.util.Log;
-
 import org.hime.android.core.HimeEngine;
-import org.hime.android.view.HimeKeyboardView;
 import org.hime.android.view.HimeCandidateView;
+import org.hime.android.view.HimeKeyboardView;
 
 /**
  * HimeInputMethodService is the main entry point for the HIME Android IME.
  * Extends InputMethodService to provide Bopomofo/Zhuyin input functionality.
  */
-public class HimeInputMethodService extends InputMethodService
-        implements HimeKeyboardView.KeyboardListener {
-
+public class HimeInputMethodService extends InputMethodService implements HimeKeyboardView.KeyboardListener {
     private static final String TAG = "HimeIME";
 
     private HimeEngine engine;
@@ -125,7 +122,8 @@ public class HimeInputMethodService extends InputMethodService
 
     @Override
     public void onKeyPressed(String key) {
-        if (key == null || key.isEmpty()) return;
+        if (key == null || key.isEmpty())
+            return;
 
         Log.d(TAG, "onKeyPressed: " + key);
 
@@ -276,14 +274,17 @@ public class HimeInputMethodService extends InputMethodService
         int maxPage = (count + HimeEngine.CANDIDATES_PER_PAGE - 1) / HimeEngine.CANDIDATES_PER_PAGE - 1;
 
         currentPage += direction;
-        if (currentPage < 0) currentPage = 0;
-        if (currentPage > maxPage) currentPage = maxPage;
+        if (currentPage < 0)
+            currentPage = 0;
+        if (currentPage > maxPage)
+            currentPage = maxPage;
 
         updateCandidates();
     }
 
     private void onCandidateSelected(int index) {
-        if (engine == null) return;
+        if (engine == null)
+            return;
 
         int actualIndex = currentPage * HimeEngine.CANDIDATES_PER_PAGE + index;
         if (engine.selectCandidate(actualIndex)) {
@@ -300,7 +301,8 @@ public class HimeInputMethodService extends InputMethodService
     /* UI updates */
 
     private void updatePreedit() {
-        if (engine == null) return;
+        if (engine == null)
+            return;
 
         String preedit = engine.getPreedit();
         InputConnection ic = getCurrentInputConnection();
@@ -316,7 +318,8 @@ public class HimeInputMethodService extends InputMethodService
     }
 
     private void updateCandidates() {
-        if (engine == null || candidateView == null) return;
+        if (engine == null || candidateView == null)
+            return;
 
         String[] candidates = engine.getCandidates(currentPage);
         int totalCount = engine.getCandidateCount();

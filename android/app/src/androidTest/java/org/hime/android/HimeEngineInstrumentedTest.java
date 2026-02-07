@@ -10,18 +10,16 @@
 
 package org.hime.android;
 
-import android.content.Context;
+import static org.junit.Assert.*;
 
+import android.content.Context;
 import androidx.test.ext.junit.runners.AndroidJUnit4;
 import androidx.test.platform.app.InstrumentationRegistry;
-
 import org.hime.android.core.HimeEngine;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
-
-import static org.junit.Assert.*;
 
 /**
  * Instrumented tests for HimeEngine with native JNI code.
@@ -29,7 +27,6 @@ import static org.junit.Assert.*;
  */
 @RunWith(AndroidJUnit4.class)
 public class HimeEngineInstrumentedTest {
-
     private Context context;
     private HimeEngine engine;
 
@@ -146,8 +143,7 @@ public class HimeEngineInstrumentedTest {
 
         String[] candidates = engine.getCandidates(0);
         /* Can be null or empty array when no candidates */
-        assertTrue("Should have no candidates",
-                   candidates == null || candidates.length == 0);
+        assertTrue("Should have no candidates", candidates == null || candidates.length == 0);
     }
 
     @Test
@@ -166,8 +162,7 @@ public class HimeEngineInstrumentedTest {
 
         engine.setInputMode(HimeEngine.MODE_ENGLISH);
         int result = engine.processKey('a', 0);
-        assertEquals("Keys should be ignored in English mode",
-                     HimeEngine.RESULT_IGNORED, result);
+        assertEquals("Keys should be ignored in English mode", HimeEngine.RESULT_IGNORED, result);
     }
 
     @Test
@@ -180,9 +175,8 @@ public class HimeEngineInstrumentedTest {
         int result = engine.processKey('j', 0);
         /* Result depends on data file availability */
         assertTrue("Should be IGNORED or CONSUMED",
-                   result == HimeEngine.RESULT_IGNORED ||
-                   result == HimeEngine.RESULT_CONSUMED ||
-                   result == HimeEngine.RESULT_COMMIT);
+                result == HimeEngine.RESULT_IGNORED || result == HimeEngine.RESULT_CONSUMED
+                        || result == HimeEngine.RESULT_COMMIT);
     }
 
     /* ========== Reset Tests ========== */
@@ -245,8 +239,8 @@ public class HimeEngineInstrumentedTest {
         engine.setInputMode(HimeEngine.MODE_CHINESE);
 
         /* Type a sequence of Zhuyin keys */
-        engine.processKey('j', 0);  /* ㄨ */
-        engine.processKey('3', 0);  /* ˇ (tone) */
+        engine.processKey('j', 0); /* ㄨ */
+        engine.processKey('3', 0); /* ˇ (tone) */
 
         /* Check preedit */
         String preedit = engine.getPreedit();

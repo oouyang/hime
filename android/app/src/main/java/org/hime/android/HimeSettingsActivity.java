@@ -23,7 +23,6 @@ import android.widget.TextView;
  * HimeSettingsActivity provides setup instructions and configuration options.
  */
 public class HimeSettingsActivity extends Activity {
-
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -54,9 +53,7 @@ public class HimeSettingsActivity extends Activity {
         settingsButton.setText(R.string.setup_open_settings);
         settingsButton.setOnClickListener(v -> openInputMethodSettings());
         LinearLayout.LayoutParams btnParams = new LinearLayout.LayoutParams(
-            LinearLayout.LayoutParams.MATCH_PARENT,
-            LinearLayout.LayoutParams.WRAP_CONTENT
-        );
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
         btnParams.topMargin = 48;
         layout.addView(settingsButton, btnParams);
 
@@ -65,9 +62,7 @@ public class HimeSettingsActivity extends Activity {
         switchButton.setText("切換輸入法");
         switchButton.setOnClickListener(v -> showInputMethodPicker());
         LinearLayout.LayoutParams switchParams = new LinearLayout.LayoutParams(
-            LinearLayout.LayoutParams.MATCH_PARENT,
-            LinearLayout.LayoutParams.WRAP_CONTENT
-        );
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
         switchParams.topMargin = 16;
         layout.addView(switchButton, switchParams);
 

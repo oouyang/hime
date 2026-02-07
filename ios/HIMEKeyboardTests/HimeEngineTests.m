@@ -136,8 +136,7 @@
 
     /* Backspace should be handled */
     HimeKeyResult result = [self.engine processKeyCode:0x08 character:0x08 modifiers:0];
-    XCTAssertTrue(result == HimeKeyResultAbsorbed || result == HimeKeyResultIgnored,
-                  @"Backspace should be handled");
+    XCTAssertTrue(result == HimeKeyResultAbsorbed || result == HimeKeyResultIgnored, @"Backspace should be handled");
 }
 
 - (void)testEscapeClearsPreedit {
@@ -146,8 +145,7 @@
 
     /* Escape should clear/reset */
     HimeKeyResult result = [self.engine processKeyCode:0x1B character:0x1B modifiers:0];
-    XCTAssertTrue(result == HimeKeyResultAbsorbed || result == HimeKeyResultIgnored,
-                  @"Escape should be handled");
+    XCTAssertTrue(result == HimeKeyResultAbsorbed || result == HimeKeyResultIgnored, @"Escape should be handled");
 }
 
 #pragma mark - Candidate Selection Tests

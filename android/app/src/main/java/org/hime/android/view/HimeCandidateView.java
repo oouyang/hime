@@ -22,7 +22,6 @@ import android.view.View;
  * Shows a horizontal scrollable list of candidate characters.
  */
 public class HimeCandidateView extends View {
-
     private static final String TAG = "HimeCandidateView";
 
     /* View dimensions */
@@ -216,8 +215,7 @@ public class HimeCandidateView extends View {
         float x = isPrev ? 0 : getWidth() - navButtonWidth;
         float padding = height * 0.15f;
 
-        RectF rect = new RectF(x + padding, padding,
-                               x + navButtonWidth - padding, height - padding);
+        RectF rect = new RectF(x + padding, padding, x + navButtonWidth - padding, height - padding);
 
         navButtonPaint.setColor(COLOR_NAV_BUTTON);
         canvas.drawRoundRect(rect, height * 0.1f, height * 0.1f, navButtonPaint);
@@ -230,7 +228,8 @@ public class HimeCandidateView extends View {
     }
 
     private void drawCandidate(Canvas canvas, int index) {
-        if (candidatePositions == null || index >= candidatePositions.length) return;
+        if (candidatePositions == null || index >= candidatePositions.length)
+            return;
 
         float x = candidatePositions[index];
         float width = candidateWidths[index];
@@ -258,7 +257,8 @@ public class HimeCandidateView extends View {
     }
 
     private void drawPageInfo(Canvas canvas) {
-        if (totalCount <= 0) return;
+        if (totalCount <= 0)
+            return;
 
         int totalPages = (totalCount + 9) / 10; /* 10 candidates per page */
         String info = String.format("%d/%d", currentPage + 1, totalPages);
@@ -318,7 +318,8 @@ public class HimeCandidateView extends View {
     }
 
     private int findCandidateAt(float x) {
-        if (candidatePositions == null) return -1;
+        if (candidatePositions == null)
+            return -1;
 
         /* Skip if in nav button areas */
         if (x < navButtonWidth || x > getWidth() - navButtonWidth) {

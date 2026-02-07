@@ -124,8 +124,7 @@
     /* Escape should clear/reset */
     HimeKeyResult result = [self.engine processKeyCode:0x1B character:0x1B modifiers:0];
     /* Result can be Absorbed or Ignored depending on state */
-    XCTAssertTrue(result == HimeKeyResultAbsorbed || result == HimeKeyResultIgnored,
-                  @"Escape should be handled");
+    XCTAssertTrue(result == HimeKeyResultAbsorbed || result == HimeKeyResultIgnored, @"Escape should be handled");
 }
 
 @end

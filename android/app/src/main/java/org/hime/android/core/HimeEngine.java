@@ -11,7 +11,6 @@ package org.hime.android.core;
 
 import android.content.Context;
 import android.util.Log;
-
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
@@ -128,7 +127,8 @@ public class HimeEngine {
      * @return Result code: RESULT_IGNORED, RESULT_CONSUMED, or RESULT_COMMIT
      */
     public int processKey(char keyChar, int modifiers) {
-        if (!initialized) return RESULT_IGNORED;
+        if (!initialized)
+            return RESULT_IGNORED;
         return nativeProcessKey(keyChar, modifiers);
     }
 
@@ -137,7 +137,8 @@ public class HimeEngine {
      * Shows Bopomofo symbols being composed.
      */
     public String getPreedit() {
-        if (!initialized) return "";
+        if (!initialized)
+            return "";
         String preedit = nativeGetPreedit();
         return preedit != null ? preedit : "";
     }
@@ -147,7 +148,8 @@ public class HimeEngine {
      * Returns characters that should be inserted into the text field.
      */
     public String getCommit() {
-        if (!initialized) return "";
+        if (!initialized)
+            return "";
         String commit = nativeGetCommit();
         return commit != null ? commit : "";
     }
@@ -159,7 +161,8 @@ public class HimeEngine {
      * @return Array of candidate strings, or null if none
      */
     public String[] getCandidates(int page) {
-        if (!initialized) return null;
+        if (!initialized)
+            return null;
         return nativeGetCandidates(page);
     }
 
@@ -167,7 +170,8 @@ public class HimeEngine {
      * Get total number of candidates.
      */
     public int getCandidateCount() {
-        if (!initialized) return 0;
+        if (!initialized)
+            return 0;
         return nativeGetCandidateCount();
     }
 
@@ -178,7 +182,8 @@ public class HimeEngine {
      * @return true if selection was successful
      */
     public boolean selectCandidate(int index) {
-        if (!initialized) return false;
+        if (!initialized)
+            return false;
         return nativeSelectCandidate(index);
     }
 
@@ -213,7 +218,8 @@ public class HimeEngine {
      * Get current input mode.
      */
     public int getInputMode() {
-        if (!initialized) return MODE_CHINESE;
+        if (!initialized)
+            return MODE_CHINESE;
         return nativeGetInputMode();
     }
 
@@ -238,7 +244,8 @@ public class HimeEngine {
      * Get current character set (Traditional/Simplified).
      */
     public int getCharset() {
-        if (!initialized) return CHARSET_TRADITIONAL;
+        if (!initialized)
+            return CHARSET_TRADITIONAL;
         return nativeGetCharset();
     }
 
@@ -255,7 +262,8 @@ public class HimeEngine {
      * Toggle between Traditional and Simplified.
      */
     public int toggleCharset() {
-        if (!initialized) return CHARSET_TRADITIONAL;
+        if (!initialized)
+            return CHARSET_TRADITIONAL;
         return nativeToggleCharset();
     }
 
@@ -265,7 +273,8 @@ public class HimeEngine {
      * Get smart punctuation enabled state.
      */
     public boolean isSmartPunctuationEnabled() {
-        if (!initialized) return false;
+        if (!initialized)
+            return false;
         return nativeGetSmartPunctuation();
     }
 
@@ -283,7 +292,8 @@ public class HimeEngine {
      * @return Converted string, or null if no conversion
      */
     public String convertPunctuation(char ascii) {
-        if (!initialized) return null;
+        if (!initialized)
+            return null;
         return nativeConvertPunctuation(ascii);
     }
 
@@ -302,7 +312,8 @@ public class HimeEngine {
      * Get Pinyin annotation enabled state.
      */
     public boolean isPinyinAnnotationEnabled() {
-        if (!initialized) return false;
+        if (!initialized)
+            return false;
         return nativeGetPinyinAnnotation();
     }
 
@@ -321,7 +332,8 @@ public class HimeEngine {
      * Get candidate display style.
      */
     public int getCandidateStyle() {
-        if (!initialized) return CANDIDATE_STYLE_HORIZONTAL;
+        if (!initialized)
+            return CANDIDATE_STYLE_HORIZONTAL;
         return nativeGetCandidateStyle();
     }
 
@@ -340,7 +352,8 @@ public class HimeEngine {
      * Get color scheme.
      */
     public int getColorScheme() {
-        if (!initialized) return COLOR_SCHEME_LIGHT;
+        if (!initialized)
+            return COLOR_SCHEME_LIGHT;
         return nativeGetColorScheme();
     }
 
@@ -368,7 +381,8 @@ public class HimeEngine {
      * Get current keyboard layout.
      */
     public int getKeyboardLayout() {
-        if (!initialized) return KB_STANDARD;
+        if (!initialized)
+            return KB_STANDARD;
         return nativeGetKeyboardLayout();
     }
 
@@ -378,7 +392,8 @@ public class HimeEngine {
      * @return 0 on success, -1 on error
      */
     public int setKeyboardLayout(int layout) {
-        if (!initialized) return -1;
+        if (!initialized)
+            return -1;
         return nativeSetKeyboardLayout(layout);
     }
 
@@ -388,7 +403,8 @@ public class HimeEngine {
      * @return 0 on success, -1 if layout not found
      */
     public int setKeyboardLayoutByName(String layoutName) {
-        if (!initialized || layoutName == null) return -1;
+        if (!initialized || layoutName == null)
+            return -1;
         return nativeSetKeyboardLayoutByName(layoutName);
     }
 
@@ -398,7 +414,8 @@ public class HimeEngine {
      * Get sound feedback enabled state.
      */
     public boolean isSoundEnabled() {
-        if (!initialized) return false;
+        if (!initialized)
+            return false;
         return nativeGetSoundEnabled();
     }
 
@@ -415,7 +432,8 @@ public class HimeEngine {
      * Get vibration feedback enabled state.
      */
     public boolean isVibrationEnabled() {
-        if (!initialized) return false;
+        if (!initialized)
+            return false;
         return nativeGetVibrationEnabled();
     }
 
@@ -432,7 +450,8 @@ public class HimeEngine {
      * Get vibration duration in milliseconds.
      */
     public int getVibrationDuration() {
-        if (!initialized) return 20;
+        if (!initialized)
+            return 20;
         return nativeGetVibrationDuration();
     }
 

@@ -10,12 +10,12 @@
 
 package org.hime.android;
 
+import static org.junit.Assert.*;
+
 import org.hime.android.core.HimeEngine;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
-
-import static org.junit.Assert.*;
 
 /**
  * Unit tests for HimeEngine Java wrapper.
@@ -24,7 +24,6 @@ import static org.junit.Assert.*;
  * the native library should be run as instrumented tests.
  */
 public class HimeEngineTest {
-
     /**
      * Test that engine constants are defined correctly.
      */

@@ -1,12 +1,14 @@
----
 #
 # HIME coding style
 #
 # This is based on gtk .clang-format style file with a few overrides.
 # https://raw.githubusercontent.com/GNOME/gtk/mainline/.clang-format
+#
+# Supports: C, C++, Objective-C, Java
+#
 
+---
 Language: Cpp
-
 # start of the gtk style file ------------------------------------------------
 # See https://wiki.apertis.org/Guidelines/Coding_conventions#Code_formatting
 BasedOnStyle: GNU
@@ -70,3 +72,39 @@ PenaltyReturnTypeOnItsOwnLine: 200
 SpacesBeforeTrailingComments: 2
 Standard:        Auto
 # end of HIME overrides ------------------------------------------------------
+
+---
+# Objective-C style (iOS/macOS)
+Language: ObjC
+BasedOnStyle: Google
+IndentWidth: 4
+ColumnLimit: 120
+ObjCBlockIndentWidth: 4
+ObjCSpaceAfterProperty: true
+ObjCSpaceBeforeProtocolList: true
+ObjCBinPackProtocolList: Never
+SpaceAfterCStyleCast: true
+BreakBeforeBraces: Attach
+AllowShortFunctionsOnASingleLine: Empty
+AllowShortIfStatementsOnASingleLine: Never
+AllowShortLoopsOnASingleLine: false
+BinPackParameters: false
+BinPackArguments: false
+AlignTrailingComments: true
+SpacesBeforeTrailingComments: 2
+PointerAlignment: Right
+AlignAfterOpenBracket: Align
+
+---
+# Java style (Android)
+Language: Java
+BasedOnStyle: Google
+IndentWidth: 4
+ColumnLimit: 120
+BreakBeforeBraces: Attach
+AllowShortFunctionsOnASingleLine: Empty
+AllowShortIfStatementsOnASingleLine: Never
+SpaceAfterCStyleCast: true
+AlignTrailingComments: true
+SpacesBeforeTrailingComments: 2
+ContinuationIndentWidth: 8
