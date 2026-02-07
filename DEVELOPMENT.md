@@ -866,6 +866,32 @@ After installing:
 
 See `ios/README.md` for detailed build and installation instructions.
 
+### Android Build (Gradle)
+
+For Android, HIME provides an InputMethodService-based IME. Build with Gradle:
+
+```bash
+cd android
+
+# Debug build
+./gradlew assembleDebug
+
+# Release build
+./gradlew assembleRelease
+
+# Install on connected device
+./gradlew installDebug
+```
+
+Or open the `android/` folder in Android Studio and build from the IDE.
+
+After installing:
+1. Go to **Settings** → **System** → **Languages & input** → **On-screen keyboard**
+2. Enable **HIME 輸入法**
+3. Switch to HIME when typing in any text field
+
+See `android/README.md` for detailed build and installation instructions.
+
 ## Resources
 
 - **Repository:** https://github.com/hime-ime/hime

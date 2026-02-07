@@ -1,0 +1,25 @@
+/*
+ * HIME Android - Root Build Script
+ *
+ * Copyright (C) 2020 The HIME team, Taiwan
+ * License: GNU LGPL v2.1
+ */
+
+buildscript {
+    ext {
+        agp_version = '8.2.0'
+        kotlin_version = '1.9.21'
+        min_sdk = 21
+        target_sdk = 34
+        compile_sdk = 34
+        ndk_version = '25.2.9519653'
+    }
+}
+
+plugins {
+    id 'com.android.application' version "$agp_version" apply false
+}
+
+task clean(type: Delete) {
+    delete rootProject.buildDir
+}

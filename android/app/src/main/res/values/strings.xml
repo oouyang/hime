@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  HIME Android - String Resources
+
+  Copyright (C) 2020 The HIME team, Taiwan
+  License: GNU LGPL v2.1
+-->
+<resources>
+    <!-- Application -->
+    <string name="app_name">HIME</string>
+    <string name="ime_name">HIME 輸入法</string>
+
+    <!-- Subtypes -->
+    <string name="subtype_zhuyin">注音 (Zhuyin)</string>
+    <string name="subtype_english">English</string>
+
+    <!-- Settings -->
+    <string name="settings_title">HIME 設定</string>
+    <string name="settings_keyboard">鍵盤設定</string>
+    <string name="settings_appearance">外觀</string>
+    <string name="settings_about">關於</string>
+
+    <!-- Setup instructions -->
+    <string name="setup_title">啟用 HIME 輸入法</string>
+    <string name="setup_step1">1. 開啟系統設定</string>
+    <string name="setup_step2">2. 選擇「語言與輸入」</string>
+    <string name="setup_step3">3. 選擇「虛擬鍵盤」或「管理鍵盤」</string>
+    <string name="setup_step4">4. 啟用「HIME 輸入法」</string>
+    <string name="setup_step5">5. 切換至 HIME 即可開始使用</string>
+    <string name="setup_open_settings">開啟輸入法設定</string>
+
+    <!-- About -->
+    <string name="about_version">版本 %s</string>
+    <string name="about_description">HIME 是一個輕量級的輸入法框架，支援注音、倉頡、拼音等多種輸入法。</string>
+    <string name="about_license">授權：GNU LGPL v2.1</string>
+    <string name="about_website">網站：https://hime-ime.github.io/</string>
+</resources>
