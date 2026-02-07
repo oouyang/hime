@@ -415,7 +415,7 @@ static int xerror_handler (Display *d, XErrorEvent *eve) {
 Atom hime_atom;
 extern int hime_show_win_kbm;
 
-static void cb_trad_sim_toggle (void) {
+void cb_trad_sim_toggle (void) {
     toggle_gb_output ();
 #if TRAY_ENABLED
     disp_tray_icon ();
@@ -433,12 +433,12 @@ void kbm_open_close (GtkButton *checkmenuitem, gboolean b_show) {
     }
 }
 
-static void kbm_toggle (void) {
+void kbm_toggle (void) {
     win_kbm_inited = 1;
     kbm_open_close (NULL, !hime_show_win_kbm);
 }
 
-static void do_exit (void);
+void do_exit (void);
 
 /* Message handler functions for dispatch table */
 static void msg_change_font_size (void) {
@@ -554,7 +554,7 @@ static void init_atom_property (void) {
     XSetSelectionOwner (dpy, hime_atom, xim_xwin, CurrentTime);
 }
 
-static void do_exit (void) {
+void do_exit (void) {
     dbg ("----------------- do_exit ----------------\n");
 
     free_pho_mem ();

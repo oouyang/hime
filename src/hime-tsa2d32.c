@@ -34,7 +34,8 @@ phokey_t pinyin2phokey (char *s);
 static char *bf;
 static gboolean b_pinyin;
 
-static int *phidx, *sidx, phcount;
+static int *phidx, *sidx;
+int phcount;
 static int bfsize, phidxsize;
 static u_char *sf;
 static gboolean is_gtab, gtabkey64;
