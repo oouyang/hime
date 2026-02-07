@@ -9,7 +9,6 @@
  * License: GNU LGPL v2.1
  */
 
-#define HIME_CORE_EXPORTS
 #include "hime-core.h"
 
 #include <stdlib.h>

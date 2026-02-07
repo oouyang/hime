@@ -8,13 +8,21 @@
  * License: GNU LGPL v2.1
  */
 
-#define WIN32_LEAN_AND_MEAN
-#define NOMINMAX
-
 #include <windows.h>
 #include <msctf.h>
 #include <olectl.h>
 #include <assert.h>
+#include <stdio.h>
+#include <wchar.h>
+
+/* MinGW compatibility */
+#ifndef TF_CLIENTID_NULL
+#define TF_CLIENTID_NULL 0
+#endif
+
+#ifndef swprintf
+#define swprintf _snwprintf
+#endif
 
 extern "C" {
 #include "hime-core.h"
