@@ -127,6 +127,36 @@ set(HIME_DATA_FILES
 # Note: In Xcode, add these files to the keyboard extension target manually
 # CMake's iOS support for app extensions is limited
 
+# ========== Unit Tests ==========
+# Note: iOS tests typically run via Xcode. This target is for reference.
+option(BUILD_TESTS "Build unit tests" OFF)
+
+if(BUILD_TESTS)
+    enable_testing()
+
+    add_library(HIMEKeyboardTests MODULE
+        HIMEKeyboardTests/HimeEngineTests.m
+    )
+
+    target_link_libraries(HIMEKeyboardTests PRIVATE
+        hime-shared
+        "-framework UIKit"
+        "-framework Foundation"
+        "-framework XCTest"
+    )
+
+    target_include_directories(HIMEKeyboardTests PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/Shared/include
+    )
+
+    set_target_properties(HIMEKeyboardTests PROPERTIES
+        BUNDLE TRUE
+        BUNDLE_EXTENSION "xctest"
+        XCODE_ATTRIBUTE_CLANG_ENABLE_OBJC_ARC YES
+        XCODE_PRODUCT_TYPE "com.apple.product-type.bundle.unit-test"
+    )
+endif()
+
 message(STATUS "")
 message(STATUS "HIME iOS configuration complete")
 message(STATUS "  Version: ${PROJECT_VERSION}")
