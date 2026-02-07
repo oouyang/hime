@@ -695,6 +695,9 @@ Tests are located in the `tests/` directory:
 | `test-framework.h` | Minimal test framework (assertions, test macros) |
 | `test-utf8.c` | UTF-8 function tests (utf8_sz, utf8cpy, utf8_eq, etc.) |
 | `test-util.c` | Utility function tests (zmalloc, memdup, myfgets) |
+| `test-pho.c` | Phonetic key encoding/decoding tests (pho2key, key_typ_pho) |
+| `test-gtab.c` | Generic table function tests (CONVT2, gtab_key2name) |
+| `test-seq.c` | Sequence comparison tests (phokey_t_seq*, mask_tone) |
 
 ### Writing New Tests
 

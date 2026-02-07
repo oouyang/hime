@@ -3,7 +3,7 @@
 CFLAGS += -std=gnu17 -Wall $(GTKINC) -I../src
 
 # Test programs
-PROGS = test-utf8 test-util
+PROGS = test-utf8 test-util test-pho test-gtab test-seq
 
 # Build all test programs
 all: $(PROGS)
@@ -15,6 +15,18 @@ test-utf8: test-utf8.c test-framework.h ../src/locale.o ../src/util.o
 # test-util: Utility function tests
 test-util: test-util.c test-framework.h ../src/util.o ../src/locale.o
 	$(CC) $(CFLAGS) -o $@ test-util.c ../src/util.o ../src/locale.o $(GTKLDFLAGS)
+
+# test-pho: Phonetic key function tests (self-contained implementations)
+test-pho: test-pho.c test-framework.h
+	$(CC) $(CFLAGS) -o $@ test-pho.c $(GTKLDFLAGS)
+
+# test-gtab: Generic table function tests (self-contained implementations)
+test-gtab: test-gtab.c test-framework.h
+	$(CC) $(CFLAGS) -o $@ test-gtab.c $(GTKLDFLAGS)
+
+# test-seq: Sequence comparison function tests (self-contained implementations)
+test-seq: test-seq.c test-framework.h
+	$(CC) $(CFLAGS) -o $@ test-seq.c $(GTKLDFLAGS)
 
 # Run all tests
 .PHONY: run-tests check test
