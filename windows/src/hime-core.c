@@ -463,19 +463,47 @@ typedef struct {
 
 /* Well-known GTAB tables */
 static const GtabRegistry GTAB_REGISTRY[] = {
+    /* Cangjie family */
     {"倉頡", "cj.gtab", "cj.png", HIME_GTAB_CJ},
     {"倉五", "cj5.gtab", "cj5.png", HIME_GTAB_CJ5},
+    {"五四三倉頡", "cj543.gtab", "cj5.png", HIME_GTAB_CJ543},
+    {"標點倉頡", "cj-punc.gtab", "cj-punc.png", HIME_GTAB_CJ_PUNC},
+
+    /* Simplex family */
     {"速成", "simplex.gtab", "simplex.png", HIME_GTAB_SIMPLEX},
+    {"標點簡易", "simplex-punc.gtab", "simplex.png", HIME_GTAB_SIMPLEX_PUNC},
+
+    /* DaYi */
     {"大易", "dayi3.gtab", "dayi3.png", HIME_GTAB_DAYI},
+
+    /* Array family */
     {"行列30", "ar30.gtab", "ar30.png", HIME_GTAB_ARRAY30},
     {"行列40", "array40.gtab", "ar30.png", HIME_GTAB_ARRAY40},
+    {"行列大字集", "ar30-big.gtab", "ar30.png", HIME_GTAB_ARRAY30_BIG},
+
+    /* Boshiamy */
+    {"嘸蝦米", "noseeing.gtab", "noseeing.png", HIME_GTAB_BOSHIAMY},
+
+    /* Phonetic-based */
     {"拼音", "pinyin.gtab", "pinyin.png", HIME_GTAB_PINYIN},
     {"粵拼", "jyutping.gtab", "jyutping.png", HIME_GTAB_JYUTPING},
+
+    /* Korean */
     {"韓諺", "hangul.gtab", "hangul.png", HIME_GTAB_HANGUL},
+    {"韓羅", "hangul-roman.gtab", "hangul.png", HIME_GTAB_HANGUL_ROMAN},
+
+    /* Vietnamese */
+    {"越南文", "vims.gtab", "vims.png", HIME_GTAB_VIMS},
+
+    /* Symbols and special characters */
     {"符號", "symbols.gtab", "symbols.png", HIME_GTAB_SYMBOLS},
     {"希臘文", "greek.gtab", "greek.png", HIME_GTAB_GREEK},
     {"俄文", "russian.gtab", "russian.png", HIME_GTAB_RUSSIAN},
-    {"", "", "", HIME_GTAB_CUSTOM}  /* Sentinel */
+    {"世界文", "esperanto.gtab", "esperanto.png", HIME_GTAB_ESPERANTO},
+    {"拉丁字母", "latin-letters.gtab", "latin-letters.png", HIME_GTAB_LATIN},
+
+    /* Sentinel */
+    {"", "", "", HIME_GTAB_CUSTOM}
 };
 
 /* ========== TSIN Structures ========== */

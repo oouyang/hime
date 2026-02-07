@@ -66,19 +66,47 @@ typedef enum {
 
 /* Well-known GTAB table IDs */
 typedef enum {
-    HIME_GTAB_CJ = 0,        /* Cangjie (倉頡) */
-    HIME_GTAB_CJ5 = 1,       /* Cangjie 5 (倉五) */
-    HIME_GTAB_SIMPLEX = 2,   /* Simplex (速成/簡易) */
-    HIME_GTAB_DAYI = 3,      /* DaYi (大易) */
-    HIME_GTAB_ARRAY30 = 4,   /* Array 30 (行列30) */
-    HIME_GTAB_ARRAY40 = 5,   /* Array 40 (行列40) */
-    HIME_GTAB_PINYIN = 6,    /* Pinyin table (拼音) */
-    HIME_GTAB_JYUTPING = 7,  /* Cantonese Jyutping (粵拼) */
-    HIME_GTAB_HANGUL = 8,    /* Korean Hangul (韓諺) */
-    HIME_GTAB_SYMBOLS = 9,   /* Symbol input (符號) */
-    HIME_GTAB_GREEK = 10,    /* Greek letters */
-    HIME_GTAB_RUSSIAN = 11,  /* Russian/Cyrillic */
-    HIME_GTAB_CUSTOM = 99    /* Custom/user table */
+    /* Chinese - Cangjie family */
+    HIME_GTAB_CJ = 0,           /* Cangjie (倉頡) */
+    HIME_GTAB_CJ5 = 1,          /* Cangjie 5 (倉五) */
+    HIME_GTAB_CJ543 = 2,        /* Cangjie 543 (五四三倉頡) */
+    HIME_GTAB_CJ_PUNC = 3,      /* Cangjie + punctuation (標點倉頡) */
+
+    /* Chinese - Simplex family */
+    HIME_GTAB_SIMPLEX = 10,     /* Simplex (速成/簡易) */
+    HIME_GTAB_SIMPLEX_PUNC = 11,/* Simplex + punctuation (標點簡易) */
+
+    /* Chinese - DaYi (大易) */
+    HIME_GTAB_DAYI = 20,        /* DaYi 3 (大易三碼) */
+
+    /* Chinese - Array family (行列) */
+    HIME_GTAB_ARRAY30 = 30,     /* Array 30 (行列30) */
+    HIME_GTAB_ARRAY40 = 31,     /* Array 40 (行列40) */
+    HIME_GTAB_ARRAY30_BIG = 32, /* Array 30 Big charset (行列大字集) */
+
+    /* Chinese - Boshiamy (嘸蝦米) */
+    HIME_GTAB_BOSHIAMY = 40,    /* Boshiamy (嘸蝦米) */
+
+    /* Chinese - Phonetic-based */
+    HIME_GTAB_PINYIN = 50,      /* Pinyin table (拼音) */
+    HIME_GTAB_JYUTPING = 51,    /* Cantonese Jyutping (粵拼) */
+
+    /* Korean */
+    HIME_GTAB_HANGUL = 60,      /* Korean Hangul (韓諺) */
+    HIME_GTAB_HANGUL_ROMAN = 61,/* Korean Romanization (韓羅) */
+
+    /* Vietnamese */
+    HIME_GTAB_VIMS = 70,        /* Vietnamese VIMS (越南文) */
+
+    /* Symbols and special characters */
+    HIME_GTAB_SYMBOLS = 80,     /* Symbol input (符號) */
+    HIME_GTAB_GREEK = 81,       /* Greek letters (希臘文) */
+    HIME_GTAB_RUSSIAN = 82,     /* Russian/Cyrillic (俄文) */
+    HIME_GTAB_ESPERANTO = 83,   /* Esperanto (世界文) */
+    HIME_GTAB_LATIN = 84,       /* Latin letters (拉丁字母) */
+
+    /* Custom/user-defined */
+    HIME_GTAB_CUSTOM = 99       /* Custom/user table */
 } HimeGtabTable;
 
 /* GTAB table info structure */
