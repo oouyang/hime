@@ -8,27 +8,7 @@
 #import "HimeInputController.h"
 #import <Carbon/Carbon.h>
 
-/* macOS virtual key codes */
-enum {
-    kVK_Return = 0x24,
-    kVK_Tab = 0x30,
-    kVK_Space = 0x31,
-    kVK_Delete = 0x33,
-    kVK_Escape = 0x35,
-    kVK_Shift = 0x38,
-    kVK_CapsLock = 0x39,
-    kVK_Control = 0x3B,
-    kVK_RightShift = 0x3C,
-    kVK_Option = 0x3A,
-    kVK_LeftArrow = 0x7B,
-    kVK_RightArrow = 0x7C,
-    kVK_DownArrow = 0x7D,
-    kVK_UpArrow = 0x7E,
-    kVK_PageUp = 0x74,
-    kVK_PageDown = 0x79,
-    kVK_Home = 0x73,
-    kVK_End = 0x77,
-};
+/* Key codes are defined in Carbon/HIToolbox/Events.h */
 
 @implementation HimeInputController
 
@@ -57,7 +37,20 @@ enum {
 - (void)setupCandidateWindow {
     self.candidateWindow = [[IMKCandidates alloc] initWithServer:self.server
                                                        panelType:kIMKSingleColumnScrollingCandidatePanel];
-    [self.candidateWindow setSelectionKeys:@"1234567890"];
+    /* Selection keys: 1-9, 0 (key codes for number row) */
+    NSArray *selectionKeys = @[
+        @(kVK_ANSI_1),
+        @(kVK_ANSI_2),
+        @(kVK_ANSI_3),
+        @(kVK_ANSI_4),
+        @(kVK_ANSI_5),
+        @(kVK_ANSI_6),
+        @(kVK_ANSI_7),
+        @(kVK_ANSI_8),
+        @(kVK_ANSI_9),
+        @(kVK_ANSI_0)
+    ];
+    [self.candidateWindow setSelectionKeys:selectionKeys];
     [self.candidateWindow setDismissesAutomatically:YES];
 }
 
