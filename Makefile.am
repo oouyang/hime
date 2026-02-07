@@ -37,3 +37,8 @@ distclean:
 .PHONY: clang-format
 clang-format:
 	./scripts/format_code.py
+
+.PHONY: check test
+check test:
+	@$(ECHO) -e "\x1b[1;33m** running tests\x1b[0m"
+	@$(MAKE) -C tests run-tests

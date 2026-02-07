@@ -656,13 +656,101 @@ Makefile.am   ──────────────►  Makefile.in ──�
 3. Use `$(NAME_CFLAGS)` and `$(NAME_LIBS)` in `Makefile.am`
 4. Run `autoreconf -i && ./configure`
 
+## Running Tests
+
+HIME includes unit tests for core functionality. Tests use a minimal, self-contained framework with no external dependencies.
+
+### Running All Tests
+
+```bash
+# Build the project first (tests depend on compiled objects)
+make
+
+# Run all tests
+make test
+# or
+make check
+```
+
+### Test Output
+
+```
+=== UTF-8 Functions ===
+PASS: utf8_sz_ascii
+PASS: utf8_sz_2byte
+...
+
+=== Results ===
+Total:  31
+Passed: 31
+Failed: 0
+```
+
+### Test Structure
+
+Tests are located in the `tests/` directory:
+
+| File | Description |
+|------|-------------|
+| `test-framework.h` | Minimal test framework (assertions, test macros) |
+| `test-utf8.c` | UTF-8 function tests (utf8_sz, utf8cpy, utf8_eq, etc.) |
+| `test-util.c` | Utility function tests (zmalloc, memdup, myfgets) |
+
+### Writing New Tests
+
+```c
+#include "test-framework.h"
+
+/* Define a test */
+TEST(my_test_name) {
+    int result = function_to_test(42);
+    ASSERT_EQ(expected_value, result);
+    ASSERT_TRUE(some_condition);
+    ASSERT_STR_EQ("expected", actual_string);
+    TEST_PASS();
+}
+
+/* Register tests in main */
+TEST_SUITE_BEGIN("My Test Suite")
+    RUN_TEST(my_test_name);
+TEST_SUITE_END()
+```
+
+### Available Assertions
+
+| Assertion | Description |
+|-----------|-------------|
+| `ASSERT_TRUE(expr)` | Expression must be true |
+| `ASSERT_FALSE(expr)` | Expression must be false |
+| `ASSERT_EQ(expected, actual)` | Values must be equal |
+| `ASSERT_NE(expected, actual)` | Values must not be equal |
+| `ASSERT_STR_EQ(expected, actual)` | Strings must be equal |
+| `ASSERT_NOT_NULL(ptr)` | Pointer must not be NULL |
+| `ASSERT_NULL(ptr)` | Pointer must be NULL |
+| `ASSERT_MEM_EQ(exp, act, size)` | Memory regions must be equal |
+
+### Adding a New Test File
+
+1. Create `tests/test-myfeature.c`
+2. Include `test-framework.h`
+3. Write tests using `TEST()` macro
+4. Add to `tests/Makefile.am`:
+   ```makefile
+   PROGS = test-utf8 test-util test-myfeature
+
+   test-myfeature: test-myfeature.c test-framework.h ../src/needed.o
+       $(CC) $(CFLAGS) -o $@ test-myfeature.c ../src/needed.o $(GTKLDFLAGS)
+   ```
+5. Run `./config.status tests/Makefile` to regenerate
+
 ## Contributing
 
 1. Fork the repository
 2. Create a feature branch: `git checkout -b my-feature`
 3. Make changes and format: `make clang-format`
-4. Commit with clear message: `git commit -m "feat: add new feature"`
-5. Push and create PR
+4. Run tests: `make test`
+5. Commit with clear message: `git commit -m "feat: add new feature"`
+6. Push and create PR
 
 See [CLAUDE.md](CLAUDE.md) for architecture details and code style guidelines.
 

@@ -480,5 +480,6 @@ AC_CONFIG_FILES([
   src/modules/Makefile
   src/qt5-im/Makefile
   src/qt6-im/Makefile
+  tests/Makefile
 ])
 AC_OUTPUT
