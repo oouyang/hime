@@ -791,6 +791,28 @@ HIME can be used on Windows through the [PIME](https://github.com/nickmcmahon/PI
 
 See `pime/hime/README.md` for detailed usage instructions.
 
+### Standalone Windows Build
+
+For a native Windows IME without Python dependencies, use the standalone TSF implementation:
+
+```powershell
+cd windows
+mkdir build && cd build
+cmake .. -G "Visual Studio 17 2022" -A x64
+cmake --build . --config Release
+```
+
+This produces:
+- `hime-core.dll` - Platform-independent core library
+- `hime-tsf.dll` - Windows TSF text service
+
+Register with:
+```powershell
+regsvr32 hime-tsf.dll
+```
+
+See `windows/README.md` for detailed build and installation instructions.
+
 ## Resources
 
 - **Repository:** https://github.com/hime-ime/hime

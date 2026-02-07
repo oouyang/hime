@@ -1,0 +1,11 @@
+; HIME TSF Text Service Module Definition File
+; Copyright (C) 2020 The HIME team, Taiwan
+; License: GNU LGPL v2.1
+
+LIBRARY "hime-tsf"
+
+EXPORTS
+    DllGetClassObject       PRIVATE
+    DllCanUnloadNow         PRIVATE
+    DllRegisterServer       PRIVATE
+    DllUnregisterServer     PRIVATE
