@@ -110,6 +110,28 @@ The Zhuyin keyboard follows the standard Taiwan layout:
 └───────┴───────────────────┴───┴───┴───┘
 ```
 
+### Special Keys
+
+| Key | Function |
+|-----|----------|
+| `MODE` | Toggle Chinese/English mode |
+| `Space` | First tone / confirm selection |
+| `3` | Second tone (ˊ) |
+| `4` | Third tone (ˇ) |
+| `6` | Fourth tone (ˋ) |
+| `7` | Neutral tone (˙) |
+| `1-9, 0` | Select candidate |
+| `⌫` | Backspace / delete last symbol |
+| `↵` | Return / commit preedit |
+| `⇧` | Shift for uppercase (English mode) |
+
+### Input Flow
+
+1. Type Bopomofo symbols using the keyboard
+2. Press a tone key (3, 4, 6, 7) or Space (1st tone)
+3. Select a character from candidates using number keys
+4. Press `MODE` to toggle Chinese/English mode
+
 ## Data Files
 
 The following data files should be placed in `app/src/main/assets/`:
@@ -149,8 +171,52 @@ These files are copied from the main HIME `data/` directory.
 └─────────────────────────────────────────┘
 ```
 
+## Differences from Other Platforms
+
+| Feature | Linux (GTK) | Windows (TSF) | macOS (IMK) | iOS | Android |
+|---------|-------------|---------------|-------------|-----|---------|
+| Framework | IBus/XIM | TSF | Input Method Kit | UIKit Extension | InputMethodService |
+| Language | C | C++ | Objective-C | Objective-C | Java + JNI |
+| Build | autotools | MinGW CMake | CMake | Xcode | Gradle |
+| UI | System | System | System | Custom | Custom |
+| Candidate | System | System | System | Custom View | Custom View |
+
+## Troubleshooting
+
+### Build fails with NDK error
+- Ensure Android NDK is installed via SDK Manager
+- Check that `ndkVersion` in `build.gradle` matches installed version
+- Try: `./gradlew clean && ./gradlew assembleDebug`
+
+### IME doesn't appear in Settings
+- Ensure the APK is properly installed
+- Check `adb logcat` for installation errors
+- Verify AndroidManifest.xml has correct service declaration
+
+### Keyboard crashes on startup
+- Check `adb logcat | grep HimeIME` for error logs
+- Ensure `pho.tab2` is in the assets folder
+- Verify JNI library loads correctly
+
+### Characters not appearing
+- Ensure the application supports soft keyboards
+- Check that InputConnection is valid
+- Some applications may not properly support IME
+
+### JNI library not found
+```bash
+# Check if native library is built
+ls app/build/intermediates/cmake/debug/obj/*/libhime-jni.so
+```
+
 ## License
 
 GNU Lesser General Public License v2.1
 
 Copyright (C) 2020 The HIME team, Taiwan
+
+## Credits
+
+- [HIME](https://github.com/hime-ime/hime) - Original input method engine
+- [TRIME](https://github.com/osfans/trime) - Reference Android IME implementation
+- HIME Team for phonetic tables and algorithms
