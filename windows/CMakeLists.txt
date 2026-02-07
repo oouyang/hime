@@ -50,6 +50,7 @@ add_library(hime-core SHARED
 
 target_include_directories(hime-core PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../shared/include
 )
 
 target_compile_definitions(hime-core PRIVATE
