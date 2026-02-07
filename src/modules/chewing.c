@@ -165,7 +165,8 @@ chewing_initialize (void) {
         pszHome = "";
 
     pszChewingHashDir = malloc (strlen (pszHome) + strlen ("/.chewing/") + 1);
-    memset (pszChewingHashDir, 0x00, strlen (pszHome) + strlen ("/.chewing/") + 1);
+    if (!pszChewingHashDir)
+        return FALSE;
     sprintf (pszChewingHashDir, "%s/.chewing", pszHome);
 
     free (pszChewingHashDir);

@@ -420,7 +420,13 @@ int main (int argc, char **argv) {
 
         if (bfsize < new_bfN) {
             bfsize = new_bfN + 1024 * 1024;
-            bf = (char *) realloc (bf, bfsize);
+            char *new_bf = (char *) realloc (bf, bfsize);
+            if (!new_bf) {
+                fprintf (stderr, "realloc failed\n");
+                free (bf);
+                return 1;
+            }
+            bf = new_bf;
         }
 
         memcpy (&bf[ofs++], &clen, 1);

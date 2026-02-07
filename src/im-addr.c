@@ -53,6 +53,10 @@ void get_hime_im_srv_sock_path (char *outstr, const int outstrN) {
     char my_dir[DIR_NAME_SIZE];
 
     struct passwd *pw = getpwuid (uid);
+    if (!pw) {
+        fprintf (stderr, "getpwuid failed for uid %d\n", uid);
+        return;
+    }
     const gchar *tmpdir = g_get_tmp_dir ();
     snprintf (my_dir, sizeof (my_dir), "%s/.hime-%s", tmpdir, pw->pw_name);
     struct stat st;

@@ -435,6 +435,8 @@ int main (int argc, char **argv) {
 
         raw_keys[raw_count] = strdup (cmd);
         raw_args[raw_count] = strdup (arg);
+        if (!raw_keys[raw_count] || !raw_args[raw_count])
+            p_err ("Memory allocation failed\n");
         raw_count++;
     }
     fclose (fr);

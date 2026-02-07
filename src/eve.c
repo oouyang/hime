@@ -100,7 +100,12 @@ void force_preedit_shift () {
 }
 
 void send_text_call_back (char *text) {
-    callback_str_buffer = (char *) realloc (callback_str_buffer, strlen (text) + 1);
+    char *new_buf = (char *) realloc (callback_str_buffer, strlen (text) + 1);
+    if (!new_buf) {
+        dbg ("realloc failed in send_text_call_back\n");
+        return;
+    }
+    callback_str_buffer = new_buf;
     strcpy (callback_str_buffer, text);
     fake_shift ();
 }
