@@ -93,6 +93,18 @@ if(MINGW)
     target_sources(hime-tsf PRIVATE hime-tsf.def)
 endif()
 
+# ========== Copy data files to build output ==========
+# Copy pho.tab2 next to the DLL so it's found at runtime
+file(GLOB DATA_FILES
+    ${CMAKE_CURRENT_SOURCE_DIR}/../data/pho.tab2
+    ${CMAKE_CURRENT_SOURCE_DIR}/../data/*.kbm
+)
+file(MAKE_DIRECTORY ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/data)
+foreach(DATA_FILE ${DATA_FILES})
+    get_filename_component(DATA_FILENAME ${DATA_FILE} NAME)
+    configure_file(${DATA_FILE} ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/data/${DATA_FILENAME} COPYONLY)
+endforeach()
+
 # ========== Installation ==========
 install(TARGETS hime-core hime-tsf
     RUNTIME DESTINATION bin
@@ -104,7 +116,15 @@ install(FILES include/hime-core.h
     DESTINATION include
 )
 
-# Install data files
+# Install data files alongside DLLs for easy deployment
+install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/../data/
+    DESTINATION bin/data
+    FILES_MATCHING
+    PATTERN "pho.tab2"
+    PATTERN "*.kbm"
+)
+
+# Also install to separate data directory for reference
 install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/../data/
     DESTINATION data
     FILES_MATCHING

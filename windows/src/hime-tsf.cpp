@@ -9,6 +9,7 @@
  */
 
 #include <assert.h>
+#include <stdarg.h>
 #include <stdio.h>
 #include <wchar.h>
 
@@ -39,10 +40,92 @@ static const GUID GUID_HimeProfile = {
     0xc9b56d43, 0x6e7f, 0x5f3b, {0xad, 0x2c, 0x1e, 0x4f, 0x50, 0x61, 0xc8, 0xd9}};
 
 /* Constants */
+#ifdef NDEBUG
 static const WCHAR TEXTSERVICE_DESC[] = L"HIME 輸入法";
+#else
+static const WCHAR TEXTSERVICE_DESC[] = L"HIME 輸入法 [DEBUG-0213]";
+#endif
 static const WCHAR TEXTSERVICE_MODEL[] = L"Apartment";
 static HINSTANCE g_hInst = NULL;
 static LONG g_cRefDll = 0;
+
+/* Debug logging - only active in debug builds */
+static char g_logPath[MAX_PATH] = {0};
+static int g_logFailed = 0;
+
+static void hime_log (const char *fmt, ...) {
+#ifdef NDEBUG
+    (void) fmt;
+    return;
+#else
+    if (g_logFailed)
+        return;
+
+    if (!g_logPath[0]) {
+        DWORD pid = GetCurrentProcessId ();
+
+        /* Try c:\mu\tmp\hime\ first */
+        CreateDirectoryW (L"c:\\mu", NULL);
+        CreateDirectoryW (L"c:\\mu\\tmp", NULL);
+        CreateDirectoryW (L"c:\\mu\\tmp\\hime", NULL);
+
+        char tryPath[MAX_PATH];
+        snprintf (tryPath, MAX_PATH, "c:\\mu\\tmp\\hime\\test-%lu.log", (unsigned long) pid);
+        FILE *fp = fopen (tryPath, "a");
+        if (fp) {
+            fclose (fp);
+            strncpy (g_logPath, tryPath, MAX_PATH - 1);
+        } else {
+            /* Fallback: write next to the DLL */
+            WCHAR dllPath[MAX_PATH];
+            GetModuleFileNameW (g_hInst, dllPath, MAX_PATH);
+            WCHAR *slash = wcsrchr (dllPath, L'\\');
+            if (slash) {
+                WCHAR logPathW[MAX_PATH];
+                swprintf (logPathW, MAX_PATH, L"%.*s\\hime-test-%lu.log",
+                          (int) (slash - dllPath + 1), dllPath, (unsigned long) pid);
+                WideCharToMultiByte (CP_ACP, 0, logPathW, -1, g_logPath, MAX_PATH, NULL, NULL);
+            }
+
+            fp = fopen (g_logPath, "a");
+            if (fp) {
+                fclose (fp);
+            } else {
+                /* Last resort: TEMP dir */
+                WCHAR tempDir[MAX_PATH];
+                GetTempPathW (MAX_PATH, tempDir);
+                WCHAR logPathW[MAX_PATH];
+                swprintf (logPathW, MAX_PATH, L"%shime-test-%lu.log",
+                          tempDir, (unsigned long) pid);
+                WideCharToMultiByte (CP_ACP, 0, logPathW, -1, g_logPath, MAX_PATH, NULL, NULL);
+            }
+        }
+
+        /* Log where we're writing */
+        fp = fopen (g_logPath, "a");
+        if (fp) {
+            fprintf (fp, "=== HIME TSF [DEBUG-0213] PID=%lu ===\n", (unsigned long) pid);
+            fprintf (fp, "Log path: %s\n", g_logPath);
+            fclose (fp);
+        } else {
+            g_logFailed = 1;
+            OutputDebugStringW (L"HIME: ALL log paths failed!\n");
+            return;
+        }
+    }
+
+    FILE *fp = fopen (g_logPath, "a");
+    if (!fp)
+        return;
+
+    va_list ap;
+    va_start (ap, fmt);
+    vfprintf (fp, fmt, ap);
+    va_end (ap);
+    fprintf (fp, "\n");
+    fclose (fp);
+#endif /* !NDEBUG */
+}
 
 /* Forward declarations */
 class HimeTextService;
@@ -153,6 +236,8 @@ class HimeTextService : public ITfTextInputProcessor,
     DWORD m_dwCookie;
     WCHAR m_commitBuf[256];
     int m_commitLen;
+    WCHAR m_accumBuf[1024]; /* Accumulated committed chars in current composition */
+    int m_accumLen;
 };
 
 /* ========== HimeClassFactory Class ========== */
@@ -181,8 +266,10 @@ HimeTextService::HimeTextService ()
       m_pComposition (NULL),
       m_himeCtx (NULL),
       m_dwCookie (0),
-      m_commitLen (0) {
+      m_commitLen (0),
+      m_accumLen (0) {
     memset (m_commitBuf, 0, sizeof (m_commitBuf));
+    memset (m_accumBuf, 0, sizeof (m_accumBuf));
     InterlockedIncrement (&g_cRefDll);
 }
 
@@ -235,23 +322,85 @@ STDMETHODIMP HimeTextService::Activate (ITfThreadMgr *pThreadMgr, TfClientId tfC
     m_pThreadMgr->AddRef ();
     m_tfClientId = tfClientId;
 
-    /* Initialize HIME core */
-    WCHAR path[MAX_PATH];
-    GetModuleFileNameW (g_hInst, path, MAX_PATH);
-    WCHAR *lastSlash = wcsrchr (path, L'\\');
+    /* Initialize HIME core - find data directory */
+    WCHAR dllPath[MAX_PATH];
+    GetModuleFileNameW (g_hInst, dllPath, MAX_PATH);
+
+    char dllPathUtf8[MAX_PATH];
+    WideCharToMultiByte (CP_UTF8, 0, dllPath, -1, dllPathUtf8, MAX_PATH, NULL, NULL);
+    hime_log ("Activate: DLL path: %s", dllPathUtf8);
+
+    /* Try multiple data directory locations:
+     * 1. Same directory as DLL: <dll_dir>/pho.tab2
+     * 2. data/ subdirectory:    <dll_dir>/data/pho.tab2
+     * 3. Parent's data/ dir:    <dll_dir>/../data/pho.tab2
+     */
+    WCHAR basePath[MAX_PATH];
+    wcscpy (basePath, dllPath);
+    WCHAR *lastSlash = wcsrchr (basePath, L'\\');
     if (lastSlash) {
-        wcscpy (lastSlash + 1, L"data");
+        *(lastSlash + 1) = L'\0'; /* Keep trailing backslash */
     }
 
-    char dataDir[MAX_PATH];
-    WideCharToMultiByte (CP_UTF8, 0, path, -1, dataDir, MAX_PATH, NULL, NULL);
+    /* Try each path in order */
+    const WCHAR *dataPaths[] = {
+        L"",        /* Same directory as DLL */
+        L"data",    /* data/ subdirectory */
+        L"..\\data" /* Parent's data/ directory */
+    };
 
-    if (hime_init (dataDir) == 0) {
+    char dataDir[MAX_PATH];
+    BOOL initialized = FALSE;
+
+    for (int i = 0; i < 3; i++) {
+        WCHAR tryPath[MAX_PATH];
+        swprintf (tryPath, MAX_PATH, L"%s%s", basePath, dataPaths[i]);
+
+        WideCharToMultiByte (CP_UTF8, 0, tryPath, -1, dataDir, MAX_PATH, NULL, NULL);
+        hime_log ("Activate: Trying data path [%d]: %s", i, dataDir);
+
+        /* Check if pho.tab2 exists at this path */
+        char testFile[MAX_PATH * 2];
+        snprintf (testFile, sizeof (testFile), "%s/pho.tab2", dataDir);
+        FILE *fp = fopen (testFile, "rb");
+        if (fp) {
+            hime_log ("Activate: Found pho.tab2 at: %s", testFile);
+            fclose (fp);
+        } else {
+            snprintf (testFile, sizeof (testFile), "%s/data/pho.tab2", dataDir);
+            fp = fopen (testFile, "rb");
+            if (fp) {
+                hime_log ("Activate: Found pho.tab2 at: %s", testFile);
+                fclose (fp);
+            } else {
+                hime_log ("Activate: pho.tab2 NOT found for path [%d]", i);
+            }
+        }
+
+        int rc = hime_init (dataDir);
+        hime_log ("Activate: hime_init returned %d", rc);
+
+        if (rc == 0) {
+            initialized = TRUE;
+            break;
+        }
+    }
+
+    if (initialized) {
         m_himeCtx = hime_context_new ();
+        if (m_himeCtx) {
+            hime_log ("Activate: Context created OK, chinese_mode=%d",
+                      hime_is_chinese_mode (m_himeCtx));
+        } else {
+            hime_log ("Activate: ERROR - Failed to create context");
+        }
+    } else {
+        hime_log ("Activate: ERROR - hime_init failed for ALL paths");
     }
 
     /* Initialize keystroke sink */
-    _InitKeystrokeSink ();
+    HRESULT hr = _InitKeystrokeSink ();
+    hime_log ("Activate: _InitKeystrokeSink returned 0x%08lx", (unsigned long) hr);
 
     return S_OK;
 }
@@ -305,10 +454,13 @@ HRESULT HimeTextService::_RequestEditSession (ITfContext *pContext, int action) 
     if (!pEditSession)
         return E_OUTOFMEMORY;
 
-    HRESULT hr;
-    hr = pContext->RequestEditSession (m_tfClientId, pEditSession, TF_ES_ASYNCDONTCARE | TF_ES_READWRITE, &hr);
+    /* Use synchronous edit sessions to ensure correct ordering.
+     * Async sessions can cause commits and compositions to execute
+     * out of order, resulting in reversed text. */
+    HRESULT hrSession;
+    HRESULT hr = pContext->RequestEditSession (m_tfClientId, pEditSession, TF_ES_SYNC | TF_ES_READWRITE, &hrSession);
     pEditSession->Release ();
-    return hr;
+    return SUCCEEDED (hr) ? hrSession : hr;
 }
 
 /* Edit session implementation */
@@ -368,14 +520,27 @@ HRESULT HimeTextService::DoUpdateComposition (TfEditCookie ec, ITfContext *pCont
         return E_FAIL;
 
     /* Get preedit string */
-    char preeditUtf8[HIME_MAX_PREEDIT];
-    int len = hime_get_preedit (m_himeCtx, preeditUtf8, sizeof (preeditUtf8));
+    char preeditUtf8[HIME_MAX_PREEDIT * 2];
+    char rawPreedit[HIME_MAX_PREEDIT];
+    int len = hime_get_preedit (m_himeCtx, rawPreedit, sizeof (rawPreedit));
+
     if (len <= 0)
         return S_OK;
 
-    /* Convert to wide string */
-    WCHAR preeditW[HIME_MAX_PREEDIT];
-    int wlen = MultiByteToWideChar (CP_UTF8, 0, preeditUtf8, len, preeditW, HIME_MAX_PREEDIT);
+#ifndef NDEBUG
+    /* Debug: log mode and candidate count (not in composition text) */
+    hime_log ("Preedit: chinese=%d candidates=%d text='%s'",
+              m_himeCtx ? hime_is_chinese_mode (m_himeCtx) : 0,
+              m_himeCtx ? hime_get_candidate_count (m_himeCtx) : 0,
+              rawPreedit);
+#endif
+
+    snprintf (preeditUtf8, sizeof (preeditUtf8), "%s", rawPreedit);
+    len = strlen (preeditUtf8);
+
+    /* Convert preedit to wide string */
+    WCHAR preeditW[HIME_MAX_PREEDIT * 2];
+    int wlen = MultiByteToWideChar (CP_UTF8, 0, preeditUtf8, len, preeditW, HIME_MAX_PREEDIT * 2);
     if (wlen <= 0)
         return E_FAIL;
 
@@ -395,20 +560,18 @@ HRESULT HimeTextService::DoCommit (TfEditCookie ec, ITfContext *pContext) {
         return S_OK;
 
     if (m_pComposition) {
-        /* Replace composition with commit text */
+        /* Replace composition text with committed character, then end */
         ITfRange *pRange = NULL;
         HRESULT hr = m_pComposition->GetRange (&pRange);
         if (SUCCEEDED (hr) && pRange) {
             pRange->SetText (ec, 0, m_commitBuf, m_commitLen);
             pRange->Release ();
         }
-
-        /* End composition */
         m_pComposition->EndComposition (ec);
         m_pComposition->Release ();
         m_pComposition = NULL;
     } else {
-        /* Insert directly at selection */
+        /* No active composition — insert at selection */
         ITfInsertAtSelection *pInsertAtSelection = NULL;
         HRESULT hr = pContext->QueryInterface (IID_ITfInsertAtSelection, (void **) &pInsertAtSelection);
         if (SUCCEEDED (hr)) {
@@ -431,7 +594,13 @@ STDMETHODIMP HimeTextService::OnSetFocus (BOOL fForeground) {
 STDMETHODIMP HimeTextService::OnTestKeyDown (ITfContext *pContext, WPARAM wParam, LPARAM lParam, BOOL *pfEaten) {
     *pfEaten = FALSE;
 
-    if (!m_himeCtx || !hime_is_chinese_mode (m_himeCtx)) {
+    if (!m_himeCtx) {
+        hime_log ("OnTestKeyDown: NO CONTEXT - key passes through");
+        return S_OK;
+    }
+
+    if (!hime_is_chinese_mode (m_himeCtx)) {
+        hime_log ("OnTestKeyDown: chinese_mode=OFF, key 0x%02x passes through", (unsigned) wParam);
         return S_OK;
     }
 
@@ -470,8 +639,10 @@ STDMETHODIMP HimeTextService::OnTestKeyUp (ITfContext *pContext, WPARAM wParam, 
 STDMETHODIMP HimeTextService::OnKeyDown (ITfContext *pContext, WPARAM wParam, LPARAM lParam, BOOL *pfEaten) {
     *pfEaten = FALSE;
 
-    if (!m_himeCtx)
+    if (!m_himeCtx) {
+        hime_log ("OnKeyDown: NO CONTEXT - key passes through");
         return S_OK;
+    }
 
     /* Convert virtual key to character */
     BYTE keyState[256];
@@ -485,6 +656,34 @@ STDMETHODIMP HimeTextService::OnKeyDown (ITfContext *pContext, WPARAM wParam, LP
         charCode = wch[0];
     }
 
+    /* Ensure known keys always have correct charCode even if ToUnicode fails.
+     * ToUnicode can return 0 when a TSF IME is active, losing the character.
+     * We must map all keys used in Zhuyin keyboard layouts. */
+    if (charCode == 0) {
+        if (wParam == VK_SPACE)
+            charCode = ' ';
+        else if (wParam == VK_RETURN)
+            charCode = '\r';
+        else if (wParam == VK_BACK)
+            charCode = 0x08;
+        else if (wParam == VK_ESCAPE)
+            charCode = 0x1B;
+        else if (wParam >= '0' && wParam <= '9')
+            charCode = (UINT) wParam;
+        else if (wParam >= 'A' && wParam <= 'Z')
+            charCode = (UINT) wParam + 32; /* lowercase */
+        else if (wParam == VK_OEM_COMMA)
+            charCode = ','; /* ㄝ */
+        else if (wParam == VK_OEM_PERIOD)
+            charCode = '.'; /* ㄡ */
+        else if (wParam == VK_OEM_1)
+            charCode = ';'; /* ㄤ */
+        else if (wParam == VK_OEM_2)
+            charCode = '/'; /* ㄥ */
+        else if (wParam == VK_OEM_MINUS)
+            charCode = '-'; /* ㄦ */
+    }
+
     UINT modifiers = 0;
     if (keyState[VK_SHIFT] & 0x80)
         modifiers |= HIME_MOD_SHIFT;
@@ -493,14 +692,10 @@ STDMETHODIMP HimeTextService::OnKeyDown (ITfContext *pContext, WPARAM wParam, LP
     if (keyState[VK_MENU] & 0x80)
         modifiers |= HIME_MOD_ALT;
 
-    /* Handle Shift for mode toggle (only on key release for clean toggle) */
-    if (wParam == VK_SHIFT && !(modifiers & (HIME_MOD_CONTROL | HIME_MOD_ALT))) {
-        /* Toggle handled in OnKeyUp */
-        return S_OK;
-    }
-
-    /* Process key through HIME */
+    /* Process key through HIME (Ctrl+Space toggle removed for debugging) */
     HimeKeyResult kr = hime_process_key (m_himeCtx, (uint32_t) wParam, charCode, modifiers);
+    hime_log ("OnKeyDown: vk=0x%02x char=0x%04x mod=0x%x result=%d",
+              (unsigned) wParam, charCode, modifiers, (int) kr);
 
     switch (kr) {
     case HIME_KEY_COMMIT: {
@@ -541,17 +736,8 @@ STDMETHODIMP HimeTextService::OnKeyUp (ITfContext *pContext, WPARAM wParam, LPAR
     if (!m_himeCtx)
         return S_OK;
 
-    /* Handle Shift key release for mode toggle */
-    if (wParam == VK_SHIFT) {
-        BYTE keyState[256];
-        GetKeyboardState (keyState);
-
-        /* Only toggle if no other modifiers are pressed */
-        if (!(keyState[VK_CONTROL] & 0x80) && !(keyState[VK_MENU] & 0x80)) {
-            hime_toggle_chinese_mode (m_himeCtx);
-            *pfEaten = TRUE;
-        }
-    }
+    /* Shift key is no longer used for mode toggle (conflicts with IME switching).
+     * Use Ctrl+Space instead (handled in OnKeyDown). */
 
     return S_OK;
 }
@@ -562,23 +748,32 @@ STDMETHODIMP HimeTextService::OnPreservedKey (ITfContext *pContext, REFGUID rgui
 }
 
 STDMETHODIMP HimeTextService::OnCompositionTerminated (TfEditCookie ecWrite, ITfComposition *pComposition) {
-    if (m_himeCtx) {
-        hime_context_reset (m_himeCtx);
-    }
+    /* Clear composition text so debug prefix doesn't leak into document */
     if (m_pComposition) {
+        ITfRange *pRange = NULL;
+        m_pComposition->GetRange (&pRange);
+        if (pRange) {
+            pRange->SetText (ecWrite, 0, L"", 0);
+            pRange->Release ();
+        }
         m_pComposition->Release ();
         m_pComposition = NULL;
+    }
+    if (m_himeCtx) {
+        hime_context_reset (m_himeCtx);
     }
     return S_OK;
 }
 
 void HimeTextService::_EndComposition () {
     if (m_pComposition) {
-        /* Note: Can't call EndComposition here without edit cookie */
-        /* The composition will be ended when we commit or when terminated */
+        /* Note: Can't call EndComposition here without edit cookie.
+         * The composition will be ended via the next edit session. */
         m_pComposition->Release ();
         m_pComposition = NULL;
     }
+    /* Clear accumulated text */
+    m_accumLen = 0;
     if (m_himeCtx) {
         hime_context_reset (m_himeCtx);
     }

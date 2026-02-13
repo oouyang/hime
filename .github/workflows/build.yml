@@ -1,0 +1,77 @@
+name: Build All Platforms
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+jobs:
+  linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libgtk2.0-dev libxtst-dev autoconf automake \
+            gettext clang-format-14
+
+      - name: Build
+        run: |
+          autoreconf -i
+          ./configure
+          make -j$(nproc)
+
+      - name: Run shared tests
+        run: |
+          cd shared/tests
+          make
+          ./test-hime-core
+
+  windows:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install MinGW
+        run: sudo apt-get update && sudo apt-get install -y mingw-w64 cmake
+
+      - name: Build
+        run: |
+          cd windows
+          mkdir build && cd build
+          cmake .. -DCMAKE_TOOLCHAIN_FILE=../mingw-w64-x86_64.cmake -DCMAKE_BUILD_TYPE=Release
+          make -j$(nproc)
+
+      - name: Upload Windows artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: hime-windows
+          path: |
+            windows/build/bin/hime-core.dll
+            windows/build/bin/hime-tsf.dll
+            windows/build/bin/test-hime-core.exe
+            windows/build/bin/data/
+            windows/build/register.bat
+            windows/build/unregister.bat
+
+  macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build
+        run: |
+          cd macos
+          mkdir build && cd build
+          cmake .. -DCMAKE_BUILD_TYPE=Release
+          make -j$(sysctl -n hw.ncpu)
+
+      - name: Upload macOS artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: hime-macos
+          path: macos/build/HIME.app

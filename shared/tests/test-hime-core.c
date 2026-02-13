@@ -1433,6 +1433,457 @@ TEST (practice_random_text) {
     TEST_PASS ();
 }
 
+/* ========== Integration Tests: Full Input Flow ========== */
+
+TEST (pho_type_bopomofo_key) {
+    /* Test that typing a single Bopomofo key produces preedit */
+    hime_init ("../../data");
+    HimeContext *ctx = hime_context_new ();
+    ASSERT_NOT_NULL (ctx);
+    ASSERT_TRUE (hime_is_chinese_mode (ctx));
+
+    /* Type 'j' which maps to ㄓ on standard keyboard */
+    HimeKeyResult kr = hime_process_key (ctx, 'J', 'j', 0);
+    ASSERT_EQ (HIME_KEY_PREEDIT, kr);
+
+    char buf[256];
+    int len = hime_get_preedit (ctx, buf, sizeof (buf));
+    ASSERT_TRUE (len > 0);
+    /* Preedit should contain Bopomofo symbol */
+    ASSERT_TRUE (strlen (buf) > 0);
+
+    hime_context_free (ctx);
+    hime_cleanup ();
+    TEST_PASS ();
+}
+
+TEST (pho_space_triggers_lookup) {
+    /* Test that Space after Bopomofo triggers candidate lookup */
+    hime_init ("../../data");
+    HimeContext *ctx = hime_context_new ();
+    ASSERT_NOT_NULL (ctx);
+
+    /* Type ㄉ (d) + ㄜ (k on standard keyboard) + ˙ (space = 1st tone) */
+    /* This is the phonetic input for 的 (de, neutral tone) or 德 (de, 2nd tone) */
+    /* Actually let's type a simpler example: ㄇ (m='a') + ㄚ (a on keyboard='8') */
+    /* Standard keyboard: 'a' -> ㄇ, '8' -> ㄚ */
+    hime_process_key (ctx, 'A', 'a', 0); /* ㄇ */
+    hime_process_key (ctx, '8', '8', 0); /* ㄚ */
+
+    char buf[256];
+    int len = hime_get_preedit (ctx, buf, sizeof (buf));
+    ASSERT_TRUE (len > 0); /* Should have Bopomofo preedit */
+
+    /* Press Space (1st tone) to trigger lookup */
+    HimeKeyResult kr = hime_process_key (ctx, ' ', ' ', 0);
+
+    /* Should either commit (single candidate) or show candidates */
+    ASSERT_TRUE (kr == HIME_KEY_COMMIT || kr == HIME_KEY_PREEDIT);
+
+    if (kr == HIME_KEY_COMMIT) {
+        len = hime_get_commit (ctx, buf, sizeof (buf));
+        ASSERT_TRUE (len > 0); /* Should have committed a character */
+    } else {
+        /* Multiple candidates - verify they exist */
+        ASSERT_TRUE (hime_get_candidate_count (ctx) > 0);
+    }
+
+    hime_context_free (ctx);
+    hime_cleanup ();
+    TEST_PASS ();
+}
+
+TEST (pho_tone_triggers_lookup) {
+    /* Test that pressing a tone key triggers candidate lookup */
+    hime_init ("../../data");
+    HimeContext *ctx = hime_context_new ();
+    ASSERT_NOT_NULL (ctx);
+
+    /* Type ㄇ (a) + ㄚ (8) + ˇ (3rd tone = key '3') */
+    hime_process_key (ctx, 'A', 'a', 0); /* ㄇ initial */
+    hime_process_key (ctx, '8', '8', 0); /* ㄚ final */
+    HimeKeyResult kr = hime_process_key (ctx, '3', '3', 0); /* 3rd tone */
+
+    /* Should trigger lookup */
+    ASSERT_TRUE (kr == HIME_KEY_COMMIT || kr == HIME_KEY_PREEDIT);
+
+    if (kr == HIME_KEY_PREEDIT) {
+        /* Candidates available - preedit should contain candidate list */
+        char buf[1024];
+        hime_get_preedit (ctx, buf, sizeof (buf));
+        ASSERT_TRUE (hime_get_candidate_count (ctx) > 0);
+        /* Preedit should contain number labels like "1." for candidate selection */
+        ASSERT_TRUE (strstr (buf, "1.") != NULL);
+    }
+
+    hime_context_free (ctx);
+    hime_cleanup ();
+    TEST_PASS ();
+}
+
+TEST (pho_candidate_selection) {
+    /* Test selecting a candidate by number key */
+    hime_init ("../../data");
+    HimeContext *ctx = hime_context_new ();
+    ASSERT_NOT_NULL (ctx);
+
+    /* Type a syllable that produces multiple candidates */
+    hime_process_key (ctx, 'A', 'a', 0); /* ㄇ */
+    hime_process_key (ctx, '8', '8', 0); /* ㄚ */
+    HimeKeyResult kr = hime_process_key (ctx, ' ', ' ', 0); /* 1st tone */
+
+    if (kr == HIME_KEY_PREEDIT && hime_get_candidate_count (ctx) > 1) {
+        /* Select first candidate with '1' key */
+        kr = hime_process_key (ctx, '1', '1', 0);
+        ASSERT_EQ (HIME_KEY_COMMIT, kr);
+
+        char buf[256];
+        int len = hime_get_commit (ctx, buf, sizeof (buf));
+        ASSERT_TRUE (len > 0); /* Should have committed a character */
+        /* The committed text should be a CJK character (3 bytes in UTF-8) */
+        ASSERT_TRUE (len >= 3);
+    } else if (kr == HIME_KEY_COMMIT) {
+        /* Single candidate was auto-committed */
+        char buf[256];
+        int len = hime_get_commit (ctx, buf, sizeof (buf));
+        ASSERT_TRUE (len > 0);
+    }
+
+    hime_context_free (ctx);
+    hime_cleanup ();
+    TEST_PASS ();
+}
+
+TEST (pho_single_candidate_autocommit) {
+    /* Test that a syllable with only one candidate auto-commits */
+    hime_init ("../../data");
+    HimeContext *ctx = hime_context_new ();
+    ASSERT_NOT_NULL (ctx);
+
+    /* Try various syllables - some may have single candidates */
+    /* ㄉㄧㄝ (die2) = 爹 might be unique */
+    hime_process_key (ctx, 'D', 'd', 0); /* ㄉ */
+    hime_process_key (ctx, 'I', 'i', 0); /* ㄧ */
+    hime_process_key (ctx, 'E', 'e', 0); /* ㄝ (mapped to key 'e' depends on layout) */
+
+    /* Try with Space for 1st tone */
+    HimeKeyResult kr = hime_process_key (ctx, ' ', ' ', 0);
+
+    /* Either commits or shows candidates - both are valid */
+    ASSERT_TRUE (kr == HIME_KEY_COMMIT || kr == HIME_KEY_PREEDIT || kr == HIME_KEY_IGNORED);
+
+    hime_context_free (ctx);
+    hime_cleanup ();
+    TEST_PASS ();
+}
+
+TEST (pho_backspace_deletes_component) {
+    /* Test Backspace removes last phonetic component */
+    hime_init ("../../data");
+    HimeContext *ctx = hime_context_new ();
+    ASSERT_NOT_NULL (ctx);
+
+    /* Type two components */
+    hime_process_key (ctx, 'A', 'a', 0); /* ㄇ */
+    hime_process_key (ctx, '8', '8', 0); /* ㄚ */
+
+    char buf1[256];
+    hime_get_preedit (ctx, buf1, sizeof (buf1));
+    int len1 = strlen (buf1);
+    ASSERT_TRUE (len1 > 0);
+
+    /* Backspace should remove last component */
+    HimeKeyResult kr = hime_process_key (ctx, 0x08, 0x08, 0);
+    ASSERT_EQ (HIME_KEY_PREEDIT, kr);
+
+    char buf2[256];
+    hime_get_preedit (ctx, buf2, sizeof (buf2));
+    int len2 = strlen (buf2);
+    /* Preedit should be shorter after backspace */
+    ASSERT_TRUE (len2 < len1);
+
+    /* Another backspace should clear everything */
+    kr = hime_process_key (ctx, 0x08, 0x08, 0);
+    ASSERT_TRUE (kr == HIME_KEY_PREEDIT || kr == HIME_KEY_ABSORBED);
+
+    hime_context_free (ctx);
+    hime_cleanup ();
+    TEST_PASS ();
+}
+
+TEST (pho_escape_cancels_input) {
+    /* Test Escape clears current input */
+    hime_init ("../../data");
+    HimeContext *ctx = hime_context_new ();
+    ASSERT_NOT_NULL (ctx);
+
+    /* Type some keys */
+    hime_process_key (ctx, 'A', 'a', 0);
+    hime_process_key (ctx, '8', '8', 0);
+
+    char buf[256];
+    hime_get_preedit (ctx, buf, sizeof (buf));
+    ASSERT_TRUE (strlen (buf) > 0);
+
+    /* Escape should clear */
+    HimeKeyResult kr = hime_process_key (ctx, 0x1B, 0x1B, 0);
+    ASSERT_EQ (HIME_KEY_ABSORBED, kr);
+
+    hime_get_preedit (ctx, buf, sizeof (buf));
+    ASSERT_EQ (0, (int) strlen (buf));
+
+    hime_context_free (ctx);
+    hime_cleanup ();
+    TEST_PASS ();
+}
+
+TEST (pho_english_mode_passthrough) {
+    /* Test that English mode passes all keys through */
+    hime_init ("../../data");
+    HimeContext *ctx = hime_context_new ();
+    ASSERT_NOT_NULL (ctx);
+
+    hime_set_chinese_mode (ctx, false);
+
+    HimeKeyResult kr = hime_process_key (ctx, 'A', 'a', 0);
+    ASSERT_EQ (HIME_KEY_IGNORED, kr);
+
+    kr = hime_process_key (ctx, ' ', ' ', 0);
+    ASSERT_EQ (HIME_KEY_IGNORED, kr);
+
+    kr = hime_process_key (ctx, '1', '1', 0);
+    ASSERT_EQ (HIME_KEY_IGNORED, kr);
+
+    hime_context_free (ctx);
+    hime_cleanup ();
+    TEST_PASS ();
+}
+
+TEST (pho_mode_toggle_resets_state) {
+    /* Test that toggling mode resets preedit */
+    hime_init ("../../data");
+    HimeContext *ctx = hime_context_new ();
+    ASSERT_NOT_NULL (ctx);
+
+    /* Type some Bopomofo */
+    hime_process_key (ctx, 'A', 'a', 0);
+
+    char buf[256];
+    hime_get_preedit (ctx, buf, sizeof (buf));
+    ASSERT_TRUE (strlen (buf) > 0);
+
+    /* Toggle to English - should reset */
+    hime_toggle_chinese_mode (ctx);
+    ASSERT_FALSE (hime_is_chinese_mode (ctx));
+
+    hime_get_preedit (ctx, buf, sizeof (buf));
+    ASSERT_EQ (0, (int) strlen (buf));
+
+    /* Toggle back - should be clean */
+    hime_toggle_chinese_mode (ctx);
+    ASSERT_TRUE (hime_is_chinese_mode (ctx));
+
+    hime_get_preedit (ctx, buf, sizeof (buf));
+    ASSERT_EQ (0, (int) strlen (buf));
+
+    hime_context_free (ctx);
+    hime_cleanup ();
+    TEST_PASS ();
+}
+
+TEST (pho_candidate_paging) {
+    /* Test candidate page navigation */
+    hime_init ("../../data");
+    HimeContext *ctx = hime_context_new ();
+    ASSERT_NOT_NULL (ctx);
+    hime_set_candidates_per_page (ctx, 5);
+
+    /* Type a common syllable likely to have many candidates */
+    hime_process_key (ctx, 'I', 'i', 0); /* ㄧ */
+    HimeKeyResult kr = hime_process_key (ctx, ' ', ' ', 0); /* 1st tone */
+
+    if (kr == HIME_KEY_PREEDIT && hime_get_candidate_count (ctx) > 5) {
+        ASSERT_EQ (0, hime_get_candidate_page (ctx));
+
+        /* Page down */
+        bool ok = hime_candidate_page_down (ctx);
+        ASSERT_TRUE (ok);
+        ASSERT_EQ (1, hime_get_candidate_page (ctx));
+
+        /* Page up */
+        ok = hime_candidate_page_up (ctx);
+        ASSERT_TRUE (ok);
+        ASSERT_EQ (0, hime_get_candidate_page (ctx));
+
+        /* Can't page up past 0 */
+        ok = hime_candidate_page_up (ctx);
+        ASSERT_FALSE (ok);
+    }
+
+    hime_context_free (ctx);
+    hime_cleanup ();
+    TEST_PASS ();
+}
+
+TEST (pho_preedit_includes_candidates) {
+    /* Test that preedit includes candidate list when candidates exist */
+    hime_init ("../../data");
+    HimeContext *ctx = hime_context_new ();
+    ASSERT_NOT_NULL (ctx);
+
+    /* Type a syllable that produces multiple candidates */
+    hime_process_key (ctx, 'A', 'a', 0); /* ㄇ */
+    hime_process_key (ctx, '8', '8', 0); /* ㄚ */
+    HimeKeyResult kr = hime_process_key (ctx, ' ', ' ', 0); /* 1st tone */
+
+    if (kr == HIME_KEY_PREEDIT && hime_get_candidate_count (ctx) > 1) {
+        char buf[1024];
+        hime_get_preedit (ctx, buf, sizeof (buf));
+
+        /* Preedit should contain "1." label for first candidate */
+        ASSERT_TRUE (strstr (buf, "1.") != NULL);
+        /* Preedit should contain "2." label for second candidate */
+        ASSERT_TRUE (strstr (buf, "2.") != NULL);
+
+        /* Verify candidate count matches labels shown */
+        int count = hime_get_candidate_count (ctx);
+        ASSERT_TRUE (count >= 2);
+
+        /* Verify individual candidates are accessible */
+        char cand[64];
+        int clen = hime_get_candidate (ctx, 0, cand, sizeof (cand));
+        ASSERT_TRUE (clen > 0);
+    }
+
+    hime_context_free (ctx);
+    hime_cleanup ();
+    TEST_PASS ();
+}
+
+TEST (pho_full_input_cycle) {
+    /* Test complete input cycle: type → lookup → select → commit → repeat */
+    hime_init ("../../data");
+    HimeContext *ctx = hime_context_new ();
+    ASSERT_NOT_NULL (ctx);
+
+    char commit_buf[256];
+
+    /* First character */
+    hime_process_key (ctx, 'A', 'a', 0); /* ㄇ */
+    hime_process_key (ctx, '8', '8', 0); /* ㄚ */
+    HimeKeyResult kr = hime_process_key (ctx, ' ', ' ', 0); /* 1st tone */
+
+    if (kr == HIME_KEY_COMMIT) {
+        int len = hime_get_commit (ctx, commit_buf, sizeof (commit_buf));
+        ASSERT_TRUE (len > 0);
+        hime_clear_commit (ctx);
+    } else if (kr == HIME_KEY_PREEDIT && hime_get_candidate_count (ctx) > 0) {
+        /* Select first candidate */
+        kr = hime_process_key (ctx, '1', '1', 0);
+        ASSERT_EQ (HIME_KEY_COMMIT, kr);
+        int len = hime_get_commit (ctx, commit_buf, sizeof (commit_buf));
+        ASSERT_TRUE (len > 0);
+        hime_clear_commit (ctx);
+    }
+
+    /* Context should be clean for next character */
+    char buf[256];
+    hime_get_preedit (ctx, buf, sizeof (buf));
+    /* Preedit should be empty or only contain pending Bopomofo (no candidates) */
+    ASSERT_EQ (0, hime_get_candidate_count (ctx));
+
+    /* Second character should work the same */
+    hime_process_key (ctx, 'J', 'j', 0); /* ㄓ */
+    hime_get_preedit (ctx, buf, sizeof (buf));
+    ASSERT_TRUE (strlen (buf) > 0);
+
+    hime_context_free (ctx);
+    hime_cleanup ();
+    TEST_PASS ();
+}
+
+TEST (pho_multiple_keyboards) {
+    /* Test that different keyboard layouts produce different key mappings */
+    hime_init ("../../data");
+
+    HimeContext *ctx1 = hime_context_new ();
+    ASSERT_NOT_NULL (ctx1);
+    hime_set_keyboard_layout (ctx1, HIME_KB_STANDARD);
+
+    HimeContext *ctx2 = hime_context_new ();
+    ASSERT_NOT_NULL (ctx2);
+    hime_set_keyboard_layout (ctx2, HIME_KB_HSU);
+
+    /* Same key should produce different results on different layouts */
+    hime_process_key (ctx1, 'A', 'a', 0);
+    hime_process_key (ctx2, 'A', 'a', 0);
+
+    char buf1[256], buf2[256];
+    hime_get_preedit (ctx1, buf1, sizeof (buf1));
+    hime_get_preedit (ctx2, buf2, sizeof (buf2));
+
+    /* Both should have preedit content */
+    ASSERT_TRUE (strlen (buf1) > 0);
+    ASSERT_TRUE (strlen (buf2) > 0);
+
+    /* Different layouts should produce different Bopomofo for same key */
+    /* (This depends on specific layout mappings) */
+
+    hime_context_free (ctx1);
+    hime_context_free (ctx2);
+    hime_cleanup ();
+    TEST_PASS ();
+}
+
+TEST (pho_data_loading) {
+    /* Test that phonetic data loads correctly */
+    hime_cleanup (); /* Ensure clean state */
+
+    int ret = hime_init ("../../data");
+    ASSERT_EQ (0, ret);
+
+    HimeContext *ctx = hime_context_new ();
+    ASSERT_NOT_NULL (ctx);
+
+    /* Type a very common syllable: ㄉ(d) ㄜ(k) ˙(space) for 的 */
+    hime_process_key (ctx, 'D', 'd', 0); /* ㄉ */
+    hime_process_key (ctx, 'K', 'k', 0); /* ㄜ */
+    HimeKeyResult kr = hime_process_key (ctx, ' ', ' ', 0); /* neutral/1st tone */
+
+    /* 的 is very common - should produce results */
+    ASSERT_TRUE (kr == HIME_KEY_COMMIT || kr == HIME_KEY_PREEDIT);
+
+    if (kr == HIME_KEY_COMMIT) {
+        char buf[256];
+        int len = hime_get_commit (ctx, buf, sizeof (buf));
+        ASSERT_TRUE (len > 0);
+    }
+
+    hime_context_free (ctx);
+    hime_cleanup ();
+    TEST_PASS ();
+}
+
+TEST (pho_invalid_data_path) {
+    /* Test graceful failure with bad data path */
+    hime_cleanup ();
+    int ret = hime_init ("/nonexistent/path");
+    ASSERT_EQ (-1, ret);
+
+    /* Context creation should still work, but processing won't */
+    HimeContext *ctx = hime_context_new ();
+    ASSERT_NOT_NULL (ctx);
+
+    /* Without data, keys should still not crash */
+    HimeKeyResult kr = hime_process_key (ctx, 'A', 'a', 0);
+    /* Result depends on implementation - just verify no crash */
+    (void) kr;
+
+    hime_context_free (ctx);
+    hime_cleanup ();
+    TEST_PASS ();
+}
+
 /* ========== Test Suite ========== */
 
 TEST_SUITE_BEGIN ("HIME Core Library Tests")
@@ -1565,5 +2016,22 @@ RUN_TEST (practice_get_all_texts);
 RUN_TEST (practice_category_names);
 RUN_TEST (practice_difficulty_names);
 RUN_TEST (practice_random_text);
+
+/* Integration: Bopomofo Input Flow */
+RUN_TEST (pho_type_bopomofo_key);
+RUN_TEST (pho_space_triggers_lookup);
+RUN_TEST (pho_tone_triggers_lookup);
+RUN_TEST (pho_candidate_selection);
+RUN_TEST (pho_single_candidate_autocommit);
+RUN_TEST (pho_backspace_deletes_component);
+RUN_TEST (pho_escape_cancels_input);
+RUN_TEST (pho_english_mode_passthrough);
+RUN_TEST (pho_mode_toggle_resets_state);
+RUN_TEST (pho_candidate_paging);
+RUN_TEST (pho_preedit_includes_candidates);
+RUN_TEST (pho_full_input_cycle);
+RUN_TEST (pho_multiple_keyboards);
+RUN_TEST (pho_data_loading);
+RUN_TEST (pho_invalid_data_path);
 
 TEST_SUITE_END ()

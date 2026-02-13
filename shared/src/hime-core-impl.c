@@ -801,19 +801,15 @@ static const char *get_pho_char (int idx) {
     return item->ch;
 }
 
-static int lookup_phokey (hime_phokey_t phokey, HimeContext *ctx) {
-    ctx->candidate_count = 0;
-
+static int lookup_phokey_exact (hime_phokey_t phokey, HimeContext *ctx) {
     if (!g_pho_table.idx)
         return 0;
 
-    /* Find matching key in index */
     for (int i = 0; i < g_pho_table.idx_count; i++) {
         if (g_pho_table.idx[i].key == phokey) {
             int start = g_pho_table.idx[i].start;
             int end = g_pho_table.idx[i + 1].start;
 
-            /* Collect candidates (sorted by count in table) */
             for (int j = start; j < end && ctx->candidate_count < HIME_MAX_CANDIDATES; j++) {
                 const char *ch = get_pho_char (j);
                 if (ch && ch[0]) {
@@ -823,13 +819,34 @@ static int lookup_phokey (hime_phokey_t phokey, HimeContext *ctx) {
                     ctx->candidate_count++;
                 }
             }
-            break;
+            return ctx->candidate_count;
         } else if (g_pho_table.idx[i].key > phokey) {
             break;
         }
     }
+    return 0;
+}
 
-    return ctx->candidate_count;
+static int lookup_phokey (hime_phokey_t phokey, HimeContext *ctx) {
+    ctx->candidate_count = 0;
+
+    if (!g_pho_table.idx)
+        return 0;
+
+    /* Try exact match first */
+    if (lookup_phokey_exact (phokey, ctx) > 0)
+        return ctx->candidate_count;
+
+    /* If tone is 1 (1st tone / Space), fall back to tone=0.
+     * The pho.tab2 table stores many 1st-tone entries under tone=0. */
+    int tone = phokey & 7;
+    if (tone == 1) {
+        hime_phokey_t fallback = phokey & ~7; /* Clear tone bits → tone=0 */
+        if (lookup_phokey_exact (fallback, ctx) > 0)
+            return ctx->candidate_count;
+    }
+
+    return 0;
 }
 
 static void update_preedit (HimeContext *ctx) {
@@ -865,6 +882,31 @@ static void update_preedit (HimeContext *ctx) {
             if (pos + len < HIME_MAX_PREEDIT - 1) {
                 strcpy (ctx->preedit + pos, s);
                 pos += len;
+            }
+        }
+    }
+
+    /* Append candidate list when available */
+    if (ctx->candidate_count > 0) {
+        int page = ctx->candidate_page;
+        int per_page = ctx->candidates_per_page;
+        int start = page * per_page;
+        int end = start + per_page;
+        if (end > ctx->candidate_count)
+            end = ctx->candidate_count;
+
+        for (int i = start; i < end; i++) {
+            int num = (i - start) + 1;
+            char label[32];
+            snprintf (label, sizeof (label), " %d.", num % 10);
+            int llen = strlen (label);
+            int clen = strlen (ctx->candidates[i]);
+
+            if (pos + llen + clen < HIME_MAX_PREEDIT - 1) {
+                strcpy (ctx->preedit + pos, label);
+                pos += llen;
+                strcpy (ctx->preedit + pos, ctx->candidates[i]);
+                pos += clen;
             }
         }
     }
@@ -972,9 +1014,8 @@ HIME_API void hime_context_reset (HimeContext *ctx) {
     memset (ctx->typ_pho, 0, sizeof (ctx->typ_pho));
     memset (ctx->inph, 0, sizeof (ctx->inph));
 
-    /* Reset common buffers */
+    /* Reset common buffers (keep commit - cleared by hime_clear_commit) */
     ctx->preedit[0] = '\0';
-    ctx->commit[0] = '\0';
     ctx->candidate_count = 0;
     ctx->candidate_page = 0;
 
@@ -1078,6 +1119,8 @@ static HimeKeyResult pho_process_key (HimeContext *ctx, uint32_t keycode, uint32
                     trigger_feedback (ctx, HIME_FEEDBACK_CANDIDATE);
                     return HIME_KEY_COMMIT;
                 } else if (ctx->candidate_count > 0) {
+                    /* Rebuild preedit to include candidate list */
+                    update_preedit (ctx);
                     trigger_feedback (ctx, key == ' ' ? HIME_FEEDBACK_KEY_SPACE : HIME_FEEDBACK_KEY_PRESS);
                     return HIME_KEY_PREEDIT;
                 } else if (key == ' ') {
