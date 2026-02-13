@@ -1,0 +1,8 @@
+/* English localization for HIME Input Method */
+
+/* Bundle name */
+"CFBundleName" = "HIME";
+"CFBundleDisplayName" = "HIME Input Method";
+
+/* Input mode names */
+"org.hime-ime.inputmethod.HIME.Zhuyin" = "HIME Zhuyin";

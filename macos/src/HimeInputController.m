@@ -12,13 +12,25 @@
 
 @implementation HimeInputController
 
+#pragma mark - Class Loading
+
++ (void)load {
+    NSLog(@"HIME: HimeInputController +load called");
+}
+
++ (void)initialize {
+    NSLog(@"HIME: HimeInputController +initialize called");
+}
+
 #pragma mark - Lifecycle
 
 - (instancetype)initWithServer:(IMKServer *)server delegate:(nullable id)delegate client:(id<IMKTextInput>)client {
+    NSLog(@"HIME: initWithServer called");
     self = [super initWithServer:server delegate:delegate client:client];
     if (self) {
         [self setupEngine];
         [self setupCandidateWindow];
+        NSLog(@"HIME: Controller initialized, engine=%@", self.engine ? @"OK" : @"NIL");
     }
     return self;
 }
@@ -62,8 +74,11 @@
 #pragma mark - IMKInputController Override
 
 - (BOOL)handleEvent:(NSEvent *)event client:(id)sender {
-    if (!self.engine)
+    NSLog(@"HIME: handleEvent type=%lu keyCode=%hu chars=%@", (unsigned long)event.type, event.keyCode, event.characters);
+    if (!self.engine) {
+        NSLog(@"HIME: No engine!");
         return NO;
+    }
     if (event.type != NSEventTypeKeyDown)
         return NO;
 
@@ -252,9 +267,21 @@
     [self.candidateWindow updateCandidates];
 }
 
+#pragma mark - Input Modes
+
++ (NSArray<NSString *> *)inputModes {
+    NSLog(@"HIME: +inputModes called");
+    return @[@"org.hime-ime.inputmethod.HIME.Zhuyin"];
+}
+
+- (NSArray<NSString *> *)recognizedEvents:(id)sender {
+    return @[(NSString *)kTISNotifySelectedKeyboardInputSourceChanged];
+}
+
 #pragma mark - Session Management
 
 - (void)activateServer:(id)sender {
+    NSLog(@"HIME: activateServer called, engine=%@", self.engine ? @"OK" : @"NIL");
     [super activateServer:sender];
     /* Reset state when activated */
     [self.engine reset];

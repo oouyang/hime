@@ -75,9 +75,11 @@ target_include_directories(${HIME_BUNDLE_NAME} PRIVATE
 )
 
 # Enable ARC (Automatic Reference Counting)
+# Note: XCODE_ATTRIBUTE only works with Xcode generator, so also add compile flags
 set_target_properties(${HIME_BUNDLE_NAME} PROPERTIES
     XCODE_ATTRIBUTE_CLANG_ENABLE_OBJC_ARC YES
 )
+target_compile_options(${HIME_BUNDLE_NAME} PRIVATE -fobjc-arc)
 
 # Bundle properties
 set_target_properties(${HIME_BUNDLE_NAME} PROPERTIES
@@ -110,6 +112,29 @@ if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/Resources/HIME.icns)
         ${CMAKE_CURRENT_SOURCE_DIR}/Resources/HIME.icns)
     set_target_properties(${HIME_BUNDLE_NAME} PROPERTIES
         MACOSX_BUNDLE_ICON_FILE HIME.icns)
+endif()
+
+# Copy localization files
+set(LPROJ_EN ${CMAKE_CURRENT_SOURCE_DIR}/Resources/en.lproj/InfoPlist.strings)
+set(LPROJ_ZH_HANT ${CMAKE_CURRENT_SOURCE_DIR}/Resources/zh-Hant.lproj/InfoPlist.strings)
+set(LPROJ_ZH_HANS ${CMAKE_CURRENT_SOURCE_DIR}/Resources/zh-Hans.lproj/InfoPlist.strings)
+
+if(EXISTS ${LPROJ_EN})
+    set_source_files_properties(${LPROJ_EN}
+        PROPERTIES MACOSX_PACKAGE_LOCATION Resources/en.lproj)
+    target_sources(${HIME_BUNDLE_NAME} PRIVATE ${LPROJ_EN})
+endif()
+
+if(EXISTS ${LPROJ_ZH_HANT})
+    set_source_files_properties(${LPROJ_ZH_HANT}
+        PROPERTIES MACOSX_PACKAGE_LOCATION Resources/zh-Hant.lproj)
+    target_sources(${HIME_BUNDLE_NAME} PRIVATE ${LPROJ_ZH_HANT})
+endif()
+
+if(EXISTS ${LPROJ_ZH_HANS})
+    set_source_files_properties(${LPROJ_ZH_HANS}
+        PROPERTIES MACOSX_PACKAGE_LOCATION Resources/zh-Hans.lproj)
+    target_sources(${HIME_BUNDLE_NAME} PRIVATE ${LPROJ_ZH_HANS})
 endif()
 
 # ========== Unit Tests ==========

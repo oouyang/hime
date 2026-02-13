@@ -2,9 +2,8 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-    <!-- Bundle Identification -->
     <key>CFBundleDevelopmentRegion</key>
-    <string>en</string>
+    <string>zh_TW</string>
     <key>CFBundleExecutable</key>
     <string>${MACOSX_BUNDLE_EXECUTABLE_NAME}</string>
     <key>CFBundleIdentifier</key>
@@ -19,57 +18,57 @@
     <string>${MACOSX_BUNDLE_SHORT_VERSION_STRING}</string>
     <key>CFBundleVersion</key>
     <string>${MACOSX_BUNDLE_BUNDLE_VERSION}</string>
-    <key>NSHumanReadableCopyright</key>
-    <string>${MACOSX_BUNDLE_COPYRIGHT}</string>
-    <key>CFBundleIconFile</key>
-    <string>HIME.icns</string>
     <key>LSMinimumSystemVersion</key>
     <string>10.13</string>
+    <key>NSHumanReadableCopyright</key>
+    <string>${MACOSX_BUNDLE_COPYRIGHT}</string>
+    <key>LSBackgroundOnly</key>
+    <true/>
+    <key>NSPrincipalClass</key>
+    <string>NSApplication</string>
 
     <!-- Input Method Kit Configuration -->
     <key>InputMethodConnectionName</key>
-    <string>HIME_Connection</string>
+    <string>${MACOSX_BUNDLE_GUI_IDENTIFIER}_Connection</string>
     <key>InputMethodServerControllerClass</key>
     <string>HimeInputController</string>
-    <key>LSBackgroundOnly</key>
-    <true/>
-    <key>LSUIElement</key>
-    <true/>
 
     <!-- Input Modes -->
     <key>ComponentInputModeDict</key>
     <dict>
-        <key>org.hime-ime.inputmethod.Zhuyin</key>
+        <key>org.hime-ime.inputmethod.HIME.Zhuyin</key>
         <dict>
             <key>TISInputSourceID</key>
-            <string>org.hime-ime.inputmethod.Zhuyin</string>
+            <string>org.hime-ime.inputmethod.HIME.Zhuyin</string>
             <key>TISIntendedLanguage</key>
             <string>zh-Hant</string>
-            <key>tsInputModeMenuIconFileKey</key>
-            <string>HIME</string>
-            <key>tsInputModeAlternateMenuIconFileKey</key>
-            <string>HIME</string>
-            <key>tsInputModeKeyEquivalentKey</key>
-            <string>z</string>
-            <key>tsInputModeKeyEquivalentModifiersKey</key>
-            <integer>2048</integer>
-            <key>tsInputModeDefaultStateKey</key>
+            <key>TISIconIsTemplate</key>
+            <false/>
+            <key>tsInputModeScriptKey</key>
+            <integer>2</integer>
+            <key>tsInputModeIsVisibleKey</key>
             <true/>
             <key>tsInputModePrimaryInScriptKey</key>
             <true/>
-            <key>tsInputModeScriptKey</key>
-            <string>smUnicodeScript</string>
-            <key>tsInputModeIsVisibleKey</key>
+            <key>tsInputModeDefaultStateKey</key>
             <true/>
+            <key>tsInputModeCharacterRepertoireKey</key>
+            <array>
+                <string>Hant</string>
+            </array>
         </dict>
     </dict>
 
-    <!-- Supported Localizations -->
+    <key>tsInputModeListKey</key>
+    <array>
+        <string>org.hime-ime.inputmethod.HIME.Zhuyin</string>
+    </array>
+
     <key>CFBundleLocalizations</key>
     <array>
+        <string>zh_TW</string>
+        <string>zh_CN</string>
         <string>en</string>
-        <string>zh-Hant</string>
-        <string>zh-Hans</string>
     </array>
 </dict>
 </plist>

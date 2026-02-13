@@ -1,0 +1,157 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build-linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libgtk2.0-dev libxtst-dev autoconf automake gettext
+
+      - name: Build
+        run: |
+          autoreconf -i
+          ./configure
+          make -j$(nproc)
+
+      - name: Run tests
+        run: |
+          cd shared/tests
+          make
+          ./test-hime-core
+
+      - name: Package
+        run: |
+          VERSION=${GITHUB_REF_NAME#v}
+          make DESTDIR=$(pwd)/pkg install
+          tar czf hime-${VERSION}-linux-x86_64.tar.gz -C pkg usr
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-release
+          path: hime-*-linux-*.tar.gz
+
+  build-windows:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install MinGW
+        run: sudo apt-get update && sudo apt-get install -y mingw-w64 cmake
+
+      - name: Build
+        run: |
+          cd windows
+          mkdir build && cd build
+          cmake .. -DCMAKE_TOOLCHAIN_FILE=../mingw-w64-x86_64.cmake -DCMAKE_BUILD_TYPE=Release
+          make -j$(nproc)
+
+      - name: Package
+        run: |
+          VERSION=${GITHUB_REF_NAME#v}
+          mkdir -p hime-windows/bin/data
+          cp windows/build/bin/hime-core.dll hime-windows/bin/
+          cp windows/build/bin/hime-tsf.dll hime-windows/bin/
+          cp windows/build/bin/test-hime-core.exe hime-windows/bin/
+          cp windows/build/bin/data/* hime-windows/bin/data/
+          cp windows/build/register.bat hime-windows/
+          cp windows/build/unregister.bat hime-windows/
+          cat > hime-windows/README.txt << 'EOF'
+          HIME Input Method Editor for Windows
+
+          Install:
+            1. Copy this folder to C:\Program Files\HIME
+            2. Run register.bat as Administrator
+            3. Add HIME keyboard in Settings > Language
+
+          Uninstall:
+            1. Run unregister.bat as Administrator
+            2. Delete the folder
+          EOF
+          zip -r hime-${VERSION}-windows-x86_64.zip hime-windows/
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-release
+          path: hime-*-windows-*.zip
+
+  build-macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build
+        run: |
+          cd macos
+          mkdir build && cd build
+          cmake .. -DCMAKE_BUILD_TYPE=Release
+          make -j$(sysctl -n hw.ncpu)
+
+      - name: Code sign (ad-hoc)
+        run: |
+          codesign --force --deep --sign - macos/build/HIME.app
+
+      - name: Package
+        run: |
+          VERSION=${GITHUB_REF_NAME#v}
+          cd macos/build
+          # Create DMG
+          mkdir -p dmg
+          cp -r HIME.app dmg/
+          cat > dmg/README.txt << 'EOF'
+          HIME Input Method Editor for macOS
+
+          Install:
+            1. Copy HIME.app to /Library/Input Methods/
+            2. Log out and log back in
+            3. Add HIME in System Settings > Keyboard > Input Sources
+
+          Uninstall:
+            1. Remove HIME from Input Sources
+            2. Delete /Library/Input Methods/HIME.app
+          EOF
+          hdiutil create -volname "HIME ${VERSION}" \
+            -srcfolder dmg \
+            -ov -format UDZO \
+            "hime-${VERSION}-macos.dmg"
+          cp "hime-${VERSION}-macos.dmg" "${GITHUB_WORKSPACE}/"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-release
+          path: hime-*-macos.dmg
+
+  create-release:
+    needs: [build-linux, build-windows, build-macos]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          files: |
+            artifacts/linux-release/*
+            artifacts/windows-release/*
+            artifacts/macos-release/*
