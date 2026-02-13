@@ -54,9 +54,28 @@ hime-tslearn
 kbmcv
 pin-juyin
 tmp/
+PLAN.md
+install-sh
+pkgconfig/
+
+# Build directories
+windows/build/
+macos/build/
+ios/build/
+android/app/build/
+
+# Test binaries
+shared/tests/test-hime-core
+tests/test-gtab
+tests/test-pho
+tests/test-seq
+tests/test-utf8
+tests/test-util
+
 # Autotools
 aclocal.m4
 autom4te.cache/
+configure
 config.log
 config.status
 compile
