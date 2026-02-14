@@ -79,6 +79,37 @@ Output in `windows/build/bin/`: `hime-core.dll`, `hime-tsf.dll`, `test-hime-core
 
 See `windows/sandbox/README.md` for Windows Sandbox testing workflow.
 
+### Android
+
+```bash
+# Prerequisites: Android SDK + NDK
+# Option 1: Install Android Studio (includes SDK)
+# Option 2: Command-line tools only:
+#   Download from https://developer.android.com/studio#command-tools
+#   sdkmanager "platform-tools" "platforms;android-34" "ndk;25.2.9519653" "build-tools;34.0.0"
+
+export ANDROID_HOME=/path/to/android-sdk
+export ANDROID_NDK_HOME=$ANDROID_HOME/ndk/25.2.9519653
+
+# Build debug APK
+cd android
+./gradlew assembleDebug
+
+# Build release APK
+./gradlew assembleRelease
+
+# Install on connected device
+./gradlew installDebug
+```
+
+Output: `android/app/build/outputs/apk/debug/app-debug.apk`
+
+If `gradlew` is missing, use system gradle:
+```bash
+gradle wrapper    # generates gradlew
+./gradlew assembleDebug
+```
+
 ### macOS (native build only)
 
 ```bash
