@@ -8,13 +8,18 @@ HIME is a lightweight input method editor (IME) framework for Linux supporting m
 
 ## Build Commands
 
+### Linux
+
 ```bash
+# Prerequisites (Debian/Ubuntu)
+sudo apt-get install -y libgtk2.0-dev libxtst-dev autoconf automake gettext
+
 # Initial setup (required after clone or configure.ac changes)
 autoreconf -i
 ./configure
 
 # Build
-make
+make -j$(nproc)
 
 # Install
 make install
@@ -23,13 +28,78 @@ make install
 make clang-format
 ```
 
+If `configure` fails with "bzip2 not found", create `pkgconfig/bzip2.pc`:
+```bash
+mkdir -p pkgconfig
+cat > pkgconfig/bzip2.pc << 'EOF'
+prefix=/usr
+exec_prefix=${prefix}
+libdir=${exec_prefix}/lib/x86_64-linux-gnu
+includedir=${prefix}/include
+Name: bzip2
+Description: bzip2 compression library
+Version: 1.0.8
+Libs: -L${libdir} -lbz2
+Cflags: -I${includedir}
+EOF
+export PKG_CONFIG_PATH=$(pwd)/pkgconfig:$PKG_CONFIG_PATH
+./configure
+```
+
 ### Configure Options
 
 - `--with-gtk=[2.0|3.0]` - Select GTK version (default: 2.0)
 - `--enable-qt5-immodule` - Enable Qt5 input method module
-- `--enable-qt6-immodule` - Enable Qt6 input method module
+- `--enable-qt6-immodule` - Enable Qt6 input method module (requires Qt6 moc)
+- `--disable-qt6-immodule` - Disable Qt6 if moc not found
 - `--enable-anthy` - Enable Japanese Anthy support
 - `--enable-chewing` - Enable Chewing library support
+
+### Windows (Cross-compile from Linux)
+
+```bash
+# Prerequisites (Debian/Ubuntu)
+sudo apt-get install -y mingw-w64 cmake
+
+# Build (Debug)
+cd windows
+mkdir build && cd build
+cmake .. -DCMAKE_TOOLCHAIN_FILE=../mingw-w64-x86_64.cmake -DCMAKE_BUILD_TYPE=Debug
+make -j$(nproc)
+
+# Build (Release — no debug logging, no debug tag)
+cmake .. -DCMAKE_TOOLCHAIN_FILE=../mingw-w64-x86_64.cmake -DCMAKE_BUILD_TYPE=Release
+make -j$(nproc)
+
+# Run tests (via Wine or on Windows)
+./bin/test-hime-core.exe
+```
+
+Output in `windows/build/bin/`: `hime-core.dll`, `hime-tsf.dll`, `test-hime-core.exe`, `data/`.
+
+See `windows/sandbox/README.md` for Windows Sandbox testing workflow.
+
+### macOS (native build only)
+
+```bash
+# Requires Xcode with Input Method Kit framework
+cd macos
+mkdir build && cd build
+cmake .. -DCMAKE_BUILD_TYPE=Release
+make -j$(sysctl -n hw.ncpu)
+
+# Install
+sudo cp -r HIME.app /Library/Input\ Methods/
+# Log out and log back in
+```
+
+### Shared Tests
+
+```bash
+cd shared/tests
+make
+./test-hime-core    # Runs 98 tests
+```
 
 ## Code Style
 
