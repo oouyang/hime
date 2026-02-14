@@ -58,6 +58,39 @@ jobs:
             windows/build/register.bat
             windows/build/unregister.bat
 
+  android:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install NDK
+        run: sdkmanager "ndk;25.2.9519653"
+
+      - name: Build debug APK
+        working-directory: android
+        run: |
+          chmod +x gradlew 2>/dev/null || gradle wrapper
+          ./gradlew assembleDebug
+
+      - name: Run unit tests
+        working-directory: android
+        run: ./gradlew test
+
+      - name: Upload Android artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: hime-android
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+
   macos:
     runs-on: macos-latest
     steps:
