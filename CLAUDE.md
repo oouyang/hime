@@ -81,18 +81,43 @@ See `windows/sandbox/README.md` for Windows Sandbox testing workflow.
 
 ### Android
 
-```bash
-# Prerequisites: Android SDK + NDK
-# Option 1: Install Android Studio (includes SDK)
-# Option 2: Command-line tools only:
-#   Download from https://developer.android.com/studio#command-tools
-#   sdkmanager "platform-tools" "platforms;android-34" "ndk;25.2.9519653" "build-tools;34.0.0"
+Prerequisites:
+- **JDK 17** (required — JDK 21 has `jlink` compatibility issues with AGP 8.2)
+- **Android SDK** (command-line tools or Android Studio)
+- **Android NDK** 25.2.9519653
 
-export ANDROID_HOME=/path/to/android-sdk
-export ANDROID_NDK_HOME=$ANDROID_HOME/ndk/25.2.9519653
+```bash
+# Install prerequisites (Debian/Ubuntu)
+apt-get install -y openjdk-17-jdk-headless
+
+# Install Android SDK (command-line tools)
+mkdir -p ~/android-sdk && cd ~/android-sdk
+curl -sL https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip -o cmdline-tools.zip
+unzip -qo cmdline-tools.zip
+mkdir -p cmdline-tools/latest
+cp -r cmdline-tools/bin cmdline-tools/lib cmdline-tools/latest/
+
+# Accept licenses and install SDK components
+printf 'y\ny\ny\ny\ny\ny\ny\ny\n' | bash ~/android-sdk/cmdline-tools/latest/bin/sdkmanager --sdk_root=~/android-sdk --licenses
+bash ~/android-sdk/cmdline-tools/latest/bin/sdkmanager --sdk_root=~/android-sdk \
+  "platform-tools" "platforms;android-34" "build-tools;34.0.0" "ndk;25.2.9519653"
+
+# Set environment
+export ANDROID_HOME=~/android-sdk
+export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
+
+# Create local.properties (one-time)
+cd /path/to/hime/android
+echo "sdk.dir=$ANDROID_HOME" > local.properties
+
+# Generate gradlew if missing (requires Gradle 7+)
+# Download Gradle 8.4 if system gradle is too old:
+#   curl -sL https://services.gradle.org/distributions/gradle-8.4-bin.zip -o /tmp/gradle.zip
+#   unzip -qo /tmp/gradle.zip -d ~/gradle
+#   ~/gradle/gradle-8.4/bin/gradle wrapper
+gradle wrapper 2>/dev/null || ~/gradle/gradle-8.4/bin/gradle wrapper
 
 # Build debug APK
-cd android
 ./gradlew assembleDebug
 
 # Build release APK
@@ -104,11 +129,10 @@ cd android
 
 Output: `android/app/build/outputs/apk/debug/app-debug.apk`
 
-If `gradlew` is missing, use system gradle:
-```bash
-gradle wrapper    # generates gradlew
-./gradlew assembleDebug
-```
+**Known issues:**
+- JDK 21 causes `jlink` errors with AGP 8.2 — use JDK 17
+- `android.useAndroidX=true` must be in `gradle.properties`
+- `ANDROID_SDK_ROOT` and `ANDROID_HOME` must not conflict — use `local.properties` for `sdk.dir`
 
 ### macOS (native build only)
 

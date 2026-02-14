@@ -67,6 +67,7 @@ jobs:
         uses: actions/setup-java@v4
         with:
           java-version: '17'
+          # JDK 21 has jlink compatibility issues with AGP 8.2
           distribution: 'temurin'
 
       - name: Setup Android SDK
