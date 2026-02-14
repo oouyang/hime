@@ -63,6 +63,9 @@ windows/build/
 macos/build/
 ios/build/
 android/app/build/
+android/.gradle/
+android/app/.cxx/
+android/local.properties
 
 # Test binaries
 shared/tests/test-hime-core
