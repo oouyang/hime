@@ -54,7 +54,7 @@ echo  1. Open Settings ^> Time ^& Language ^> Language ^& Region
 echo  2. Click "Chinese (Traditional, Taiwan)"
 echo     (Add it first if not present: Add a language ^> Chinese Traditional)
 echo  3. Click Language options ^> Add a keyboard
-echo  4. Select "HIME" (look for [DEBUG-0213] tag)
+echo  4. Select "HIME"
 echo  5. Open Notepad
 echo  6. Press Win+Space to switch to HIME
 echo  7. Type: a 8 Space 1  (should produce a Chinese character)

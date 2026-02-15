@@ -106,7 +106,7 @@ static const GUID GUID_TFCAT_TIPCAP_IMMERSIVESUPPORT = {
 #ifdef NDEBUG
 static const WCHAR TEXTSERVICE_DESC[] = L"HIME 輸入法";
 #else
-static const WCHAR TEXTSERVICE_DESC[] = L"HIME 輸入法 [DEBUG-0213]";
+static const WCHAR TEXTSERVICE_DESC[] = L"HIME 輸入法 [DEBUG]";
 #endif
 static const WCHAR TEXTSERVICE_MODEL[] = L"Apartment";
 static HINSTANCE g_hInst = NULL;
@@ -167,7 +167,7 @@ static void hime_log (const char *fmt, ...) {
         /* Log where we're writing */
         fp = fopen (g_logPath, "a");
         if (fp) {
-            fprintf (fp, "=== HIME TSF [DEBUG-0213] PID=%lu ===\n", (unsigned long) pid);
+            fprintf (fp, "=== HIME TSF PID=%lu ===\n", (unsigned long) pid);
             fprintf (fp, "Log path: %s\n", g_logPath);
             fclose (fp);
         } else {

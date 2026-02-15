@@ -48,7 +48,7 @@ The sandbox auto-runs `deploy-and-test.bat` which:
 1. Open **Settings > Time & Language > Language & Region**
 2. Add **Chinese (Traditional, Taiwan)** if not present
 3. Click it > **Language options** > **Add a keyboard**
-4. Select **HIME** (look for `[DEBUG-0213]` tag)
+4. Select **HIME** (in Debug builds, look for `[DEBUG]` suffix)
 5. Open **Notepad**
 6. Press **Win+Space** to switch to HIME
 7. Test typing:
