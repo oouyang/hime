@@ -78,6 +78,7 @@ target_link_libraries(hime-tsf PRIVATE
     oleaut32
     uuid
     advapi32
+    gdi32
 )
 
 set_target_properties(hime-tsf PROPERTIES
@@ -94,9 +95,10 @@ if(MINGW)
 endif()
 
 # ========== Copy data files to build output ==========
-# Copy pho.tab2 next to the DLL so it's found at runtime
+# Copy pho.tab2, .gtab tables, and .kbm files next to the DLL
 file(GLOB DATA_FILES
     ${CMAKE_CURRENT_SOURCE_DIR}/../data/pho.tab2
+    ${CMAKE_CURRENT_SOURCE_DIR}/../data/*.gtab
     ${CMAKE_CURRENT_SOURCE_DIR}/../data/*.kbm
 )
 file(MAKE_DIRECTORY ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/data)
@@ -121,6 +123,7 @@ install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/../data/
     DESTINATION bin/data
     FILES_MATCHING
     PATTERN "pho.tab2"
+    PATTERN "*.gtab"
     PATTERN "*.kbm"
 )
 
@@ -129,7 +132,42 @@ install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/../data/
     DESTINATION data
     FILES_MATCHING
     PATTERN "pho.tab2"
+    PATTERN "*.gtab"
     PATTERN "*.kbm"
+)
+
+# ========== HIME Installer ==========
+add_executable(hime-install
+    src/hime-install.c
+    src/hime-install.rc
+)
+
+target_link_libraries(hime-install PRIVATE
+    advapi32
+    shell32
+)
+
+target_link_options(hime-install PRIVATE -mconsole -municode)
+
+set_target_properties(hime-install PROPERTIES
+    OUTPUT_NAME "hime-install"
+)
+
+# ========== HIME Uninstaller ==========
+add_executable(hime-uninstall
+    src/hime-uninstall.c
+    src/hime-uninstall.rc
+)
+
+target_link_libraries(hime-uninstall PRIVATE
+    advapi32
+    shell32
+)
+
+target_link_options(hime-uninstall PRIVATE -mconsole -municode)
+
+set_target_properties(hime-uninstall PROPERTIES
+    OUTPUT_NAME "hime-uninstall"
 )
 
 # ========== Registration Scripts ==========
