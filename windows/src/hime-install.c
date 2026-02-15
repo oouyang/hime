@@ -215,17 +215,6 @@ int wmain (int argc, WCHAR *argv[]) {
     WCHAR src_dir[MAX_PATH];
     wcscpy (src_dir, exe_path);
 
-    /* Check for upgrade: unregister old DLL if present */
-    WCHAR old_tsf[MAX_PATH];
-    _snwprintf (old_tsf, MAX_PATH, L"%ls\\hime-tsf.dll", INSTALL_DIR);
-    if (GetFileAttributesW (old_tsf) != INVALID_FILE_ATTRIBUTES) {
-        wprintf (L"Existing installation detected. Upgrading...\n");
-        wprintf (L"Unregistering old TSF DLL...\n");
-        WCHAR unreg_args[MAX_PATH + 16];
-        _snwprintf (unreg_args, MAX_PATH + 16, L"/u /s \"%ls\"", old_tsf);
-        run_regsvr32 (unreg_args);
-    }
-
     /* Create install directories */
     wprintf (L"Creating install directory...\n");
     CreateDirectoryW (INSTALL_DIR, NULL);
@@ -236,7 +225,8 @@ int wmain (int argc, WCHAR *argv[]) {
     _snwprintf (icons_dir, MAX_PATH, L"%ls\\icons", INSTALL_DIR);
     CreateDirectoryW (icons_dir, NULL);
 
-    /* Copy DLLs */
+    /* Copy DLLs first — must happen before unregister so that regsvr32
+     * loads the NEW DLL (older versions may have bugs that hang). */
     wprintf (L"\nCopying files:\n");
     WCHAR src_path[MAX_PATH], dst_path[MAX_PATH];
     BOOL ok = TRUE;
@@ -247,6 +237,16 @@ int wmain (int argc, WCHAR *argv[]) {
         _snwprintf (dst_path, MAX_PATH, L"%ls\\%ls", INSTALL_DIR, dlls[i]);
         if (!copy_file_checked (src_path, dst_path))
             ok = FALSE;
+    }
+
+    /* Unregister old TSF DLL after copying so regsvr32 loads the new DLL */
+    WCHAR installed_tsf[MAX_PATH];
+    _snwprintf (installed_tsf, MAX_PATH, L"%ls\\hime-tsf.dll", INSTALL_DIR);
+    {
+        wprintf (L"\nUnregistering old TSF DLL...\n");
+        WCHAR unreg_args[MAX_PATH + 16];
+        _snwprintf (unreg_args, MAX_PATH + 16, L"/u /s \"%ls\"", installed_tsf);
+        run_regsvr32 (unreg_args);
     }
 
     /* Copy installer and uninstaller */
