@@ -351,6 +351,7 @@ class HimeTextService : public ITfTextInputProcessor,
     int m_commitLen;
     WCHAR m_accumBuf[1024]; /* Accumulated committed chars in current composition */
     int m_accumLen;
+    BOOL m_justCommitted; /* Swallow Space/Enter immediately after a commit */
 };
 
 /* ========== HimeClassFactory Class ========== */
@@ -381,7 +382,8 @@ HimeTextService::HimeTextService ()
       m_pLangBarButton (NULL),
       m_dwCookie (0),
       m_commitLen (0),
-      m_accumLen (0) {
+      m_accumLen (0),
+      m_justCommitted (FALSE) {
     memset (m_commitBuf, 0, sizeof (m_commitBuf));
     memset (m_accumBuf, 0, sizeof (m_accumBuf));
     InterlockedIncrement (&g_cRefDll);
@@ -957,6 +959,20 @@ STDMETHODIMP HimeTextService::OnKeyDown (ITfContext *pContext, WPARAM wParam, LP
         return S_OK;
     }
 
+    /* After a commit, swallow the next Space or Enter key.
+     * When Cangjie auto-commits on the last key of a code (e.g., ytumb→端),
+     * the user often presses Space/Enter as a "confirm" habit. Without this,
+     * that Space/Enter passes through to the app and can delete or replace
+     * the just-committed character. */
+    if (m_justCommitted) {
+        m_justCommitted = FALSE;
+        if (wParam == VK_SPACE || wParam == VK_RETURN) {
+            hime_log ("OnKeyDown: swallowed post-commit vk=0x%02x", (unsigned) wParam);
+            *pfEaten = TRUE;
+            return S_OK;
+        }
+    }
+
     /* Process key through HIME */
     HimeKeyResult kr = hime_process_key (m_himeCtx, (uint32_t) wParam, charCode, modifiers);
     hime_log ("OnKeyDown: vk=0x%02x char=0x%04x mod=0x%x result=%d",
@@ -975,6 +991,7 @@ STDMETHODIMP HimeTextService::OnKeyDown (ITfContext *pContext, WPARAM wParam, LP
             }
         }
         hime_clear_commit (m_himeCtx);
+        m_justCommitted = TRUE;
         *pfEaten = TRUE;
         break;
     }
