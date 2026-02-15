@@ -62,24 +62,21 @@ jobs:
       - name: Package
         run: |
           VERSION=${GITHUB_REF_NAME#v}
-          mkdir -p hime-windows/bin/data
-          cp windows/build/bin/hime-core.dll hime-windows/bin/
-          cp windows/build/bin/hime-tsf.dll hime-windows/bin/
-          cp windows/build/bin/test-hime-core.exe hime-windows/bin/
-          cp windows/build/bin/data/* hime-windows/bin/data/
-          cp windows/build/register.bat hime-windows/
-          cp windows/build/unregister.bat hime-windows/
+          mkdir -p hime-windows/data
+          cp windows/build/bin/hime-core.dll hime-windows/
+          cp windows/build/bin/hime-tsf.dll hime-windows/
+          cp windows/build/bin/hime-install.exe hime-windows/
+          cp windows/build/bin/hime-uninstall.exe hime-windows/
+          cp windows/build/bin/data/* hime-windows/data/
           cat > hime-windows/README.txt << 'EOF'
           HIME Input Method Editor for Windows
 
           Install:
-            1. Copy this folder to C:\Program Files\HIME
-            2. Run register.bat as Administrator
-            3. Add HIME keyboard in Settings > Language
+            Run hime-install.exe as Administrator.
 
           Uninstall:
-            1. Run unregister.bat as Administrator
-            2. Delete the folder
+            Run hime-uninstall.exe as Administrator,
+            or use Add/Remove Programs in Settings.
           EOF
           zip -r hime-${VERSION}-windows-x86_64.zip hime-windows/
 

@@ -17,6 +17,8 @@
 #define UNINSTALL_REG_KEY \
     L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\HIME"
 
+static BOOL g_needReboot = FALSE;
+
 static BOOL
 is_running_as_admin (void)
 {
@@ -36,12 +38,53 @@ is_running_as_admin (void)
 
 static BOOL
 copy_file_checked (const WCHAR *src, const WCHAR *dst) {
-    if (!CopyFileW (src, dst, FALSE)) {
-        wprintf (L"  FAILED to copy %ls -> %ls (error %lu)\n", src, dst,
-                 GetLastError ());
+    if (CopyFileW (src, dst, FALSE)) {
+        wprintf (L"  %ls\n", dst);
+        return TRUE;
+    }
+
+    DWORD err = GetLastError ();
+    if (err != ERROR_SHARING_VIOLATION) {
+        wprintf (L"  FAILED to copy %ls -> %ls (error %lu)\n", src, dst, err);
         return FALSE;
     }
-    wprintf (L"  %ls\n", dst);
+
+    /* The destination file is locked (loaded by running processes).
+     * Rename the locked file to a unique .old-N name, copy the new file,
+     * then schedule the old file for deletion on next reboot. Windows
+     * allows renaming a locked file within the same directory. */
+    WCHAR old_path[MAX_PATH];
+    BOOL renamed = FALSE;
+    for (int i = 0; i < 100; i++) {
+        _snwprintf (old_path, MAX_PATH, L"%ls.old-%d", dst, i);
+        if (GetFileAttributesW (old_path) == INVALID_FILE_ATTRIBUTES) {
+            /* File doesn't exist, safe to use */
+            renamed = MoveFileExW (dst, old_path, 0);
+            if (renamed)
+                break;
+        }
+        /* File exists (possibly locked from a previous install), try next */
+    }
+
+    if (!renamed) {
+        wprintf (L"  FAILED to copy %ls -> %ls (error %lu, file locked)\n",
+                 src, dst, GetLastError ());
+        return FALSE;
+    }
+
+    /* Schedule .old file for deletion on reboot */
+    MoveFileExW (old_path, NULL, MOVEFILE_DELAY_UNTIL_REBOOT);
+
+    if (!CopyFileW (src, dst, FALSE)) {
+        wprintf (L"  FAILED to copy %ls -> %ls (error %lu after rename)\n",
+                 src, dst, GetLastError ());
+        /* Try to restore the old file */
+        MoveFileExW (old_path, dst, MOVEFILE_REPLACE_EXISTING);
+        return FALSE;
+    }
+
+    wprintf (L"  %ls (replaced locked file)\n", dst);
+    g_needReboot = TRUE;
     return TRUE;
 }
 
@@ -240,6 +283,11 @@ int wmain (int argc, WCHAR *argv[]) {
 
     wprintf (L"\n");
     wprintf (L"Installation complete!\n\n");
+    if (g_needReboot) {
+        wprintf (L"NOTE: Some DLLs were in use and replaced while locked.\n");
+        wprintf (L"Please log out and log back in (or reboot) to complete\n");
+        wprintf (L"the upgrade.\n\n");
+    }
     wprintf (L"Next steps:\n");
     wprintf (L"  1. Open Settings > Time & Language > Language & Region\n");
     wprintf (L"  2. Under your language, click '...' > Language options\n");

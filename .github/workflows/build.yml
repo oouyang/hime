@@ -7,6 +7,17 @@ on:
     branches: [master]
 
 jobs:
+  shared-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build and run shared tests
+        run: |
+          cd shared/tests
+          make
+          ./test-hime-core
+
   linux:
     runs-on: ubuntu-latest
     steps:
@@ -24,12 +35,6 @@ jobs:
           autoreconf -i
           ./configure
           make -j$(nproc)
-
-      - name: Run shared tests
-        run: |
-          cd shared/tests
-          make
-          ./test-hime-core
 
   windows:
     runs-on: ubuntu-latest
@@ -53,10 +58,10 @@ jobs:
           path: |
             windows/build/bin/hime-core.dll
             windows/build/bin/hime-tsf.dll
+            windows/build/bin/hime-install.exe
+            windows/build/bin/hime-uninstall.exe
             windows/build/bin/test-hime-core.exe
             windows/build/bin/data/
-            windows/build/register.bat
-            windows/build/unregister.bat
 
   android:
     runs-on: ubuntu-latest
@@ -109,3 +114,15 @@ jobs:
         with:
           name: hime-macos
           path: macos/build/HIME.app
+
+  ios:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build
+        run: |
+          cd ios
+          mkdir build && cd build
+          cmake .. -G Xcode -DCMAKE_SYSTEM_NAME=iOS
+          cmake --build . --config Release -- -sdk iphoneos -allowProvisioningUpdates CODE_SIGNING_ALLOWED=NO

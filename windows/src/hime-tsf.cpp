@@ -281,7 +281,8 @@ class HimeEditSession : public ITfEditSession {
 
     enum { ACTION_START_COMPOSITION = 1,
            ACTION_UPDATE_COMPOSITION,
-           ACTION_COMMIT };
+           ACTION_COMMIT,
+           ACTION_END_COMPOSITION };
 
   private:
     LONG m_cRef;
@@ -323,6 +324,7 @@ class HimeTextService : public ITfTextInputProcessor,
     HRESULT DoStartComposition (TfEditCookie ec, ITfContext *pContext);
     HRESULT DoUpdateComposition (TfEditCookie ec, ITfContext *pContext);
     HRESULT DoCommit (TfEditCookie ec, ITfContext *pContext);
+    HRESULT DoEndComposition (TfEditCookie ec, ITfContext *pContext);
 
     HimeContext *GetHimeContext () { return m_himeCtx; }
     ITfComposition *GetComposition () { return m_pComposition; }
@@ -643,6 +645,8 @@ STDMETHODIMP HimeEditSession::DoEditSession (TfEditCookie ec) {
         return m_pService->DoUpdateComposition (ec, m_pContext);
     case ACTION_COMMIT:
         return m_pService->DoCommit (ec, m_pContext);
+    case ACTION_END_COMPOSITION:
+        return m_pService->DoEndComposition (ec, m_pContext);
     }
     return E_UNEXPECTED;
 }
@@ -758,6 +762,27 @@ HRESULT HimeTextService::DoCommit (TfEditCookie ec, ITfContext *pContext) {
     }
 
     m_commitLen = 0;
+    return S_OK;
+}
+
+HRESULT HimeTextService::DoEndComposition (TfEditCookie ec, ITfContext *pContext) {
+    if (m_pComposition) {
+        /* Clear composition text so preedit/candidate text doesn't leak into document */
+        ITfRange *pRange = NULL;
+        HRESULT hr = m_pComposition->GetRange (&pRange);
+        if (SUCCEEDED (hr) && pRange) {
+            pRange->SetText (ec, 0, L"", 0);
+            pRange->Release ();
+        }
+        m_pComposition->EndComposition (ec);
+        m_pComposition->Release ();
+        m_pComposition = NULL;
+    }
+    /* Clear accumulated text */
+    m_accumLen = 0;
+    if (m_himeCtx) {
+        hime_context_reset (m_himeCtx);
+    }
     return S_OK;
 }
 
@@ -935,7 +960,7 @@ STDMETHODIMP HimeTextService::OnKeyDown (ITfContext *pContext, WPARAM wParam, LP
         hime_log ("Toggle detected: vk=0x%02x mod=0x%x", (unsigned) wParam, modifiers);
 
     if (isToggle) {
-        _EndComposition ();
+        _RequestEditSession (pContext, HimeEditSession::ACTION_END_COMPOSITION);
 
         /* 3-way cycle: EN → Zhuyin → Cangjie → EN */
         if (!hime_is_chinese_mode (m_himeCtx)) {
@@ -1001,7 +1026,7 @@ STDMETHODIMP HimeTextService::OnKeyDown (ITfContext *pContext, WPARAM wParam, LP
         break;
     }
     case HIME_KEY_ABSORBED: {
-        _EndComposition ();
+        _RequestEditSession (pContext, HimeEditSession::ACTION_END_COMPOSITION);
         UpdateLanguageBar ();
         *pfEaten = TRUE;
         break;
@@ -1261,7 +1286,26 @@ STDMETHODIMP HimeLangBarButton::GetIcon (HICON *phIcon) {
 STDMETHODIMP HimeLangBarButton::GetText (BSTR *pbstrText) {
     if (!pbstrText)
         return E_INVALIDARG;
-    *pbstrText = SysAllocString (L"姬");
+
+    /* Build mode-specific text: "英姬", "注姬", "倉姬", etc. */
+    const char *label = "en";
+    HimeContext *ctx = m_pService ? m_pService->GetHimeContext () : NULL;
+    if (ctx) {
+        label = hime_get_method_label (ctx);
+    }
+
+    WCHAR labelW[16];
+    MultiByteToWideChar (CP_UTF8, 0, label, -1, labelW, 16);
+
+    /* Map English-mode "en" label to "英" for display */
+    if (wcscmp (labelW, L"en") == 0) {
+        wcscpy (labelW, L"英");
+    }
+
+    WCHAR text[32];
+    swprintf (text, 32, L"%s 姬", labelW);
+
+    *pbstrText = SysAllocString (text);
     return (*pbstrText) ? S_OK : E_OUTOFMEMORY;
 }
 

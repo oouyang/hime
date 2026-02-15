@@ -6,6 +6,10 @@
 
 #include <winver.h>
 
+/* Icon resource — used by AddLanguageProfile() for the Windows language indicator.
+ * Resource ID 1 is referenced as icon index 0 in AddLanguageProfile(). */
+1 ICON "../res/hime.ico"
+
 #define VER_FILEVERSION             0,10,1,0
 #define VER_FILEVERSION_STR         "0.10.1\0"
 
