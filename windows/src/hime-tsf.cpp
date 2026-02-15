@@ -104,9 +104,9 @@ static const GUID GUID_TFCAT_TIPCAP_IMMERSIVESUPPORT = {
 
 /* Constants */
 #ifdef NDEBUG
-static const WCHAR TEXTSERVICE_DESC[] = L"HIME 輸入法";
+static const WCHAR TEXTSERVICE_DESC[] = L"HIME";
 #else
-static const WCHAR TEXTSERVICE_DESC[] = L"HIME 輸入法 [DEBUG]";
+static const WCHAR TEXTSERVICE_DESC[] = L"HIME [DEBUG]";
 #endif
 static const WCHAR TEXTSERVICE_MODEL[] = L"Apartment";
 static HINSTANCE g_hInst = NULL;
