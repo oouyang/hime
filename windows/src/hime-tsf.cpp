@@ -104,9 +104,9 @@ static const GUID GUID_TFCAT_TIPCAP_IMMERSIVESUPPORT = {
 
 /* Constants */
 #ifdef NDEBUG
-static const WCHAR TEXTSERVICE_DESC[] = L"HIME";
+static const WCHAR TEXTSERVICE_DESC[] = L"姬 HIME";
 #else
-static const WCHAR TEXTSERVICE_DESC[] = L"HIME [DEBUG]";
+static const WCHAR TEXTSERVICE_DESC[] = L"姬 HIME [DEBUG]";
 #endif
 static const WCHAR TEXTSERVICE_MODEL[] = L"Apartment";
 static HINSTANCE g_hInst = NULL;
@@ -1244,7 +1244,7 @@ STDMETHODIMP HimeLangBarButton::GetIcon (HICON *phIcon) {
 STDMETHODIMP HimeLangBarButton::GetText (BSTR *pbstrText) {
     if (!pbstrText)
         return E_INVALIDARG;
-    *pbstrText = SysAllocString (L"HIME");
+    *pbstrText = SysAllocString (L"姬");
     return (*pbstrText) ? S_OK : E_OUTOFMEMORY;
 }
 
