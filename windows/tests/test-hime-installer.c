@@ -547,6 +547,48 @@ TEST (registry_key_path_format) {
     PASS ();
 }
 
+/* ========== Admin Check Tests ========== */
+
+/*
+ * Helper: replicate the admin check logic from the installer.
+ * Returns TRUE if running as admin, FALSE otherwise.
+ */
+static BOOL
+is_running_as_admin (void)
+{
+    BOOL is_admin = FALSE;
+    SID_IDENTIFIER_AUTHORITY authority = {SECURITY_NT_AUTHORITY};
+    PSID admin_group = NULL;
+
+    if (AllocateAndInitializeSid (&authority, 2,
+                                  SECURITY_BUILTIN_DOMAIN_RID,
+                                  DOMAIN_ALIAS_RID_ADMINS,
+                                  0, 0, 0, 0, 0, 0, &admin_group)) {
+        CheckTokenMembership (NULL, admin_group, &is_admin);
+        FreeSid (admin_group);
+    }
+    return is_admin;
+}
+
+TEST (admin_check_returns_bool) {
+    /*
+     * Verify is_running_as_admin returns a valid BOOL (0 or 1).
+     * We don't assert which value — it depends on the test environment.
+     */
+    BOOL result = is_running_as_admin ();
+    ASSERT_TRUE (result == TRUE || result == FALSE);
+    printf ("    (running as admin: %s)\n", result ? "yes" : "no");
+    PASS ();
+}
+
+TEST (admin_check_consistent) {
+    /* Calling twice should return the same result */
+    BOOL first = is_running_as_admin ();
+    BOOL second = is_running_as_admin ();
+    ASSERT_EQ (first, second);
+    PASS ();
+}
+
 /* ========== Main ========== */
 
 int
@@ -575,6 +617,10 @@ wmain (int argc, WCHAR *argv[])
     RUN_TEST (delete_directory_contents);
     RUN_TEST (skip_self_during_uninstall);
     RUN_TEST (registry_key_path_format);
+
+    printf ("\nAdmin check tests:\n");
+    RUN_TEST (admin_check_returns_bool);
+    RUN_TEST (admin_check_consistent);
 
     printf ("\n=== Results ===\n");
     printf ("Total:  %d\n", tests_total);

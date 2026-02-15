@@ -16,6 +16,36 @@
 #define UNINSTALL_REG_KEY \
     L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\HIME"
 
+static BOOL
+is_running_as_admin (void)
+{
+    BOOL is_admin = FALSE;
+    SID_IDENTIFIER_AUTHORITY authority = {SECURITY_NT_AUTHORITY};
+    PSID admin_group = NULL;
+
+    if (AllocateAndInitializeSid (&authority, 2,
+                                  SECURITY_BUILTIN_DOMAIN_RID,
+                                  DOMAIN_ALIAS_RID_ADMINS,
+                                  0, 0, 0, 0, 0, 0, &admin_group)) {
+        CheckTokenMembership (NULL, admin_group, &is_admin);
+        FreeSid (admin_group);
+    }
+    return is_admin;
+}
+
+static void
+wait_for_keypress (void)
+{
+    HANDLE hStdin = GetStdHandle (STD_INPUT_HANDLE);
+    FlushConsoleInputBuffer (hStdin);
+    INPUT_RECORD ir;
+    DWORD read;
+    while (ReadConsoleInputW (hStdin, &ir, 1, &read)) {
+        if (ir.EventType == KEY_EVENT && ir.Event.KeyEvent.bKeyDown)
+            break;
+    }
+}
+
 static void
 run_regsvr32 (const WCHAR *args) {
     WCHAR cmd[MAX_PATH + 64];
@@ -77,13 +107,23 @@ int wmain (int argc, WCHAR *argv[]) {
     wprintf (L"HIME Input Method Editor - Uninstaller v" HIME_VERSION "\n");
     wprintf (L"=============================================\n\n");
 
+    if (!is_running_as_admin ()) {
+        wprintf (L"ERROR: Administrator privileges are required.\n\n");
+        wprintf (L"Please right-click hime-uninstall.exe and select\n");
+        wprintf (L"\"Run as administrator\", then try again.\n\n");
+        wprintf (L"Press any key to exit...\n");
+        wait_for_keypress ();
+        return 1;
+    }
+
     /* Check if HIME is installed */
     WCHAR tsf_path[MAX_PATH];
     _snwprintf (tsf_path, MAX_PATH, L"%ls\\hime-tsf.dll", INSTALL_DIR);
     if (GetFileAttributesW (tsf_path) == INVALID_FILE_ATTRIBUTES) {
         wprintf (L"HIME does not appear to be installed.\n");
         wprintf (L"Press any key to exit...\n");
-        goto wait_exit;
+        wait_for_keypress ();
+        return 1;
     }
 
     /* Confirm */
@@ -175,16 +215,7 @@ int wmain (int argc, WCHAR *argv[]) {
     wprintf (
         L"Please sign out and sign back in to complete the removal.\n\n");
     wprintf (L"Press any key to exit...\n");
-
-wait_exit:;
-    HANDLE hStdin = GetStdHandle (STD_INPUT_HANDLE);
-    FlushConsoleInputBuffer (hStdin);
-    INPUT_RECORD ir;
-    DWORD read;
-    while (ReadConsoleInputW (hStdin, &ir, 1, &read)) {
-        if (ir.EventType == KEY_EVENT && ir.Event.KeyEvent.bKeyDown)
-            break;
-    }
+    wait_for_keypress ();
 
     return 0;
 }

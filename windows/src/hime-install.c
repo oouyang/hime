@@ -18,6 +18,23 @@
     L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\HIME"
 
 static BOOL
+is_running_as_admin (void)
+{
+    BOOL is_admin = FALSE;
+    SID_IDENTIFIER_AUTHORITY authority = {SECURITY_NT_AUTHORITY};
+    PSID admin_group = NULL;
+
+    if (AllocateAndInitializeSid (&authority, 2,
+                                  SECURITY_BUILTIN_DOMAIN_RID,
+                                  DOMAIN_ALIAS_RID_ADMINS,
+                                  0, 0, 0, 0, 0, 0, &admin_group)) {
+        CheckTokenMembership (NULL, admin_group, &is_admin);
+        FreeSid (admin_group);
+    }
+    return is_admin;
+}
+
+static BOOL
 copy_file_checked (const WCHAR *src, const WCHAR *dst) {
     if (!CopyFileW (src, dst, FALSE)) {
         wprintf (L"  FAILED to copy %ls -> %ls (error %lu)\n", src, dst,
@@ -118,6 +135,19 @@ copy_data_files (const WCHAR *src_data_dir, const WCHAR *dst_data_dir) {
     return ok;
 }
 
+static void
+wait_for_keypress (void)
+{
+    HANDLE hStdin = GetStdHandle (STD_INPUT_HANDLE);
+    FlushConsoleInputBuffer (hStdin);
+    INPUT_RECORD ir;
+    DWORD read;
+    while (ReadConsoleInputW (hStdin, &ir, 1, &read)) {
+        if (ir.EventType == KEY_EVENT && ir.Event.KeyEvent.bKeyDown)
+            break;
+    }
+}
+
 int wmain (int argc, WCHAR *argv[]) {
     (void) argc;
     (void) argv;
@@ -125,6 +155,15 @@ int wmain (int argc, WCHAR *argv[]) {
     wprintf (L"\n");
     wprintf (L"HIME Input Method Editor - Installer v" HIME_VERSION "\n");
     wprintf (L"==========================================\n\n");
+
+    if (!is_running_as_admin ()) {
+        wprintf (L"ERROR: Administrator privileges are required.\n\n");
+        wprintf (L"Please right-click hime-install.exe and select\n");
+        wprintf (L"\"Run as administrator\", then try again.\n\n");
+        wprintf (L"Press any key to exit...\n");
+        wait_for_keypress ();
+        return 1;
+    }
 
     /* Determine source directory (where this exe is running from) */
     WCHAR exe_path[MAX_PATH];
@@ -207,16 +246,7 @@ int wmain (int argc, WCHAR *argv[]) {
     wprintf (L"  3. Add a keyboard and select 'HIME Input Method'\n");
     wprintf (L"  4. Use Win+Space to switch input methods\n\n");
     wprintf (L"Press any key to exit...\n");
-
-    /* Wait for keypress */
-    HANDLE hStdin = GetStdHandle (STD_INPUT_HANDLE);
-    FlushConsoleInputBuffer (hStdin);
-    INPUT_RECORD ir;
-    DWORD read;
-    while (ReadConsoleInputW (hStdin, &ir, 1, &read)) {
-        if (ir.EventType == KEY_EVENT && ir.Event.KeyEvent.bKeyDown)
-            break;
-    }
+    wait_for_keypress ();
 
     return ok ? 0 : 1;
 }
