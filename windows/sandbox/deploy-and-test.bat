@@ -12,9 +12,12 @@ mkdir "C:\Program Files\HIME\bin\data" 2>nul
 echo [1/4] Copying files...
 copy /Y "%~dp0hime-core.dll" "C:\Program Files\HIME\bin\" >nul
 copy /Y "%~dp0hime-tsf.dll" "C:\Program Files\HIME\bin\" >nul
+copy /Y "%~dp0hime-install.exe" "C:\Program Files\HIME\bin\" >nul
+copy /Y "%~dp0hime-uninstall.exe" "C:\Program Files\HIME\bin\" >nul
 copy /Y "%~dp0test-hime-core.exe" "C:\Program Files\HIME\bin\" >nul
 copy /Y "%~dp0data\pho.tab2" "C:\Program Files\HIME\bin\data\" >nul
 copy /Y "%~dp0data\*.kbm" "C:\Program Files\HIME\bin\data\" >nul
+copy /Y "%~dp0data\*.gtab" "C:\Program Files\HIME\bin\data\" >nul
 
 :: Run engine tests first
 echo.

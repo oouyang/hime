@@ -99,46 +99,69 @@ mingw32-make
 ```
 build/
 ├── bin/
-│   ├── hime-core.dll       # Core library
-│   ├── hime-tsf.dll        # TSF text service
-│   └── test-hime-core.exe  # Test program
+│   ├── hime-core.dll        # Core library
+│   ├── hime-tsf.dll         # TSF text service
+│   ├── hime-install.exe     # Installer (UAC-elevated)
+│   ├── hime-uninstall.exe   # Uninstaller (UAC-elevated)
+│   ├── test-hime-core.exe   # Test program
+│   └── data/                # Input method tables
 ├── lib/
-│   ├── libhime-core.dll.a  # Import library
-│   └── libhime-tsf.dll.a   # Import library
-├── register.bat            # Registration script
-└── unregister.bat          # Unregistration script
+│   ├── libhime-core.dll.a   # Import library
+│   └── libhime-tsf.dll.a    # Import library
+├── register.bat             # Manual registration script
+└── unregister.bat           # Manual unregistration script
 ```
 
 ## Installation
 
-### Copy Files to Windows
+### Using the Installer (Recommended)
 
-After cross-compiling, copy the following to your Windows machine:
+Run `hime-install.exe` from the build output directory. It will:
+
+1. Auto-request administrator privileges (UAC prompt)
+2. Detect and upgrade any existing installation
+3. Copy files to `C:\Program Files\HIME\`
+4. Register the TSF text service
+5. Add an entry to Windows Add/Remove Programs
+
 ```
-build/bin/hime-core.dll    → C:\Program Files\HIME\bin\
-build/bin/hime-tsf.dll     → C:\Program Files\HIME\bin\
-build/register.bat         → C:\Program Files\HIME\
-build/unregister.bat       → C:\Program Files\HIME\
-data/pho.tab2              → C:\Program Files\HIME\data\
+C:\Program Files\HIME\
+├── hime-core.dll
+├── hime-tsf.dll
+├── hime-install.exe
+├── hime-uninstall.exe
+└── data\
+    ├── pho.tab2, *.gtab, *.kbm
 ```
 
-### Register the IME
+To upgrade, run `hime-install.exe` again — it unregisters the old DLL first.
 
-Run `register.bat` as Administrator, or:
+### Uninstalling
+
+Run `hime-uninstall.exe` from `C:\Program Files\HIME\`, or use
+**Settings → Apps → HIME Input Method Editor → Uninstall**.
+
+The uninstaller schedules its own deletion on next reboot via `MoveFileEx`.
+
+### Manual Installation
+
+If you prefer manual control:
+
+```
+build/bin/hime-core.dll    → C:\Program Files\HIME\
+build/bin/hime-tsf.dll     → C:\Program Files\HIME\
+build/bin/data\*           → C:\Program Files\HIME\data\
+```
+
+Register/unregister manually (as Administrator):
 ```cmd
-regsvr32 "C:\Program Files\HIME\bin\hime-tsf.dll"
-```
-
-### Unregister the IME
-
-Run `unregister.bat` as Administrator, or:
-```cmd
-regsvr32 /u "C:\Program Files\HIME\bin\hime-tsf.dll"
+regsvr32 "C:\Program Files\HIME\hime-tsf.dll"
+regsvr32 /u "C:\Program Files\HIME\hime-tsf.dll"
 ```
 
 ### Enabling the IME
 
-After registration:
+After installation:
 1. Open Windows Settings → Time & Language → Language
 2. Click on your language → Options
 3. Add a keyboard → Select "HIME 輸入法"
@@ -198,7 +221,13 @@ windows/
 ├── src/
 │   ├── hime-core.c           # Core implementation
 │   ├── hime-tsf.cpp          # TSF wrapper
-│   └── hime-tsf.rc           # Windows resource file
+│   ├── hime-tsf.rc           # TSF resource file
+│   ├── hime-install.c        # Installer
+│   ├── hime-install.rc       # Installer resource file
+│   ├── hime-install.manifest # UAC elevation manifest
+│   ├── hime-uninstall.c      # Uninstaller
+│   └── hime-uninstall.rc     # Uninstaller resource file
+├── sandbox/                  # Windows Sandbox testing
 └── tests/
     └── test-hime-core.c      # Core library tests
 ```

@@ -15,9 +15,12 @@ mkdir "%SANDBOX_DIR%\data" 2>nul
 echo Copying build files...
 copy /Y "%BUILD_DIR%\hime-core.dll" "%SANDBOX_DIR%\" >nul
 copy /Y "%BUILD_DIR%\hime-tsf.dll" "%SANDBOX_DIR%\" >nul
+copy /Y "%BUILD_DIR%\hime-install.exe" "%SANDBOX_DIR%\" >nul
+copy /Y "%BUILD_DIR%\hime-uninstall.exe" "%SANDBOX_DIR%\" >nul
 copy /Y "%BUILD_DIR%\test-hime-core.exe" "%SANDBOX_DIR%\" >nul
 copy /Y "%BUILD_DIR%\data\pho.tab2" "%SANDBOX_DIR%\data\" >nul
 copy /Y "%BUILD_DIR%\data\*.kbm" "%SANDBOX_DIR%\data\" >nul
+copy /Y "%BUILD_DIR%\data\*.gtab" "%SANDBOX_DIR%\data\" >nul
 
 :: Copy deployment script and sandbox config
 copy /Y "\\wsl$\Debian\opt\ws\hime\windows\sandbox\deploy-and-test.bat" "%SANDBOX_DIR%\" >nul
