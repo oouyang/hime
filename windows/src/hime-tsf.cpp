@@ -115,10 +115,22 @@ static const WCHAR TEXTSERVICE_MODEL[] = L"Apartment";
 static HINSTANCE g_hInst = NULL;
 static LONG g_cRefDll = 0;
 
-/* GDI+ state for PNG icon loading */
+/* GDI+ state for PNG icon loading (lazy-initialized, NOT in DllMain
+ * because GdiplusStartup/Shutdown create/join threads and will deadlock
+ * under the loader lock) */
 static ULONG_PTR g_gdiplusToken = 0;
+static BOOL g_gdiplusInitDone = FALSE;
 static HICON g_iconCache[3] = {NULL, NULL, NULL}; /* EN, PHO, GTAB */
 static int g_iconCacheMode[3] = {-1, -1, -1};
+
+static void
+_EnsureGdiplusInit (void) {
+    if (!g_gdiplusInitDone) {
+        Gdiplus::GdiplusStartupInput gdiplusStartupInput;
+        Gdiplus::GdiplusStartup (&g_gdiplusToken, &gdiplusStartupInput, NULL);
+        g_gdiplusInitDone = TRUE;
+    }
+}
 
 /* Debug logging - only active in debug builds */
 static char g_logPath[MAX_PATH] = {0};
@@ -1183,6 +1195,7 @@ STDMETHODIMP HimeLangBarButton::GetTooltipString (BSTR *pbstrToolTip) {
  * Returns NULL on failure. */
 static HICON
 _LoadPngAsIcon (const WCHAR *pngPath, int size) {
+    _EnsureGdiplusInit ();
     if (!g_gdiplusToken)
         return NULL;
 
@@ -1683,12 +1696,6 @@ BOOL WINAPI DllMain (HINSTANCE hInstance, DWORD dwReason, LPVOID lpReserved) {
     case DLL_PROCESS_ATTACH:
         g_hInst = hInstance;
         DisableThreadLibraryCalls (hInstance);
-
-        /* Initialize GDI+ for PNG icon loading */
-        {
-            Gdiplus::GdiplusStartupInput gdiplusStartupInput;
-            Gdiplus::GdiplusStartup (&g_gdiplusToken, &gdiplusStartupInput, NULL);
-        }
         break;
     case DLL_PROCESS_DETACH:
         /* Destroy cached icons */
@@ -1699,11 +1706,11 @@ BOOL WINAPI DllMain (HINSTANCE hInstance, DWORD dwReason, LPVOID lpReserved) {
             }
         }
 
-        /* Shutdown GDI+ */
-        if (g_gdiplusToken) {
-            Gdiplus::GdiplusShutdown (g_gdiplusToken);
-            g_gdiplusToken = 0;
-        }
+        /* Note: Do NOT call GdiplusShutdown() here.  DllMain runs under
+         * the loader lock and GdiplusShutdown tries to join its background
+         * thread, which causes a deadlock (the thread needs the loader lock
+         * to exit).  The OS reclaims all resources when the process exits
+         * or the DLL is unloaded. */
 
         hime_cleanup ();
         break;
