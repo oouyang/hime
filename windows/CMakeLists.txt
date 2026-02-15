@@ -213,6 +213,19 @@ target_link_libraries(test-hime-core PRIVATE
 
 add_test(NAME hime-core-test COMMAND test-hime-core)
 
+# Test program for installer/uninstaller
+add_executable(test-hime-installer
+    tests/test-hime-installer.c
+)
+
+target_link_options(test-hime-installer PRIVATE -mconsole -municode)
+
+set_target_properties(test-hime-installer PROPERTIES
+    OUTPUT_NAME "test-hime-installer"
+)
+
+add_test(NAME hime-installer-test COMMAND test-hime-installer)
+
 # ========== Package ==========
 set(CPACK_GENERATOR "ZIP")
 set(CPACK_PACKAGE_NAME "hime-ime")
