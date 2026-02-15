@@ -104,8 +104,32 @@ set_source_files_properties(${HIME_RESOURCES} PROPERTIES
 )
 target_sources(${HIME_BUNDLE_NAME} PRIVATE ${HIME_RESOURCES})
 
-# Copy icon files if they exist
-if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/Resources/HIME.icns)
+# Generate HIME.icns from iconset at build time if iconutil is available
+set(HIME_ICONSET_DIR ${CMAKE_CURRENT_SOURCE_DIR}/Resources/HIME.iconset)
+set(HIME_ICNS_FILE ${CMAKE_CURRENT_BINARY_DIR}/HIME.icns)
+
+if(EXISTS ${HIME_ICONSET_DIR})
+    find_program(ICONUTIL_EXECUTABLE iconutil)
+    if(ICONUTIL_EXECUTABLE)
+        add_custom_command(
+            OUTPUT ${HIME_ICNS_FILE}
+            COMMAND ${ICONUTIL_EXECUTABLE} -c icns ${HIME_ICONSET_DIR} -o ${HIME_ICNS_FILE}
+            DEPENDS ${HIME_ICONSET_DIR}
+            COMMENT "Generating HIME.icns from iconset"
+        )
+        add_custom_target(hime_icns ALL DEPENDS ${HIME_ICNS_FILE})
+        add_dependencies(${HIME_BUNDLE_NAME} hime_icns)
+
+        set_source_files_properties(${HIME_ICNS_FILE}
+            PROPERTIES MACOSX_PACKAGE_LOCATION Resources)
+        target_sources(${HIME_BUNDLE_NAME} PRIVATE ${HIME_ICNS_FILE})
+        set_target_properties(${HIME_BUNDLE_NAME} PROPERTIES
+            MACOSX_BUNDLE_ICON_FILE HIME.icns)
+    else()
+        message(STATUS "iconutil not found; skipping HIME.icns generation")
+    endif()
+elseif(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/Resources/HIME.icns)
+    # Use pre-built .icns if available
     set_source_files_properties(${CMAKE_CURRENT_SOURCE_DIR}/Resources/HIME.icns
         PROPERTIES MACOSX_PACKAGE_LOCATION Resources)
     target_sources(${HIME_BUNDLE_NAME} PRIVATE

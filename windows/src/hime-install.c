@@ -20,8 +20,7 @@
 static BOOL g_needReboot = FALSE;
 
 static BOOL
-is_running_as_admin (void)
-{
+is_running_as_admin (void) {
     BOOL is_admin = FALSE;
     SID_IDENTIFIER_AUTHORITY authority = {SECURITY_NT_AUTHORITY};
     PSID admin_group = NULL;
@@ -179,8 +178,7 @@ copy_data_files (const WCHAR *src_data_dir, const WCHAR *dst_data_dir) {
 }
 
 static void
-wait_for_keypress (void)
-{
+wait_for_keypress (void) {
     HANDLE hStdin = GetStdHandle (STD_INPUT_HANDLE);
     FlushConsoleInputBuffer (hStdin);
     INPUT_RECORD ir;
@@ -234,6 +232,9 @@ int wmain (int argc, WCHAR *argv[]) {
     WCHAR data_dir[MAX_PATH];
     _snwprintf (data_dir, MAX_PATH, L"%ls\\data", INSTALL_DIR);
     CreateDirectoryW (data_dir, NULL);
+    WCHAR icons_dir[MAX_PATH];
+    _snwprintf (icons_dir, MAX_PATH, L"%ls\\icons", INSTALL_DIR);
+    CreateDirectoryW (icons_dir, NULL);
 
     /* Copy DLLs */
     wprintf (L"\nCopying files:\n");
@@ -264,6 +265,12 @@ int wmain (int argc, WCHAR *argv[]) {
     WCHAR src_data_dir[MAX_PATH];
     _snwprintf (src_data_dir, MAX_PATH, L"%ls\\data", src_dir);
     if (!copy_data_files (src_data_dir, data_dir))
+        ok = FALSE;
+
+    /* Copy icon files */
+    WCHAR src_icons_dir[MAX_PATH];
+    _snwprintf (src_icons_dir, MAX_PATH, L"%ls\\icons", src_dir);
+    if (!copy_data_files (src_icons_dir, icons_dir))
         ok = FALSE;
 
     if (!ok) {

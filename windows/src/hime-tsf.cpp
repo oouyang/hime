@@ -18,6 +18,9 @@
 #include <olectl.h>
 #include <windows.h>
 
+/* GDI+ for PNG icon loading */
+#include <gdiplus.h>
+
 /* MinGW compatibility */
 #ifndef TF_CLIENTID_NULL
 #define TF_CLIENTID_NULL 0
@@ -111,6 +114,11 @@ static const WCHAR TEXTSERVICE_DESC[] = L"姬 HIME [DEBUG]";
 static const WCHAR TEXTSERVICE_MODEL[] = L"Apartment";
 static HINSTANCE g_hInst = NULL;
 static LONG g_cRefDll = 0;
+
+/* GDI+ state for PNG icon loading */
+static ULONG_PTR g_gdiplusToken = 0;
+static HICON g_iconCache[3] = {NULL, NULL, NULL}; /* EN, PHO, GTAB */
+static int g_iconCacheMode[3] = {-1, -1, -1};
 
 /* Debug logging - only active in debug builds */
 static char g_logPath[MAX_PATH] = {0};
@@ -1171,107 +1179,187 @@ STDMETHODIMP HimeLangBarButton::GetTooltipString (BSTR *pbstrToolTip) {
     return (*pbstrToolTip) ? S_OK : E_OUTOFMEMORY;
 }
 
+/* Load a PNG file as an HICON using GDI+, scaled to the given size.
+ * Returns NULL on failure. */
+static HICON
+_LoadPngAsIcon (const WCHAR *pngPath, int size) {
+    if (!g_gdiplusToken)
+        return NULL;
+
+    Gdiplus::Bitmap *bmp = Gdiplus::Bitmap::FromFile (pngPath);
+    if (!bmp || bmp->GetLastStatus () != Gdiplus::Ok) {
+        delete bmp;
+        return NULL;
+    }
+
+    /* Scale to target size */
+    Gdiplus::Bitmap *scaled = new Gdiplus::Bitmap (size, size, PixelFormat32bppARGB);
+    if (!scaled) {
+        delete bmp;
+        return NULL;
+    }
+
+    Gdiplus::Graphics g (scaled);
+    g.SetInterpolationMode (Gdiplus::InterpolationModeHighQualityBicubic);
+    g.DrawImage (bmp, 0, 0, size, size);
+
+    HICON hIcon = NULL;
+    scaled->GetHICON (&hIcon);
+
+    delete scaled;
+    delete bmp;
+    return hIcon;
+}
+
+/* Determine which PNG icon file to use for the current mode.
+ * Returns a mode index (0=EN, 1=PHO, 2=GTAB) and sets pngName. */
+static int
+_GetModeIndex (HimeContext *ctx, const WCHAR **pngName) {
+    bool isChinese = ctx && hime_is_chinese_mode (ctx);
+    if (!isChinese) {
+        *pngName = L"hime-tray.png";
+        return 0;
+    }
+    HimeInputMethod method = hime_get_input_method (ctx);
+    if (method == HIME_IM_PHO) {
+        *pngName = L"juyin.png";
+        return 1;
+    }
+    *pngName = L"cj5.png";
+    return 2;
+}
+
 HICON HimeLangBarButton::_CreateModeIcon () {
     const int SIZE = 16;
 
-    /* Get current mode label */
-    const char *label = "EN";
+    /* Get current mode */
     HimeContext *ctx = m_pService ? m_pService->GetHimeContext () : NULL;
-    if (ctx) {
-        label = hime_get_method_label (ctx);
+    const WCHAR *pngName = L"hime-tray.png";
+    int modeIdx = _GetModeIndex (ctx, &pngName);
+
+    /* Return cached icon if mode hasn't changed */
+    if (g_iconCache[modeIdx]) {
+        HICON copy = CopyIcon (g_iconCache[modeIdx]);
+        if (copy)
+            return copy;
     }
 
-    WCHAR labelW[8];
-    MultiByteToWideChar (CP_UTF8, 0, label, -1, labelW, 8);
+    /* Try loading PNG icon via GDI+ */
+    HICON hIcon = NULL;
+    if (g_gdiplusToken) {
+        WCHAR dllDir[MAX_PATH];
+        GetModuleFileNameW (g_hInst, dllDir, MAX_PATH);
+        WCHAR *sep = wcsrchr (dllDir, L'\\');
+        if (sep)
+            *sep = L'\0';
 
-    /* Choose background color based on mode */
-    COLORREF bgColor;
-    bool isChinese = ctx && hime_is_chinese_mode (ctx);
-    if (!isChinese) {
-        bgColor = RGB (80, 80, 80); /* Dark gray for English */
-    } else {
-        HimeInputMethod method = hime_get_input_method (ctx);
-        if (method == HIME_IM_PHO) {
+        WCHAR pngPath[MAX_PATH];
+        _snwprintf (pngPath, MAX_PATH, L"%ls\\icons\\%ls", dllDir, pngName);
+
+        hIcon = _LoadPngAsIcon (pngPath, SIZE);
+    }
+
+    /* Fall back to GDI-drawn icon if PNG not available */
+    if (!hIcon) {
+        const char *label = "EN";
+        if (ctx) {
+            label = hime_get_method_label (ctx);
+        }
+
+        WCHAR labelW[8];
+        MultiByteToWideChar (CP_UTF8, 0, label, -1, labelW, 8);
+
+        /* Choose background color based on mode */
+        COLORREF bgColor;
+        if (modeIdx == 0) {
+            bgColor = RGB (80, 80, 80); /* Dark gray for English */
+        } else if (modeIdx == 1) {
             bgColor = RGB (0, 90, 180); /* Blue for Zhuyin */
         } else {
             bgColor = RGB (0, 130, 60); /* Green for Cangjie/GTAB */
         }
-    }
 
-    /* Create a 16x16 icon using GDI */
-    HDC hdcScreen = GetDC (NULL);
-    HDC hdcMem = CreateCompatibleDC (hdcScreen);
+        /* Create a 16x16 icon using GDI */
+        HDC hdcScreen = GetDC (NULL);
+        HDC hdcMem = CreateCompatibleDC (hdcScreen);
 
-    BITMAPINFO bmi;
-    ZeroMemory (&bmi, sizeof (bmi));
-    bmi.bmiHeader.biSize = sizeof (BITMAPINFOHEADER);
-    bmi.bmiHeader.biWidth = SIZE;
-    bmi.bmiHeader.biHeight = -SIZE; /* Top-down */
-    bmi.bmiHeader.biPlanes = 1;
-    bmi.bmiHeader.biBitCount = 32;
-    bmi.bmiHeader.biCompression = BI_RGB;
+        BITMAPINFO bmi;
+        ZeroMemory (&bmi, sizeof (bmi));
+        bmi.bmiHeader.biSize = sizeof (BITMAPINFOHEADER);
+        bmi.bmiHeader.biWidth = SIZE;
+        bmi.bmiHeader.biHeight = -SIZE; /* Top-down */
+        bmi.bmiHeader.biPlanes = 1;
+        bmi.bmiHeader.biBitCount = 32;
+        bmi.bmiHeader.biCompression = BI_RGB;
 
-    void *pvBits = NULL;
-    HBITMAP hbmColor = CreateDIBSection (hdcMem, &bmi, DIB_RGB_COLORS, &pvBits, NULL, 0);
-    HBITMAP hbmOld = (HBITMAP) SelectObject (hdcMem, hbmColor);
+        void *pvBits = NULL;
+        HBITMAP hbmColor = CreateDIBSection (hdcMem, &bmi, DIB_RGB_COLORS, &pvBits, NULL, 0);
+        HBITMAP hbmOld = (HBITMAP) SelectObject (hdcMem, hbmColor);
 
-    /* Fill background */
-    RECT rc = {0, 0, SIZE, SIZE};
-    HBRUSH hBrush = CreateSolidBrush (bgColor);
-    FillRect (hdcMem, &rc, hBrush);
-    DeleteObject (hBrush);
+        /* Fill background */
+        RECT rc = {0, 0, SIZE, SIZE};
+        HBRUSH hBrush = CreateSolidBrush (bgColor);
+        FillRect (hdcMem, &rc, hBrush);
+        DeleteObject (hBrush);
 
-    /* Draw label text */
-    SetBkMode (hdcMem, TRANSPARENT);
-    SetTextColor (hdcMem, RGB (255, 255, 255));
+        /* Draw label text */
+        SetBkMode (hdcMem, TRANSPARENT);
+        SetTextColor (hdcMem, RGB (255, 255, 255));
 
-    /* Use a small font — calculate size based on label length */
-    int fontHeight = (wcslen (labelW) <= 2) ? 13 : 10;
-    HFONT hFont = CreateFontW (fontHeight, 0, 0, 0, FW_BOLD,
-                               FALSE, FALSE, FALSE,
-                               DEFAULT_CHARSET,
-                               OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS,
-                               ANTIALIASED_QUALITY, DEFAULT_PITCH,
-                               L"Microsoft JhengHei");
-    HFONT hOldFont = (HFONT) SelectObject (hdcMem, hFont);
+        int fontHeight = (wcslen (labelW) <= 2) ? 13 : 10;
+        HFONT hFont = CreateFontW (fontHeight, 0, 0, 0, FW_BOLD,
+                                   FALSE, FALSE, FALSE,
+                                   DEFAULT_CHARSET,
+                                   OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS,
+                                   ANTIALIASED_QUALITY, DEFAULT_PITCH,
+                                   L"Microsoft JhengHei");
+        HFONT hOldFont = (HFONT) SelectObject (hdcMem, hFont);
 
-    DrawTextW (hdcMem, labelW, -1, &rc, DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
+        DrawTextW (hdcMem, labelW, -1, &rc, DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
 
-    SelectObject (hdcMem, hOldFont);
-    DeleteObject (hFont);
-    SelectObject (hdcMem, hbmOld);
+        SelectObject (hdcMem, hOldFont);
+        DeleteObject (hFont);
+        SelectObject (hdcMem, hbmOld);
 
-    /* Set alpha channel to opaque (GDI doesn't set it) */
-    if (pvBits) {
-        BYTE *pixels = (BYTE *) pvBits;
-        for (int i = 0; i < SIZE * SIZE; i++) {
-            pixels[i * 4 + 3] = 255; /* Alpha */
+        /* Set alpha channel to opaque (GDI doesn't set it) */
+        if (pvBits) {
+            BYTE *pixels = (BYTE *) pvBits;
+            for (int i = 0; i < SIZE * SIZE; i++) {
+                pixels[i * 4 + 3] = 255; /* Alpha */
+            }
         }
+
+        /* Create mask bitmap (all black = fully opaque icon) */
+        HBITMAP hbmMask = CreateBitmap (SIZE, SIZE, 1, 1, NULL);
+        HDC hdcMask = CreateCompatibleDC (hdcScreen);
+        HBITMAP hbmMaskOld = (HBITMAP) SelectObject (hdcMask, hbmMask);
+        RECT rcMask = {0, 0, SIZE, SIZE};
+        HBRUSH hBlack = (HBRUSH) GetStockObject (BLACK_BRUSH);
+        FillRect (hdcMask, &rcMask, hBlack);
+        SelectObject (hdcMask, hbmMaskOld);
+        DeleteDC (hdcMask);
+
+        ICONINFO ii;
+        ii.fIcon = TRUE;
+        ii.xHotspot = 0;
+        ii.yHotspot = 0;
+        ii.hbmMask = hbmMask;
+        ii.hbmColor = hbmColor;
+        hIcon = CreateIconIndirect (&ii);
+
+        DeleteObject (hbmMask);
+        DeleteObject (hbmColor);
+        DeleteDC (hdcMem);
+        ReleaseDC (NULL, hdcScreen);
     }
 
-    /* Create mask bitmap (all black = fully opaque icon) */
-    HBITMAP hbmMask = CreateBitmap (SIZE, SIZE, 1, 1, NULL);
-    HDC hdcMask = CreateCompatibleDC (hdcScreen);
-    HBITMAP hbmMaskOld = (HBITMAP) SelectObject (hdcMask, hbmMask);
-    RECT rcMask = {0, 0, SIZE, SIZE};
-    HBRUSH hBlack = (HBRUSH) GetStockObject (BLACK_BRUSH);
-    FillRect (hdcMask, &rcMask, hBlack);
-    SelectObject (hdcMask, hbmMaskOld);
-    DeleteDC (hdcMask);
-
-    /* Create icon */
-    ICONINFO ii;
-    ii.fIcon = TRUE;
-    ii.xHotspot = 0;
-    ii.yHotspot = 0;
-    ii.hbmMask = hbmMask;
-    ii.hbmColor = hbmColor;
-    HICON hIcon = CreateIconIndirect (&ii);
-
-    DeleteObject (hbmMask);
-    DeleteObject (hbmColor);
-    DeleteDC (hdcMem);
-    ReleaseDC (NULL, hdcScreen);
+    /* Cache the icon */
+    if (hIcon) {
+        if (g_iconCache[modeIdx])
+            DestroyIcon (g_iconCache[modeIdx]);
+        g_iconCache[modeIdx] = hIcon;
+        return CopyIcon (hIcon);
+    }
 
     return hIcon;
 }
@@ -1595,8 +1683,28 @@ BOOL WINAPI DllMain (HINSTANCE hInstance, DWORD dwReason, LPVOID lpReserved) {
     case DLL_PROCESS_ATTACH:
         g_hInst = hInstance;
         DisableThreadLibraryCalls (hInstance);
+
+        /* Initialize GDI+ for PNG icon loading */
+        {
+            Gdiplus::GdiplusStartupInput gdiplusStartupInput;
+            Gdiplus::GdiplusStartup (&g_gdiplusToken, &gdiplusStartupInput, NULL);
+        }
         break;
     case DLL_PROCESS_DETACH:
+        /* Destroy cached icons */
+        for (int i = 0; i < 3; i++) {
+            if (g_iconCache[i]) {
+                DestroyIcon (g_iconCache[i]);
+                g_iconCache[i] = NULL;
+            }
+        }
+
+        /* Shutdown GDI+ */
+        if (g_gdiplusToken) {
+            Gdiplus::GdiplusShutdown (g_gdiplusToken);
+            g_gdiplusToken = 0;
+        }
+
         hime_cleanup ();
         break;
     }

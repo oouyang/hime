@@ -86,6 +86,18 @@ set_target_properties(HIMEApp PROPERTIES
     XCODE_ATTRIBUTE_PRODUCT_BUNDLE_IDENTIFIER "${HIME_APP_BUNDLE_ID}"
 )
 
+# App icon asset catalog
+set(HIME_ASSET_CATALOG ${CMAKE_CURRENT_SOURCE_DIR}/HIMEApp/Assets.xcassets)
+if(EXISTS ${HIME_ASSET_CATALOG})
+    file(GLOB_RECURSE HIME_ICON_ASSETS ${HIME_ASSET_CATALOG}/*)
+    set_source_files_properties(${HIME_ICON_ASSETS} PROPERTIES
+        MACOSX_PACKAGE_LOCATION Resources)
+    target_sources(HIMEApp PRIVATE ${HIME_ICON_ASSETS})
+    set_target_properties(HIMEApp PROPERTIES
+        XCODE_ATTRIBUTE_ASSETCATALOG_COMPILER_APPICON_NAME "AppIcon"
+    )
+endif()
+
 # ========== Keyboard Extension ==========
 set(HIME_KEYBOARD_SOURCES
     HIMEKeyboard/HIMEKeyboardViewController.h

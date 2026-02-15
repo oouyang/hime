@@ -17,8 +17,7 @@
     L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\HIME"
 
 static BOOL
-is_running_as_admin (void)
-{
+is_running_as_admin (void) {
     BOOL is_admin = FALSE;
     SID_IDENTIFIER_AUTHORITY authority = {SECURITY_NT_AUTHORITY};
     PSID admin_group = NULL;
@@ -34,8 +33,7 @@ is_running_as_admin (void)
 }
 
 static void
-wait_for_keypress (void)
-{
+wait_for_keypress (void) {
     HANDLE hStdin = GetStdHandle (STD_INPUT_HANDLE);
     FlushConsoleInputBuffer (hStdin);
     INPUT_RECORD ir;

@@ -6,6 +6,9 @@
 
 #include <winver.h>
 
+/* Application icon from hime.png mascot */
+1 ICON "../res/hime.ico"
+
 /* Embed UAC manifest */
 CREATEPROCESS_MANIFEST_RESOURCE_ID RT_MANIFEST "hime-install.manifest"
 

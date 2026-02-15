@@ -79,6 +79,7 @@ target_link_libraries(hime-tsf PRIVATE
     uuid
     advapi32
     gdi32
+    gdiplus
 )
 
 set_target_properties(hime-tsf PROPERTIES
@@ -107,6 +108,17 @@ foreach(DATA_FILE ${DATA_FILES})
     configure_file(${DATA_FILE} ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/data/${DATA_FILENAME} COPYONLY)
 endforeach()
 
+# ========== Copy icon files to build output ==========
+file(GLOB ICON_FILES
+    ${CMAKE_CURRENT_SOURCE_DIR}/icons/*.png
+    ${CMAKE_CURRENT_SOURCE_DIR}/icons/*.ico
+)
+file(MAKE_DIRECTORY ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/icons)
+foreach(ICON_FILE ${ICON_FILES})
+    get_filename_component(ICON_FILENAME ${ICON_FILE} NAME)
+    configure_file(${ICON_FILE} ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/icons/${ICON_FILENAME} COPYONLY)
+endforeach()
+
 # ========== Installation ==========
 install(TARGETS hime-core hime-tsf
     RUNTIME DESTINATION bin
@@ -125,6 +137,14 @@ install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/../data/
     PATTERN "pho.tab2"
     PATTERN "*.gtab"
     PATTERN "*.kbm"
+)
+
+# Install icon files alongside DLLs
+install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/icons/
+    DESTINATION bin/icons
+    FILES_MATCHING
+    PATTERN "*.png"
+    PATTERN "*.ico"
 )
 
 # Also install to separate data directory for reference
