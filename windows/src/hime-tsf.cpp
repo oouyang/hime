@@ -13,6 +13,7 @@
 #include <stdio.h>
 #include <wchar.h>
 
+#include <ctfutb.h>
 #include <msctf.h>
 #include <olectl.h>
 #include <windows.h>
@@ -30,6 +31,52 @@ extern "C" {
 #include "hime-core.h"
 }
 
+/* MinGW ctfutb.h lacks ITfLangBarItemButton and related types.
+ * Define them here following the Windows SDK definitions. */
+#ifndef TF_LBI_STYLE_BTN_BUTTON
+#define TF_LBI_STYLE_BTN_BUTTON 0x00010000
+#endif
+#ifndef TF_LBI_STYLE_SHOWNINTRAY
+#define TF_LBI_STYLE_SHOWNINTRAY 0x00000002
+#endif
+#ifndef TF_LBI_ICON
+#define TF_LBI_ICON 0x00000001
+#endif
+#ifndef TF_LBI_TEXT
+#define TF_LBI_TEXT 0x00000002
+#endif
+#ifndef TF_LBI_TOOLTIP
+#define TF_LBI_TOOLTIP 0x00000004
+#endif
+
+typedef enum { TF_LBI_CLK_RIGHT = 1,
+               TF_LBI_CLK_LEFT = 2 } TfLBIClick;
+
+/* Minimal ITfMenu forward declaration */
+MIDL_INTERFACE ("6f8a98e4-aaa0-4f15-8c5b-07e0df0a3dd8")
+ITfMenu : public IUnknown {
+  public:
+    virtual HRESULT STDMETHODCALLTYPE AddMenuItem (UINT uId, DWORD dwFlags,
+                                                   HBITMAP hbmp, HBITMAP hbmpMask,
+                                                   const WCHAR *pch, ULONG cch,
+                                                   ITfMenu *pSubMenu) = 0;
+};
+
+/* ITfLangBarItemButton interface */
+static const GUID IID_ITfLangBarItemButton = {
+    0x28c7f1d0, 0xde25, 0x11d2, {0xaf, 0xdd, 0x00, 0x10, 0x5a, 0x27, 0x99, 0xb5}};
+
+MIDL_INTERFACE ("28c7f1d0-de25-11d2-afdd-00105a2799b5")
+ITfLangBarItemButton : public ITfLangBarItem {
+  public:
+    virtual HRESULT STDMETHODCALLTYPE OnClick (TfLBIClick click, POINT pt,
+                                               const RECT *prcArea) = 0;
+    virtual HRESULT STDMETHODCALLTYPE InitMenu (ITfMenu * pMenu) = 0;
+    virtual HRESULT STDMETHODCALLTYPE OnMenuSelect (UINT wID) = 0;
+    virtual HRESULT STDMETHODCALLTYPE GetIcon (HICON * phIcon) = 0;
+    virtual HRESULT STDMETHODCALLTYPE GetText (BSTR * pbstrText) = 0;
+};
+
 /* GUIDs */
 // {B8A45C32-5F6D-4E2A-9C1B-0D3E4F5A6B7C}
 static const GUID CLSID_HimeTextService = {
@@ -38,6 +85,22 @@ static const GUID CLSID_HimeTextService = {
 // {C9B56D43-6E7F-5F3B-AD2C-1E4F5061C8D9}
 static const GUID GUID_HimeProfile = {
     0xc9b56d43, 0x6e7f, 0x5f3b, {0xad, 0x2c, 0x1e, 0x4f, 0x50, 0x61, 0xc8, 0xd9}};
+
+// {DA8E7A60-3F71-4B9C-BE2D-5E6F70819A3B}
+static const GUID GUID_HimeLangBarButton = {
+    0xda8e7a60, 0x3f71, 0x4b9c, {0xbe, 0x2d, 0x5e, 0x6f, 0x70, 0x81, 0x9a, 0x3b}};
+
+/* MinGW may lack these category GUIDs */
+#ifndef GUID_TFCAT_TIPCAP_SYSTRAYSUPPORT
+// {25504FB4-7BAB-4BC1-9C69-CF81890F0EF5}
+static const GUID GUID_TFCAT_TIPCAP_SYSTRAYSUPPORT = {
+    0x25504fb4, 0x7bab, 0x4bc1, {0x9c, 0x69, 0xcf, 0x81, 0x89, 0x0f, 0x0e, 0xf5}};
+#endif
+#ifndef GUID_TFCAT_TIPCAP_IMMERSIVESUPPORT
+// {13A016DF-560B-46CD-947A-4C3AF1E0E35D}
+static const GUID GUID_TFCAT_TIPCAP_IMMERSIVESUPPORT = {
+    0x13a016df, 0x560b, 0x46cd, {0x94, 0x7a, 0x4c, 0x3a, 0xf1, 0xe0, 0xe3, 0x5d}};
+#endif
 
 /* Constants */
 #ifdef NDEBUG
@@ -130,6 +193,51 @@ static void hime_log (const char *fmt, ...) {
 /* Forward declarations */
 class HimeTextService;
 class HimeClassFactory;
+class HimeLangBarButton;
+
+/* ========== HimeLangBarButton Class (declaration only — implementation after HimeTextService) ========== */
+
+class HimeLangBarButton : public ITfLangBarItemButton,
+                          public ITfSource {
+  public:
+    HimeLangBarButton (HimeTextService *pService);
+    ~HimeLangBarButton ();
+
+    /* IUnknown */
+    STDMETHODIMP QueryInterface (REFIID riid, void **ppvObj);
+    STDMETHODIMP_ (ULONG)
+    AddRef ();
+    STDMETHODIMP_ (ULONG)
+    Release ();
+
+    /* ITfLangBarItem */
+    STDMETHODIMP GetInfo (TF_LANGBARITEMINFO *pInfo);
+    STDMETHODIMP GetStatus (DWORD *pdwStatus);
+    STDMETHODIMP Show (BOOL fShow);
+    STDMETHODIMP GetTooltipString (BSTR *pbstrToolTip);
+
+    /* ITfLangBarItemButton */
+    STDMETHODIMP OnClick (TfLBIClick click, POINT pt, const RECT *prcArea);
+    STDMETHODIMP InitMenu (ITfMenu *pMenu);
+    STDMETHODIMP OnMenuSelect (UINT wID);
+    STDMETHODIMP GetIcon (HICON *phIcon);
+    STDMETHODIMP GetText (BSTR *pbstrText);
+
+    /* ITfSource */
+    STDMETHODIMP AdviseSink (REFIID riid, IUnknown *punk, DWORD *pdwCookie);
+    STDMETHODIMP UnadviseSink (DWORD dwCookie);
+
+    /* Called by HimeTextService when mode changes */
+    void Update ();
+
+  private:
+    HICON _CreateModeIcon ();
+
+    LONG m_cRef;
+    HimeTextService *m_pService;
+    ITfLangBarItemSink *m_pLangBarItemSink;
+    DWORD m_dwSinkCookie;
+};
 
 /* ========== HimeTextService Class ========== */
 
@@ -221,9 +329,13 @@ class HimeTextService : public ITfTextInputProcessor,
     void SetComposition (ITfComposition *pComp) { m_pComposition = pComp; }
     TfClientId GetClientId () { return m_tfClientId; }
 
+    void UpdateLanguageBar ();
+
   private:
     HRESULT _InitKeystrokeSink ();
     void _UninitKeystrokeSink ();
+    HRESULT _InitLanguageBar ();
+    void _UninitLanguageBar ();
     HRESULT _RequestEditSession (ITfContext *pContext, int action);
     void _EndComposition ();
 
@@ -233,6 +345,7 @@ class HimeTextService : public ITfTextInputProcessor,
     ITfKeystrokeMgr *m_pKeystrokeMgr;
     ITfComposition *m_pComposition;
     HimeContext *m_himeCtx;
+    HimeLangBarButton *m_pLangBarButton;
     DWORD m_dwCookie;
     WCHAR m_commitBuf[256];
     int m_commitLen;
@@ -265,6 +378,7 @@ HimeTextService::HimeTextService ()
       m_pKeystrokeMgr (NULL),
       m_pComposition (NULL),
       m_himeCtx (NULL),
+      m_pLangBarButton (NULL),
       m_dwCookie (0),
       m_commitLen (0),
       m_accumLen (0) {
@@ -391,6 +505,15 @@ STDMETHODIMP HimeTextService::Activate (ITfThreadMgr *pThreadMgr, TfClientId tfC
         if (m_himeCtx) {
             hime_log ("Activate: Context created OK, chinese_mode=%d",
                       hime_is_chinese_mode (m_himeCtx));
+
+            /* Pre-load Cangjie 5 table so it's ready for switching.
+             * This switches the context to GTAB mode temporarily. */
+            int cj5_rc = hime_gtab_load_table (m_himeCtx, "cj5.gtab");
+            hime_log ("Activate: Pre-load cj5.gtab returned %d", cj5_rc);
+
+            /* Switch back to Zhuyin (PHO) as default input method */
+            hime_set_input_method (m_himeCtx, HIME_IM_PHO);
+            hime_log ("Activate: Default method set to PHO");
         } else {
             hime_log ("Activate: ERROR - Failed to create context");
         }
@@ -402,10 +525,15 @@ STDMETHODIMP HimeTextService::Activate (ITfThreadMgr *pThreadMgr, TfClientId tfC
     HRESULT hr = _InitKeystrokeSink ();
     hime_log ("Activate: _InitKeystrokeSink returned 0x%08lx", (unsigned long) hr);
 
+    /* Initialize language bar indicator */
+    hr = _InitLanguageBar ();
+    hime_log ("Activate: _InitLanguageBar returned 0x%08lx", (unsigned long) hr);
+
     return S_OK;
 }
 
 STDMETHODIMP HimeTextService::Deactivate () {
+    _UninitLanguageBar ();
     _UninitKeystrokeSink ();
 
     if (m_himeCtx) {
@@ -446,6 +574,47 @@ void HimeTextService::_UninitKeystrokeSink () {
         m_pKeystrokeMgr->UnadviseKeyEventSink (m_tfClientId);
         m_pKeystrokeMgr->Release ();
         m_pKeystrokeMgr = NULL;
+    }
+}
+
+HRESULT HimeTextService::_InitLanguageBar () {
+    ITfLangBarItemMgr *pLangBarItemMgr = NULL;
+    HRESULT hr = m_pThreadMgr->QueryInterface (IID_ITfLangBarItemMgr, (void **) &pLangBarItemMgr);
+    if (FAILED (hr))
+        return hr;
+
+    m_pLangBarButton = new HimeLangBarButton (this);
+    if (!m_pLangBarButton) {
+        pLangBarItemMgr->Release ();
+        return E_OUTOFMEMORY;
+    }
+
+    hr = pLangBarItemMgr->AddItem (m_pLangBarButton);
+    pLangBarItemMgr->Release ();
+
+    if (FAILED (hr)) {
+        m_pLangBarButton->Release ();
+        m_pLangBarButton = NULL;
+    }
+    return hr;
+}
+
+void HimeTextService::_UninitLanguageBar () {
+    if (m_pLangBarButton && m_pThreadMgr) {
+        ITfLangBarItemMgr *pLangBarItemMgr = NULL;
+        HRESULT hr = m_pThreadMgr->QueryInterface (IID_ITfLangBarItemMgr, (void **) &pLangBarItemMgr);
+        if (SUCCEEDED (hr)) {
+            pLangBarItemMgr->RemoveItem (m_pLangBarButton);
+            pLangBarItemMgr->Release ();
+        }
+        m_pLangBarButton->Release ();
+        m_pLangBarButton = NULL;
+    }
+}
+
+void HimeTextService::UpdateLanguageBar () {
+    if (m_pLangBarButton) {
+        m_pLangBarButton->Update ();
     }
 }
 
@@ -527,16 +696,19 @@ HRESULT HimeTextService::DoUpdateComposition (TfEditCookie ec, ITfContext *pCont
     if (len <= 0)
         return S_OK;
 
+    /* Prepend method label to preedit so users always know which mode is active.
+     * e.g., "[倉]竹手一 1.嗨" or "[注]ㄇㄚ 1.媽" */
+    const char *label = hime_get_method_label (m_himeCtx);
+    snprintf (preeditUtf8, sizeof (preeditUtf8), "[%s]%s", label, rawPreedit);
+    len = strlen (preeditUtf8);
+
 #ifndef NDEBUG
     /* Debug: log mode and candidate count (not in composition text) */
     hime_log ("Preedit: chinese=%d candidates=%d text='%s'",
               m_himeCtx ? hime_is_chinese_mode (m_himeCtx) : 0,
               m_himeCtx ? hime_get_candidate_count (m_himeCtx) : 0,
-              rawPreedit);
+              preeditUtf8);
 #endif
-
-    snprintf (preeditUtf8, sizeof (preeditUtf8), "%s", rawPreedit);
-    len = strlen (preeditUtf8);
 
     /* Convert preedit to wide string */
     WCHAR preeditW[HIME_MAX_PREEDIT * 2];
@@ -591,25 +763,68 @@ STDMETHODIMP HimeTextService::OnSetFocus (BOOL fForeground) {
     return S_OK;
 }
 
+/* Helper: resolve the bare character for a key, ignoring Ctrl/Alt modifiers.
+ * This is the same technique Rime/Weasel uses to reliably detect Ctrl+` etc.
+ * Returns the Unicode character the key would produce without Ctrl/Alt held. */
+static WCHAR resolveBaseChar (WPARAM wParam, LPARAM lParam) {
+    BYTE table[256];
+    GetKeyboardState (table);
+    /* Clear Ctrl and Alt so ToUnicodeEx sees the bare key */
+    table[VK_CONTROL] = 0;
+    table[VK_LCONTROL] = 0;
+    table[VK_RCONTROL] = 0;
+    table[VK_MENU] = 0;
+    table[VK_LMENU] = 0;
+    table[VK_RMENU] = 0;
+
+    WCHAR buf[8] = {0};
+    UINT scanCode = (lParam >> 16) & 0xFF;
+    int ret = ToUnicodeEx ((UINT) wParam, scanCode, table, buf, 8, 0, NULL);
+    return (ret == 1) ? buf[0] : 0;
+}
+
 STDMETHODIMP HimeTextService::OnTestKeyDown (ITfContext *pContext, WPARAM wParam, LPARAM lParam, BOOL *pfEaten) {
     *pfEaten = FALSE;
 
     if (!m_himeCtx) {
-        hime_log ("OnTestKeyDown: NO CONTEXT - key passes through");
+        return S_OK;
+    }
+
+    /* Ctrl+` or F4: eat for Zhuyin ↔ Cangjie switching (before chinese_mode check).
+     * Check VK_OEM_3 directly AND resolveBaseChar for maximum compatibility. */
+    {
+        BYTE ks[256];
+        GetKeyboardState (ks);
+        bool ctrlHeld = (ks[VK_CONTROL] & 0x80) || (GetKeyState (VK_CONTROL) & 0x8000);
+
+        if (ctrlHeld && wParam == VK_OEM_3) {
+            hime_log ("OnTestKeyDown: Ctrl+` eaten (VK_OEM_3)");
+            *pfEaten = TRUE;
+            return S_OK;
+        }
+        if (ctrlHeld) {
+            WCHAR baseChar = resolveBaseChar (wParam, lParam);
+            if (baseChar == L'`') {
+                hime_log ("OnTestKeyDown: Ctrl+` eaten (resolveBaseChar)");
+                *pfEaten = TRUE;
+                return S_OK;
+            }
+        }
+    }
+    if (wParam == VK_F4) {
+        hime_log ("OnTestKeyDown: F4 eaten");
+        *pfEaten = TRUE;
         return S_OK;
     }
 
     if (!hime_is_chinese_mode (m_himeCtx)) {
-        hime_log ("OnTestKeyDown: chinese_mode=OFF, key 0x%02x passes through", (unsigned) wParam);
         return S_OK;
     }
 
-    /* Check if this is a key we handle */
-    if (wParam >= 'A' && wParam <= 'Z')
-        *pfEaten = TRUE;
-    else if (wParam >= '0' && wParam <= '9')
-        *pfEaten = TRUE;
-    else if (wParam == VK_SPACE)
+    HimeInputMethod method = hime_get_input_method (m_himeCtx);
+
+    /* Common keys eaten by all methods */
+    if (wParam == VK_SPACE)
         *pfEaten = TRUE;
     else if (wParam == VK_BACK)
         *pfEaten = TRUE;
@@ -617,16 +832,24 @@ STDMETHODIMP HimeTextService::OnTestKeyDown (ITfContext *pContext, WPARAM wParam
         *pfEaten = TRUE;
     else if (wParam == VK_RETURN)
         *pfEaten = TRUE;
-    else if (wParam == VK_OEM_1)
-        *pfEaten = TRUE; /* ; */
-    else if (wParam == VK_OEM_COMMA)
+    else if (wParam >= 'A' && wParam <= 'Z')
         *pfEaten = TRUE;
-    else if (wParam == VK_OEM_PERIOD)
+    else if (wParam >= '0' && wParam <= '9')
         *pfEaten = TRUE;
-    else if (wParam == VK_OEM_2)
-        *pfEaten = TRUE; /* / */
-    else if (wParam == VK_OEM_MINUS)
-        *pfEaten = TRUE;
+
+    /* Zhuyin-specific punctuation keys (not needed for Cangjie) */
+    if (method == HIME_IM_PHO) {
+        if (wParam == VK_OEM_1)
+            *pfEaten = TRUE; /* ; → ㄤ */
+        else if (wParam == VK_OEM_COMMA)
+            *pfEaten = TRUE; /* , → ㄝ */
+        else if (wParam == VK_OEM_PERIOD)
+            *pfEaten = TRUE; /* . → ㄡ */
+        else if (wParam == VK_OEM_2)
+            *pfEaten = TRUE; /* / → ㄥ */
+        else if (wParam == VK_OEM_MINUS)
+            *pfEaten = TRUE; /* - → ㄦ */
+    }
 
     return S_OK;
 }
@@ -640,7 +863,6 @@ STDMETHODIMP HimeTextService::OnKeyDown (ITfContext *pContext, WPARAM wParam, LP
     *pfEaten = FALSE;
 
     if (!m_himeCtx) {
-        hime_log ("OnKeyDown: NO CONTEXT - key passes through");
         return S_OK;
     }
 
@@ -692,7 +914,50 @@ STDMETHODIMP HimeTextService::OnKeyDown (ITfContext *pContext, WPARAM wParam, LP
     if (keyState[VK_MENU] & 0x80)
         modifiers |= HIME_MOD_ALT;
 
-    /* Process key through HIME (Ctrl+Space toggle removed for debugging) */
+    /* Ctrl+` or F4: toggle between Zhuyin and Cangjie.
+     * Check both VK_OEM_3 directly and resolveBaseChar for maximum compatibility. */
+    bool isToggle = false;
+    if (wParam == VK_F4) {
+        isToggle = true;
+    } else if (modifiers & HIME_MOD_CONTROL) {
+        if (wParam == VK_OEM_3) {
+            isToggle = true;
+        } else {
+            WCHAR baseChar = resolveBaseChar (wParam, lParam);
+            if (baseChar == L'`')
+                isToggle = true;
+        }
+    }
+
+    if (isToggle)
+        hime_log ("Toggle detected: vk=0x%02x mod=0x%x", (unsigned) wParam, modifiers);
+
+    if (isToggle) {
+        _EndComposition ();
+
+        /* 3-way cycle: EN → Zhuyin → Cangjie → EN */
+        if (!hime_is_chinese_mode (m_himeCtx)) {
+            /* EN → Zhuyin */
+            hime_set_chinese_mode (m_himeCtx, true);
+            hime_set_input_method (m_himeCtx, HIME_IM_PHO);
+            hime_log ("Toggle: EN -> Zhuyin");
+        } else if (hime_get_input_method (m_himeCtx) == HIME_IM_PHO) {
+            /* Zhuyin → Cangjie */
+            hime_gtab_load_table_by_id (m_himeCtx, HIME_GTAB_CJ5);
+            hime_log ("Toggle: Zhuyin -> Cangjie 5");
+        } else {
+            /* Cangjie → EN */
+            hime_set_chinese_mode (m_himeCtx, false);
+            hime_log ("Toggle: Cangjie -> EN");
+        }
+
+        hime_log ("Toggle: now '%s'", hime_get_method_label (m_himeCtx));
+        UpdateLanguageBar ();
+        *pfEaten = TRUE;
+        return S_OK;
+    }
+
+    /* Process key through HIME */
     HimeKeyResult kr = hime_process_key (m_himeCtx, (uint32_t) wParam, charCode, modifiers);
     hime_log ("OnKeyDown: vk=0x%02x char=0x%04x mod=0x%x result=%d",
               (unsigned) wParam, charCode, modifiers, (int) kr);
@@ -720,6 +985,7 @@ STDMETHODIMP HimeTextService::OnKeyDown (ITfContext *pContext, WPARAM wParam, LP
     }
     case HIME_KEY_ABSORBED: {
         _EndComposition ();
+        UpdateLanguageBar ();
         *pfEaten = TRUE;
         break;
     }
@@ -732,13 +998,6 @@ STDMETHODIMP HimeTextService::OnKeyDown (ITfContext *pContext, WPARAM wParam, LP
 
 STDMETHODIMP HimeTextService::OnKeyUp (ITfContext *pContext, WPARAM wParam, LPARAM lParam, BOOL *pfEaten) {
     *pfEaten = FALSE;
-
-    if (!m_himeCtx)
-        return S_OK;
-
-    /* Shift key is no longer used for mode toggle (conflicts with IME switching).
-     * Use Ctrl+Space instead (handled in OnKeyDown). */
-
     return S_OK;
 }
 
@@ -776,6 +1035,278 @@ void HimeTextService::_EndComposition () {
     m_accumLen = 0;
     if (m_himeCtx) {
         hime_context_reset (m_himeCtx);
+    }
+}
+
+/* ========== HimeLangBarButton Implementation ========== */
+
+HimeLangBarButton::HimeLangBarButton (HimeTextService *pService)
+    : m_cRef (1),
+      m_pService (pService),
+      m_pLangBarItemSink (NULL),
+      m_dwSinkCookie (0) {
+}
+
+HimeLangBarButton::~HimeLangBarButton () {
+    if (m_pLangBarItemSink) {
+        m_pLangBarItemSink->Release ();
+    }
+}
+
+STDMETHODIMP HimeLangBarButton::QueryInterface (REFIID riid, void **ppvObj) {
+    if (ppvObj == NULL)
+        return E_INVALIDARG;
+    *ppvObj = NULL;
+
+    if (IsEqualIID (riid, IID_IUnknown) ||
+        IsEqualIID (riid, IID_ITfLangBarItem) ||
+        IsEqualIID (riid, IID_ITfLangBarItemButton)) {
+        *ppvObj = (ITfLangBarItemButton *) this;
+    } else if (IsEqualIID (riid, IID_ITfSource)) {
+        *ppvObj = (ITfSource *) this;
+    }
+
+    if (*ppvObj) {
+        AddRef ();
+        return S_OK;
+    }
+    return E_NOINTERFACE;
+}
+
+STDMETHODIMP_ (ULONG)
+HimeLangBarButton::AddRef () {
+    return InterlockedIncrement (&m_cRef);
+}
+
+STDMETHODIMP_ (ULONG)
+HimeLangBarButton::Release () {
+    LONG cr = InterlockedDecrement (&m_cRef);
+    if (cr == 0)
+        delete this;
+    return cr;
+}
+
+STDMETHODIMP HimeLangBarButton::GetInfo (TF_LANGBARITEMINFO *pInfo) {
+    if (!pInfo)
+        return E_INVALIDARG;
+
+    pInfo->clsidService = CLSID_HimeTextService;
+    pInfo->guidItem = GUID_HimeLangBarButton;
+    pInfo->dwStyle = TF_LBI_STYLE_BTN_BUTTON | TF_LBI_STYLE_SHOWNINTRAY;
+    pInfo->ulSort = 0;
+    wcsncpy (pInfo->szDescription, L"HIME", ARRAYSIZE (pInfo->szDescription));
+    return S_OK;
+}
+
+STDMETHODIMP HimeLangBarButton::GetStatus (DWORD *pdwStatus) {
+    if (!pdwStatus)
+        return E_INVALIDARG;
+    *pdwStatus = 0;
+    return S_OK;
+}
+
+STDMETHODIMP HimeLangBarButton::Show (BOOL fShow) {
+    return E_NOTIMPL;
+}
+
+STDMETHODIMP HimeLangBarButton::GetTooltipString (BSTR *pbstrToolTip) {
+    if (!pbstrToolTip)
+        return E_INVALIDARG;
+
+    const char *label = "";
+    HimeContext *ctx = m_pService ? m_pService->GetHimeContext () : NULL;
+    if (ctx) {
+        label = hime_get_method_label (ctx);
+    }
+
+    /* Build tooltip like "HIME - 注音" */
+    WCHAR tooltip[128];
+    WCHAR labelW[32];
+    MultiByteToWideChar (CP_UTF8, 0, label, -1, labelW, 32);
+    swprintf (tooltip, 128, L"HIME - %s", labelW);
+
+    *pbstrToolTip = SysAllocString (tooltip);
+    return (*pbstrToolTip) ? S_OK : E_OUTOFMEMORY;
+}
+
+HICON HimeLangBarButton::_CreateModeIcon () {
+    const int SIZE = 16;
+
+    /* Get current mode label */
+    const char *label = "EN";
+    HimeContext *ctx = m_pService ? m_pService->GetHimeContext () : NULL;
+    if (ctx) {
+        label = hime_get_method_label (ctx);
+    }
+
+    WCHAR labelW[8];
+    MultiByteToWideChar (CP_UTF8, 0, label, -1, labelW, 8);
+
+    /* Choose background color based on mode */
+    COLORREF bgColor;
+    bool isChinese = ctx && hime_is_chinese_mode (ctx);
+    if (!isChinese) {
+        bgColor = RGB (80, 80, 80); /* Dark gray for English */
+    } else {
+        HimeInputMethod method = hime_get_input_method (ctx);
+        if (method == HIME_IM_PHO) {
+            bgColor = RGB (0, 90, 180); /* Blue for Zhuyin */
+        } else {
+            bgColor = RGB (0, 130, 60); /* Green for Cangjie/GTAB */
+        }
+    }
+
+    /* Create a 16x16 icon using GDI */
+    HDC hdcScreen = GetDC (NULL);
+    HDC hdcMem = CreateCompatibleDC (hdcScreen);
+
+    BITMAPINFO bmi;
+    ZeroMemory (&bmi, sizeof (bmi));
+    bmi.bmiHeader.biSize = sizeof (BITMAPINFOHEADER);
+    bmi.bmiHeader.biWidth = SIZE;
+    bmi.bmiHeader.biHeight = -SIZE; /* Top-down */
+    bmi.bmiHeader.biPlanes = 1;
+    bmi.bmiHeader.biBitCount = 32;
+    bmi.bmiHeader.biCompression = BI_RGB;
+
+    void *pvBits = NULL;
+    HBITMAP hbmColor = CreateDIBSection (hdcMem, &bmi, DIB_RGB_COLORS, &pvBits, NULL, 0);
+    HBITMAP hbmOld = (HBITMAP) SelectObject (hdcMem, hbmColor);
+
+    /* Fill background */
+    RECT rc = {0, 0, SIZE, SIZE};
+    HBRUSH hBrush = CreateSolidBrush (bgColor);
+    FillRect (hdcMem, &rc, hBrush);
+    DeleteObject (hBrush);
+
+    /* Draw label text */
+    SetBkMode (hdcMem, TRANSPARENT);
+    SetTextColor (hdcMem, RGB (255, 255, 255));
+
+    /* Use a small font — calculate size based on label length */
+    int fontHeight = (wcslen (labelW) <= 2) ? 13 : 10;
+    HFONT hFont = CreateFontW (fontHeight, 0, 0, 0, FW_BOLD,
+                               FALSE, FALSE, FALSE,
+                               DEFAULT_CHARSET,
+                               OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS,
+                               ANTIALIASED_QUALITY, DEFAULT_PITCH,
+                               L"Microsoft JhengHei");
+    HFONT hOldFont = (HFONT) SelectObject (hdcMem, hFont);
+
+    DrawTextW (hdcMem, labelW, -1, &rc, DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
+
+    SelectObject (hdcMem, hOldFont);
+    DeleteObject (hFont);
+    SelectObject (hdcMem, hbmOld);
+
+    /* Set alpha channel to opaque (GDI doesn't set it) */
+    if (pvBits) {
+        BYTE *pixels = (BYTE *) pvBits;
+        for (int i = 0; i < SIZE * SIZE; i++) {
+            pixels[i * 4 + 3] = 255; /* Alpha */
+        }
+    }
+
+    /* Create mask bitmap (all black = fully opaque icon) */
+    HBITMAP hbmMask = CreateBitmap (SIZE, SIZE, 1, 1, NULL);
+    HDC hdcMask = CreateCompatibleDC (hdcScreen);
+    HBITMAP hbmMaskOld = (HBITMAP) SelectObject (hdcMask, hbmMask);
+    RECT rcMask = {0, 0, SIZE, SIZE};
+    HBRUSH hBlack = (HBRUSH) GetStockObject (BLACK_BRUSH);
+    FillRect (hdcMask, &rcMask, hBlack);
+    SelectObject (hdcMask, hbmMaskOld);
+    DeleteDC (hdcMask);
+
+    /* Create icon */
+    ICONINFO ii;
+    ii.fIcon = TRUE;
+    ii.xHotspot = 0;
+    ii.yHotspot = 0;
+    ii.hbmMask = hbmMask;
+    ii.hbmColor = hbmColor;
+    HICON hIcon = CreateIconIndirect (&ii);
+
+    DeleteObject (hbmMask);
+    DeleteObject (hbmColor);
+    DeleteDC (hdcMem);
+    ReleaseDC (NULL, hdcScreen);
+
+    return hIcon;
+}
+
+STDMETHODIMP HimeLangBarButton::GetIcon (HICON *phIcon) {
+    if (!phIcon)
+        return E_INVALIDARG;
+    *phIcon = _CreateModeIcon ();
+    return (*phIcon) ? S_OK : E_FAIL;
+}
+
+STDMETHODIMP HimeLangBarButton::GetText (BSTR *pbstrText) {
+    if (!pbstrText)
+        return E_INVALIDARG;
+    *pbstrText = SysAllocString (L"HIME");
+    return (*pbstrText) ? S_OK : E_OUTOFMEMORY;
+}
+
+STDMETHODIMP HimeLangBarButton::OnClick (TfLBIClick click, POINT pt, const RECT *prcArea) {
+    /* Left-click cycles: EN → Zhuyin → Cangjie → EN */
+    HimeContext *ctx = m_pService ? m_pService->GetHimeContext () : NULL;
+    if (!ctx)
+        return S_OK;
+
+    if (!hime_is_chinese_mode (ctx)) {
+        hime_set_chinese_mode (ctx, true);
+        hime_set_input_method (ctx, HIME_IM_PHO);
+    } else if (hime_get_input_method (ctx) == HIME_IM_PHO) {
+        hime_gtab_load_table_by_id (ctx, HIME_GTAB_CJ5);
+    } else {
+        hime_set_chinese_mode (ctx, false);
+    }
+
+    Update ();
+    return S_OK;
+}
+
+STDMETHODIMP HimeLangBarButton::InitMenu (ITfMenu *pMenu) {
+    return E_NOTIMPL;
+}
+
+STDMETHODIMP HimeLangBarButton::OnMenuSelect (UINT wID) {
+    return E_NOTIMPL;
+}
+
+STDMETHODIMP HimeLangBarButton::AdviseSink (REFIID riid, IUnknown *punk, DWORD *pdwCookie) {
+    if (!IsEqualIID (riid, IID_ITfLangBarItemSink))
+        return CONNECT_E_CANNOTCONNECT;
+
+    if (m_pLangBarItemSink) {
+        return CONNECT_E_ADVISELIMIT;
+    }
+
+    HRESULT hr = punk->QueryInterface (IID_ITfLangBarItemSink, (void **) &m_pLangBarItemSink);
+    if (FAILED (hr)) {
+        m_pLangBarItemSink = NULL;
+        return hr;
+    }
+
+    *pdwCookie = 1;
+    m_dwSinkCookie = 1;
+    return S_OK;
+}
+
+STDMETHODIMP HimeLangBarButton::UnadviseSink (DWORD dwCookie) {
+    if (dwCookie != m_dwSinkCookie || !m_pLangBarItemSink)
+        return CONNECT_E_NOCONNECTION;
+
+    m_pLangBarItemSink->Release ();
+    m_pLangBarItemSink = NULL;
+    m_dwSinkCookie = 0;
+    return S_OK;
+}
+
+void HimeLangBarButton::Update () {
+    if (m_pLangBarItemSink) {
+        m_pLangBarItemSink->OnUpdate (TF_LBI_ICON | TF_LBI_TEXT | TF_LBI_TOOLTIP);
     }
 }
 
@@ -941,6 +1472,14 @@ STDAPI DllRegisterServer () {
         pCategoryMgr->RegisterCategory (CLSID_HimeTextService,
                                         GUID_TFCAT_TIP_KEYBOARD,
                                         CLSID_HimeTextService);
+        /* Register systray support (shows language bar in system tray) */
+        pCategoryMgr->RegisterCategory (CLSID_HimeTextService,
+                                        GUID_TFCAT_TIPCAP_SYSTRAYSUPPORT,
+                                        CLSID_HimeTextService);
+        /* Register immersive/UWP support (Windows 8+) */
+        pCategoryMgr->RegisterCategory (CLSID_HimeTextService,
+                                        GUID_TFCAT_TIPCAP_IMMERSIVESUPPORT,
+                                        CLSID_HimeTextService);
         pCategoryMgr->Release ();
     }
 
@@ -973,6 +1512,12 @@ STDAPI DllUnregisterServer () {
     if (SUCCEEDED (hr) && pCategoryMgr) {
         pCategoryMgr->UnregisterCategory (CLSID_HimeTextService,
                                           GUID_TFCAT_TIP_KEYBOARD,
+                                          CLSID_HimeTextService);
+        pCategoryMgr->UnregisterCategory (CLSID_HimeTextService,
+                                          GUID_TFCAT_TIPCAP_SYSTRAYSUPPORT,
+                                          CLSID_HimeTextService);
+        pCategoryMgr->UnregisterCategory (CLSID_HimeTextService,
+                                          GUID_TFCAT_TIPCAP_IMMERSIVESUPPORT,
                                           CLSID_HimeTextService);
         pCategoryMgr->Release ();
     }

@@ -5,9 +5,9 @@
  * License: GNU LGPL v2.1
  */
 
+#import <Carbon/Carbon.h>
 #import <Cocoa/Cocoa.h>
 #import <InputMethodKit/InputMethodKit.h>
-#import <Carbon/Carbon.h>
 #import "HimeInputController.h"
 
 /* Global IMK server instance */
@@ -28,8 +28,8 @@ static void registerInputSource(void) {
         BOOL found = NO;
 
         for (CFIndex i = 0; i < CFArrayGetCount(inputSources); i++) {
-            TISInputSourceRef source = (TISInputSourceRef)CFArrayGetValueAtIndex(inputSources, i);
-            NSString *sourceId = (__bridge NSString *)TISGetInputSourceProperty(source, kTISPropertyInputSourceID);
+            TISInputSourceRef source = (TISInputSourceRef) CFArrayGetValueAtIndex(inputSources, i);
+            NSString *sourceId = (__bridge NSString *) TISGetInputSourceProperty(source, kTISPropertyInputSourceID);
             if ([sourceId hasPrefix:bundleId]) {
                 found = YES;
                 NSLog(@"HIME: Input source already registered: %@", sourceId);
@@ -39,11 +39,11 @@ static void registerInputSource(void) {
 
         if (!found) {
             /* Register the input source */
-            OSStatus status = TISRegisterInputSource((__bridge CFURLRef)bundleURL);
+            OSStatus status = TISRegisterInputSource((__bridge CFURLRef) bundleURL);
             if (status == noErr) {
                 NSLog(@"HIME: Successfully registered input source");
             } else {
-                NSLog(@"HIME: Failed to register input source, status=%d", (int)status);
+                NSLog(@"HIME: Failed to register input source, status=%d", (int) status);
             }
         }
     }
@@ -74,8 +74,7 @@ int main(int argc, const char *argv[]) {
         /* Initialize the IMK server */
         NSLog(@"HIME: Creating IMKServer with connection=%@ bundleId=%@", kConnectionName, bundleId);
 
-        gServer = [[IMKServer alloc] initWithName:kConnectionName
-                                 bundleIdentifier:bundleId];
+        gServer = [[IMKServer alloc] initWithName:kConnectionName bundleIdentifier:bundleId];
 
         if (!gServer) {
             NSLog(@"HIME: Failed to initialize IMK server");

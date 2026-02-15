@@ -468,19 +468,58 @@ typedef struct {
 #define GTAB_MAX_KEYS 8
 #define GTAB_MAX_KEYNAME 64
 
-/* GTAB file header (matches original HIME format) */
+/*
+ * GTAB file header layout (matches original HIME hime-cin2gtab output).
+ *
+ * The full on-disk header is large (~86 KB) due to QUICK_KEYS:
+ *   Bytes   0..71 : basic fields (version..def_chars)
+ *   Bytes  72..86551 : QUICK_KEYS (quick1[46][10][4] + quick2[46][46][10][4])
+ *   Bytes 86552..86679 : union { endkey[99] + keybits(1) + selkey2[10] + pad | dummy[128] }
+ *
+ * After the header:
+ *   keymap:  key_count bytes
+ *   keyname: key_count * CH_SZ bytes (radical display names)
+ *   idx1:    (key_count + 1) * sizeof(uint32_t)
+ *   items:   def_chars * sizeof(GtabItem or GtabItem64)
+ */
+
+/* Size constants for the on-disk GTAB header */
+#define GTAB_HEADER_BASIC_SIZE 72 /* Fields before QUICK_KEYS */
+#define GTAB_QKEYS_SIZE 86480     /* QUICK_KEYS: quick1[46][10][4] + quick2[46][46][10][4] */
+#define GTAB_HEADER_TAIL_SIZE 128 /* Union at end of header */
+#define GTAB_FULL_HEADER_SIZE (GTAB_HEADER_BASIC_SIZE + GTAB_QKEYS_SIZE + GTAB_HEADER_TAIL_SIZE)
+#define GTAB_KEYBITS_OFFSET_IN_TAIL 99 /* Offset of keybits within the tail union */
+
+/* GTAB v2 compact format */
+#define GTAB_V2_MAGIC 0x48475432 /* "HGT2" */
+
+typedef struct {
+    uint32_t magic;          /* 0x48475432 */
+    uint16_t version;        /* 0x0002 */
+    uint16_t flags;          /* Bit 0: key64 (64-bit keys) */
+    char cname[32];          /* Display name (UTF-8, NUL-padded) */
+    char selkey[12];         /* Selection keys */
+    uint8_t space_style;     /* Space key behavior */
+    uint8_t key_count;       /* Keys in keymap (max 128) */
+    uint8_t max_press;       /* Max keystrokes per char */
+    uint8_t keybits;         /* Bits per key (1..8) */
+    uint32_t item_count;     /* Number of items (sorted by key) */
+    uint32_t keymap_offset;  /* Offset to keymap section */
+    uint32_t keyname_offset; /* Offset to keyname section */
+    uint32_t items_offset;   /* Offset to items section */
+} GtabHeaderV2;              /* 72 bytes */
+
+/* Basic fields read from the start of the GTAB header */
 typedef struct {
     int version;
     uint32_t flag;
     char cname[32];  /* Display name */
     char selkey[12]; /* Selection keys */
     int space_style; /* Space key behavior */
-    int key_count;   /* Number of keys in keymap */
+    int key_count;   /* Number of keys in keymap (KeyS) */
     int max_press;   /* Max keystrokes per character */
     int dup_sel;     /* Duplicate selection count */
-    int def_chars;   /* Number of defined characters */
-    /* Quick keys omitted for simplicity */
-    char reserved[512]; /* Reserved/padding */
+    int def_chars;   /* Number of defined characters (DefC) */
 } GtabHeader;
 
 /* GTAB item (32-bit key) */
@@ -499,20 +538,22 @@ typedef struct {
 typedef struct {
     char name[64];
     char filename[128];
-    char keymap[128];  /* Key to symbol mapping */
-    char keyname[128]; /* Symbol display names */
+    char keymap[128];              /* Key to symbol mapping (char → key index) */
+    char keyname[64 * HIME_CH_SZ]; /* Radical display names: keyname[idx*CH_SZ] */
     char selkey[16];
     int key_count;
     int max_press;
     int def_chars;
     int keybits;
-    bool key64; /* Using 64-bit keys */
+    int space_style; /* Space key behavior from header */
+    bool key64;      /* Using 64-bit keys */
     GtabItem *items;
     GtabItem64 *items64;
     int item_count;
     uint32_t *idx; /* Index for fast lookup */
     int idx_count;
     bool loaded;
+    bool sorted; /* Items pre-sorted — use binary search */
 } GtabTable;
 
 /* GTAB registry entry */
@@ -684,6 +725,8 @@ static bool g_initialized = false;
 /* Forward declarations */
 static void trigger_feedback (HimeContext *ctx, HimeFeedbackType type);
 static int gtab_lookup (HimeContext *ctx);
+static void gtab_rebuild_display (HimeContext *ctx);
+static void append_candidates_to_preedit (HimeContext *ctx);
 static HimeKeyResult gtab_process_key (HimeContext *ctx, char key);
 static HimeKeyResult intcode_process_key (HimeContext *ctx, char key);
 
@@ -849,6 +892,37 @@ static int lookup_phokey (hime_phokey_t phokey, HimeContext *ctx) {
     return 0;
 }
 
+/* Append numbered candidate list to the current preedit string.
+ * Format: " 1.字 2.字 3.字..." using the current page of candidates.
+ * Used by both Zhuyin (PHO) and GTAB (Cangjie, etc.) input methods. */
+static void append_candidates_to_preedit (HimeContext *ctx) {
+    if (!ctx || ctx->candidate_count <= 0)
+        return;
+
+    int pos = strlen (ctx->preedit);
+    int page = ctx->candidate_page;
+    int per_page = ctx->candidates_per_page;
+    int start = page * per_page;
+    int end = start + per_page;
+    if (end > ctx->candidate_count)
+        end = ctx->candidate_count;
+
+    for (int i = start; i < end; i++) {
+        int num = (i - start) + 1;
+        char label[32];
+        snprintf (label, sizeof (label), " %d.", num % 10);
+        int llen = strlen (label);
+        int clen = strlen (ctx->candidates[i]);
+
+        if (pos + llen + clen < HIME_MAX_PREEDIT - 1) {
+            strcpy (ctx->preedit + pos, label);
+            pos += llen;
+            strcpy (ctx->preedit + pos, ctx->candidates[i]);
+            pos += clen;
+        }
+    }
+}
+
 static void update_preedit (HimeContext *ctx) {
     ctx->preedit[0] = '\0';
     int pos = 0;
@@ -887,29 +961,7 @@ static void update_preedit (HimeContext *ctx) {
     }
 
     /* Append candidate list when available */
-    if (ctx->candidate_count > 0) {
-        int page = ctx->candidate_page;
-        int per_page = ctx->candidates_per_page;
-        int start = page * per_page;
-        int end = start + per_page;
-        if (end > ctx->candidate_count)
-            end = ctx->candidate_count;
-
-        for (int i = start; i < end; i++) {
-            int num = (i - start) + 1;
-            char label[32];
-            snprintf (label, sizeof (label), " %d.", num % 10);
-            int llen = strlen (label);
-            int clen = strlen (ctx->candidates[i]);
-
-            if (pos + llen + clen < HIME_MAX_PREEDIT - 1) {
-                strcpy (ctx->preedit + pos, label);
-                pos += llen;
-                strcpy (ctx->preedit + pos, ctx->candidates[i]);
-                pos += clen;
-            }
-        }
-    }
+    append_candidates_to_preedit (ctx);
 }
 
 static const KeyMapEntry *find_keymap (HimeContext *ctx, char key) {
@@ -1165,6 +1217,22 @@ HIME_API HimeKeyResult hime_process_key (
         }
     }
 
+    /* Handle Space in GTAB mode: select first candidate or commit */
+    if (ctx->method == HIME_IM_GTAB && charcode == ' ') {
+        if (ctx->candidate_count > 0) {
+            /* Space selects first candidate (Cangjie convention) */
+            strcpy (ctx->commit, ctx->candidates[0]);
+            hime_context_reset (ctx);
+            trigger_feedback (ctx, HIME_FEEDBACK_CANDIDATE);
+            return HIME_KEY_COMMIT;
+        }
+        /* No candidates and no keys entered: pass through */
+        if (ctx->gtab_key_count == 0)
+            return HIME_KEY_IGNORED;
+        /* Keys entered but no match: absorb */
+        return HIME_KEY_ABSORBED;
+    }
+
     /* Handle Escape (common to all methods) */
     if (keycode == 0x1B || charcode == 0x1B) {
         bool has_input = !typ_pho_empty (ctx->typ_pho) ||
@@ -1210,10 +1278,11 @@ HIME_API HimeKeyResult hime_process_key (
         case HIME_IM_GTAB:
             if (ctx->gtab_key_count > 0) {
                 ctx->gtab_key_count--;
-                ctx->gtab_key_display[ctx->gtab_key_count] = '\0';
+                gtab_rebuild_display (ctx);
                 strcpy (ctx->preedit, ctx->gtab_key_display);
                 if (ctx->gtab_key_count > 0) {
                     gtab_lookup (ctx);
+                    append_candidates_to_preedit (ctx);
                 } else {
                     ctx->candidate_count = 0;
                 }
@@ -1489,7 +1558,144 @@ HIME_API int hime_gtab_get_table_info (int index, HimeGtabInfo *info) {
     return 0;
 }
 
-/* Simple GTAB loader - loads basic structure */
+/* GTAB v1 loader - reads .gtab files produced by original hime-cin2gtab */
+static GtabTable *load_gtab_file_v1 (FILE *fp, GtabTable *table) {
+    /* Read basic header fields (first 72 bytes) */
+    GtabHeader header;
+    rewind (fp);
+    if (fread (&header, sizeof (GtabHeader), 1, fp) != 1) {
+        return NULL;
+    }
+
+    strncpy (table->name, header.cname, sizeof (table->name) - 1);
+    strncpy (table->selkey, header.selkey, sizeof (table->selkey) - 1);
+    table->key_count = header.key_count;
+    table->max_press = header.max_press;
+    table->def_chars = header.def_chars;
+    table->space_style = header.space_style;
+
+    /* Skip QUICK_KEYS to reach the tail union */
+    if (fseek (fp, GTAB_QKEYS_SIZE, SEEK_CUR) != 0) {
+        return NULL;
+    }
+
+    /* Read tail union (128 bytes) to extract keybits */
+    char tail[GTAB_HEADER_TAIL_SIZE];
+    if (fread (tail, GTAB_HEADER_TAIL_SIZE, 1, fp) != 1) {
+        return NULL;
+    }
+    table->keybits = (unsigned char) tail[GTAB_KEYBITS_OFFSET_IN_TAIL];
+    if (table->keybits < 1 || table->keybits > 8)
+        table->keybits = 6; /* Default: 6 bits per key */
+
+    /* Determine if using 64-bit keys */
+    table->key64 = (table->max_press * table->keybits > 32);
+
+    /* Now at file position after full header.
+     * Read keymap (key_count bytes) */
+    if (header.key_count > 0 && header.key_count <= 128) {
+        fread (table->keymap, 1, header.key_count, fp);
+    }
+
+    /* Read keyname (key_count * HIME_CH_SZ bytes) - radical display names */
+    int keyname_bytes = header.key_count * HIME_CH_SZ;
+    if (header.key_count > 0 && keyname_bytes <= (int) sizeof (table->keyname)) {
+        fread (table->keyname, HIME_CH_SZ, header.key_count, fp);
+    }
+
+    /* Read index: (key_count + 1) entries of uint32_t */
+    int idx_size = header.key_count + 1;
+    table->idx = (uint32_t *) malloc (sizeof (uint32_t) * idx_size);
+    if (!table->idx) {
+        return NULL;
+    }
+    fread (table->idx, sizeof (uint32_t), idx_size, fp);
+    table->idx_count = idx_size;
+
+    /* Read items */
+    if (table->key64) {
+        table->items64 = (GtabItem64 *) malloc (sizeof (GtabItem64) * table->def_chars);
+        if (!table->items64) {
+            free (table->idx);
+            table->idx = NULL;
+            return NULL;
+        }
+        fread (table->items64, sizeof (GtabItem64), table->def_chars, fp);
+    } else {
+        table->items = (GtabItem *) malloc (sizeof (GtabItem) * table->def_chars);
+        if (!table->items) {
+            free (table->idx);
+            table->idx = NULL;
+            return NULL;
+        }
+        fread (table->items, sizeof (GtabItem), table->def_chars, fp);
+    }
+    table->item_count = table->def_chars;
+    table->sorted = false;
+    table->loaded = true;
+    return table;
+}
+
+/* GTAB v2 loader - reads compact .gtab files with pre-sorted items */
+static GtabTable *load_gtab_file_v2 (FILE *fp, GtabTable *table) {
+    GtabHeaderV2 hdr;
+    rewind (fp);
+    if (fread (&hdr, sizeof (GtabHeaderV2), 1, fp) != 1)
+        return NULL;
+
+    if (hdr.magic != GTAB_V2_MAGIC)
+        return NULL;
+
+    strncpy (table->name, hdr.cname, sizeof (table->name) - 1);
+    strncpy (table->selkey, hdr.selkey, sizeof (table->selkey) - 1);
+    table->space_style = hdr.space_style;
+    table->key_count = hdr.key_count;
+    table->max_press = hdr.max_press;
+    table->keybits = hdr.keybits;
+    table->def_chars = (int) hdr.item_count;
+    table->key64 = (hdr.flags & 1) != 0;
+
+    /* Read keymap */
+    if (hdr.key_count > 0 && hdr.key_count <= 128) {
+        if (fseek (fp, hdr.keymap_offset, SEEK_SET) != 0)
+            return NULL;
+        fread (table->keymap, 1, hdr.key_count, fp);
+    }
+
+    /* Read keyname */
+    int keyname_bytes = hdr.key_count * HIME_CH_SZ;
+    if (hdr.key_count > 0 && keyname_bytes <= (int) sizeof (table->keyname)) {
+        if (fseek (fp, hdr.keyname_offset, SEEK_SET) != 0)
+            return NULL;
+        fread (table->keyname, HIME_CH_SZ, hdr.key_count, fp);
+    }
+
+    /* No idx array needed — binary search replaces it */
+    table->idx = NULL;
+    table->idx_count = 0;
+
+    /* Read items */
+    if (fseek (fp, hdr.items_offset, SEEK_SET) != 0)
+        return NULL;
+
+    if (table->key64) {
+        table->items64 = (GtabItem64 *) malloc (sizeof (GtabItem64) * hdr.item_count);
+        if (!table->items64)
+            return NULL;
+        fread (table->items64, sizeof (GtabItem64), hdr.item_count, fp);
+    } else {
+        table->items = (GtabItem *) malloc (sizeof (GtabItem) * hdr.item_count);
+        if (!table->items)
+            return NULL;
+        fread (table->items, sizeof (GtabItem), hdr.item_count, fp);
+    }
+    table->item_count = (int) hdr.item_count;
+    table->sorted = true;
+    table->loaded = true;
+    return table;
+}
+
+/* GTAB loader - detects format and dispatches to v1 or v2 loader */
 static GtabTable *load_gtab_file (const char *filepath) {
     FILE *fp = fopen (filepath, "rb");
     if (!fp)
@@ -1504,58 +1710,30 @@ static GtabTable *load_gtab_file (const char *filepath) {
     GtabTable *table = &g_gtab_tables[g_gtab_table_count];
     memset (table, 0, sizeof (GtabTable));
 
-    /* Read header */
-    GtabHeader header;
-    if (fread (&header, sizeof (GtabHeader), 1, fp) != 1) {
+    /* Peek first 4 bytes to detect format */
+    uint32_t magic = 0;
+    if (fread (&magic, sizeof (uint32_t), 1, fp) != 1) {
         fclose (fp);
         return NULL;
     }
 
-    strncpy (table->name, header.cname, sizeof (table->name) - 1);
-    strncpy (table->selkey, header.selkey, sizeof (table->selkey) - 1);
-    table->key_count = header.key_count;
-    table->max_press = header.max_press;
-    table->def_chars = header.def_chars;
-    table->keybits = 6; /* Default: 6 bits per key */
-
-    /* Determine if using 64-bit keys */
-    table->key64 = (table->max_press > 5);
-
-    /* Read keymap (128 bytes) */
-    fread (table->keymap, 1, 128, fp);
-
-    /* Read index */
-    int idx_size = (1 << table->keybits);
-    table->idx = (uint32_t *) malloc (sizeof (uint32_t) * idx_size);
-    if (!table->idx) {
-        fclose (fp);
-        return NULL;
-    }
-    fread (table->idx, sizeof (uint32_t), idx_size, fp);
-    table->idx_count = idx_size;
-
-    /* Read items */
-    if (table->key64) {
-        table->items64 = (GtabItem64 *) malloc (sizeof (GtabItem64) * table->def_chars);
-        if (!table->items64) {
-            free (table->idx);
-            fclose (fp);
-            return NULL;
-        }
-        fread (table->items64, sizeof (GtabItem64), table->def_chars, fp);
-    } else {
-        table->items = (GtabItem *) malloc (sizeof (GtabItem) * table->def_chars);
-        if (!table->items) {
-            free (table->idx);
-            fclose (fp);
-            return NULL;
-        }
-        fread (table->items, sizeof (GtabItem), table->def_chars, fp);
-    }
-    table->item_count = table->def_chars;
-    table->loaded = true;
+    GtabTable *result;
+    if (magic == GTAB_V2_MAGIC)
+        result = load_gtab_file_v2 (fp, table);
+    else
+        result = load_gtab_file_v1 (fp, table);
 
     fclose (fp);
+
+    if (!result) {
+        /* Clean up any partial allocations */
+        free (table->idx);
+        free (table->items);
+        free (table->items64);
+        memset (table, 0, sizeof (GtabTable));
+        return NULL;
+    }
+
     g_gtab_table_count++;
     return table;
 }
@@ -1626,7 +1804,19 @@ HIME_API int hime_gtab_get_key_string (HimeContext *ctx, char *buffer, int buffe
     return len;
 }
 
-/* GTAB key processing - lookup candidates based on entered keys */
+/* Extract 32-bit key from a GtabItem's key bytes (big-endian) */
+/* Read item key as native uint32_t (little-endian on x86).
+ * The original hime-cin2gtab writes keys with fwrite(&uint32, 4, 1, fp),
+ * so the byte order in .gtab files matches the build platform (x86 = LE). */
+static inline uint32_t gtab_item_key32 (const GtabItem *item) {
+    uint32_t k;
+    memcpy (&k, item->key, 4);
+    return k;
+}
+
+/* GTAB key processing - lookup candidates based on entered keys.
+ * Uses binary search when items are pre-sorted (v2 format),
+ * falls back to linear scan for unsorted v1 tables. */
 static int gtab_lookup (HimeContext *ctx) {
     if (!ctx || !ctx->gtab || ctx->gtab_key_count == 0)
         return 0;
@@ -1634,32 +1824,97 @@ static int gtab_lookup (HimeContext *ctx) {
     ctx->candidate_count = 0;
     GtabTable *table = ctx->gtab;
 
-    /* Build key value from entered keys */
+    /* Build search prefix from entered keys */
     uint32_t key = 0;
     for (int i = 0; i < ctx->gtab_key_count; i++) {
         key = (key << table->keybits) | ctx->gtab_keys[i];
     }
 
-    /* Search for matches */
-    if (!table->key64 && table->items) {
-        for (int i = 0; i < table->item_count && ctx->candidate_count < HIME_MAX_CANDIDATES; i++) {
-            uint32_t item_key = (table->items[i].key[0] << 24) |
-                                (table->items[i].key[1] << 16) |
-                                (table->items[i].key[2] << 8) |
-                                table->items[i].key[3];
+    /* Number of unused key positions (for prefix matching) */
+    int unused = table->max_press - ctx->gtab_key_count;
+    int shift = unused * table->keybits;
 
-            /* Match prefix */
-            int shift = (table->max_press - ctx->gtab_key_count) * table->keybits;
-            if ((item_key >> shift) == key) {
+    if (!table->key64 && table->items) {
+        if (table->sorted) {
+            /* For binary search on left-aligned keys, left-align the prefix
+             * and build a mask so we only compare the entered key positions.
+             * Keys are stored left-aligned in the top (max_press * keybits)
+             * bits of a 32-bit big-endian value, with the remaining low bits
+             * zero. We left-align our prefix to match. */
+            int total_bits = table->max_press * table->keybits;
+            int pad = 32 - total_bits; /* unused low bits in 32-bit field */
+            uint32_t prefix = key << (shift + pad);
+            uint32_t mask = (shift + pad) >= 32
+                                ? 0
+                                : ~((1u << (shift + pad)) - 1u);
+
+            /* Binary search: find first item where (item_key & mask) >= prefix */
+            int lo = 0, hi = table->item_count;
+            while (lo < hi) {
+                int mid = lo + (hi - lo) / 2;
+                uint32_t mk = gtab_item_key32 (&table->items[mid]) & mask;
+                if (mk < prefix)
+                    lo = mid + 1;
+                else
+                    hi = mid;
+            }
+            /* Linear scan forward to collect all contiguous prefix matches */
+            for (int i = lo; i < table->item_count && ctx->candidate_count < HIME_MAX_CANDIDATES; i++) {
+                uint32_t ik = gtab_item_key32 (&table->items[i]) & mask;
+                if (ik != prefix)
+                    break;
                 strncpy (ctx->candidates[ctx->candidate_count],
                          (char *) table->items[i].ch, HIME_CH_SZ);
                 ctx->candidates[ctx->candidate_count][HIME_CH_SZ] = '\0';
                 ctx->candidate_count++;
             }
+        } else {
+            /* Fallback: O(n) linear scan for unsorted v1 tables */
+            for (int i = 0; i < table->item_count && ctx->candidate_count < HIME_MAX_CANDIDATES; i++) {
+                uint32_t item_key = gtab_item_key32 (&table->items[i]);
+                if ((item_key >> shift) == key) {
+                    strncpy (ctx->candidates[ctx->candidate_count],
+                             (char *) table->items[i].ch, HIME_CH_SZ);
+                    ctx->candidates[ctx->candidate_count][HIME_CH_SZ] = '\0';
+                    ctx->candidate_count++;
+                }
+            }
         }
     }
 
     return ctx->candidate_count;
+}
+
+/* Rebuild GTAB key display string from key indices using radical names.
+ * If the table has keyname data, displays radical names (e.g., "竹手一").
+ * Otherwise falls back to raw keymap characters (e.g., "hqm"). */
+static void gtab_rebuild_display (HimeContext *ctx) {
+    GtabTable *table = ctx->gtab;
+    ctx->gtab_key_display[0] = '\0';
+
+    if (!table)
+        return;
+
+    int pos = 0;
+    for (int i = 0; i < ctx->gtab_key_count; i++) {
+        int idx = ctx->gtab_keys[i];
+        char *kn = &table->keyname[idx * HIME_CH_SZ];
+
+        /* Check if keyname has data (non-null first byte) */
+        if (kn[0]) {
+            /* Copy UTF-8 keyname (up to HIME_CH_SZ bytes, NUL-padded) */
+            int j;
+            for (j = 0; j < HIME_CH_SZ && kn[j]; j++) {
+                if (pos < (int) sizeof (ctx->gtab_key_display) - 1)
+                    ctx->gtab_key_display[pos++] = kn[j];
+            }
+        } else if (idx < 128 && table->keymap[idx]) {
+            /* Fallback: raw keymap character */
+            if (pos < (int) sizeof (ctx->gtab_key_display) - 1)
+                ctx->gtab_key_display[pos++] = table->keymap[idx];
+        }
+    }
+    ctx->gtab_key_display[pos] = '\0';
 }
 
 /* Process GTAB key input */
@@ -1685,18 +1940,17 @@ static HimeKeyResult gtab_process_key (HimeContext *ctx, char key) {
     if (ctx->gtab_key_count < GTAB_MAX_KEYS && ctx->gtab_key_count < table->max_press) {
         ctx->gtab_keys[ctx->gtab_key_count++] = key_idx;
 
-        /* Update display string */
-        int len = strlen (ctx->gtab_key_display);
-        if (len < (int) sizeof (ctx->gtab_key_display) - 1) {
-            ctx->gtab_key_display[len] = key;
-            ctx->gtab_key_display[len + 1] = '\0';
-        }
+        /* Update display string with radical names */
+        gtab_rebuild_display (ctx);
 
         /* Update preedit */
         strcpy (ctx->preedit, ctx->gtab_key_display);
 
         /* Lookup candidates */
         gtab_lookup (ctx);
+
+        /* Append numbered candidates to preedit (same format as Zhuyin) */
+        append_candidates_to_preedit (ctx);
 
         if (ctx->candidate_count == 1 && ctx->gtab_key_count >= table->max_press) {
             /* Auto-commit single match at max keys */
@@ -1962,6 +2216,47 @@ HIME_API const char *hime_get_method_name (HimeInputMethod method) {
         return INPUT_METHOD_NAMES[method];
     }
     return "Unknown";
+}
+
+HIME_API const char *hime_get_method_label (HimeContext *ctx) {
+    if (!ctx)
+        return "en";
+
+    if (!ctx->chinese_mode)
+        return "en";
+
+    switch (ctx->method) {
+    case HIME_IM_PHO:
+        return "注";
+    case HIME_IM_TSIN:
+        return "詞";
+    case HIME_IM_INTCODE:
+        return "碼";
+    case HIME_IM_GTAB:
+        if (ctx->gtab && ctx->gtab->name[0]) {
+            /* Return first character of the GTAB table name.
+             * For CJK names like "倉頡" or "倉五", this gives "倉".
+             * We use a static buffer since the table name is UTF-8
+             * and the first character may be multi-byte. */
+            static char label_buf[HIME_CH_SZ + 1];
+            const char *name = ctx->gtab->name;
+            int len = 1;
+            /* Determine UTF-8 character length */
+            unsigned char c = (unsigned char) name[0];
+            if (c >= 0xF0)
+                len = 4;
+            else if (c >= 0xE0)
+                len = 3;
+            else if (c >= 0xC0)
+                len = 2;
+            memcpy (label_buf, name, len);
+            label_buf[len] = '\0';
+            return label_buf;
+        }
+        return "表";
+    default:
+        return "cht";
+    }
 }
 
 /* ========== Settings/Preferences Implementation ========== */

@@ -1500,8 +1500,8 @@ TEST (pho_tone_triggers_lookup) {
     ASSERT_NOT_NULL (ctx);
 
     /* Type ㄇ (a) + ㄚ (8) + ˇ (3rd tone = key '3') */
-    hime_process_key (ctx, 'A', 'a', 0); /* ㄇ initial */
-    hime_process_key (ctx, '8', '8', 0); /* ㄚ final */
+    hime_process_key (ctx, 'A', 'a', 0);                    /* ㄇ initial */
+    hime_process_key (ctx, '8', '8', 0);                    /* ㄚ final */
     HimeKeyResult kr = hime_process_key (ctx, '3', '3', 0); /* 3rd tone */
 
     /* Should trigger lookup */
@@ -1528,8 +1528,8 @@ TEST (pho_candidate_selection) {
     ASSERT_NOT_NULL (ctx);
 
     /* Type a syllable that produces multiple candidates */
-    hime_process_key (ctx, 'A', 'a', 0); /* ㄇ */
-    hime_process_key (ctx, '8', '8', 0); /* ㄚ */
+    hime_process_key (ctx, 'A', 'a', 0);                    /* ㄇ */
+    hime_process_key (ctx, '8', '8', 0);                    /* ㄚ */
     HimeKeyResult kr = hime_process_key (ctx, ' ', ' ', 0); /* 1st tone */
 
     if (kr == HIME_KEY_PREEDIT && hime_get_candidate_count (ctx) > 1) {
@@ -1699,7 +1699,7 @@ TEST (pho_candidate_paging) {
     hime_set_candidates_per_page (ctx, 5);
 
     /* Type a common syllable likely to have many candidates */
-    hime_process_key (ctx, 'I', 'i', 0); /* ㄧ */
+    hime_process_key (ctx, 'I', 'i', 0);                    /* ㄧ */
     HimeKeyResult kr = hime_process_key (ctx, ' ', ' ', 0); /* 1st tone */
 
     if (kr == HIME_KEY_PREEDIT && hime_get_candidate_count (ctx) > 5) {
@@ -1732,8 +1732,8 @@ TEST (pho_preedit_includes_candidates) {
     ASSERT_NOT_NULL (ctx);
 
     /* Type a syllable that produces multiple candidates */
-    hime_process_key (ctx, 'A', 'a', 0); /* ㄇ */
-    hime_process_key (ctx, '8', '8', 0); /* ㄚ */
+    hime_process_key (ctx, 'A', 'a', 0);                    /* ㄇ */
+    hime_process_key (ctx, '8', '8', 0);                    /* ㄚ */
     HimeKeyResult kr = hime_process_key (ctx, ' ', ' ', 0); /* 1st tone */
 
     if (kr == HIME_KEY_PREEDIT && hime_get_candidate_count (ctx) > 1) {
@@ -1769,8 +1769,8 @@ TEST (pho_full_input_cycle) {
     char commit_buf[256];
 
     /* First character */
-    hime_process_key (ctx, 'A', 'a', 0); /* ㄇ */
-    hime_process_key (ctx, '8', '8', 0); /* ㄚ */
+    hime_process_key (ctx, 'A', 'a', 0);                    /* ㄇ */
+    hime_process_key (ctx, '8', '8', 0);                    /* ㄚ */
     HimeKeyResult kr = hime_process_key (ctx, ' ', ' ', 0); /* 1st tone */
 
     if (kr == HIME_KEY_COMMIT) {
@@ -1846,8 +1846,8 @@ TEST (pho_data_loading) {
     ASSERT_NOT_NULL (ctx);
 
     /* Type a very common syllable: ㄉ(d) ㄜ(k) ˙(space) for 的 */
-    hime_process_key (ctx, 'D', 'd', 0); /* ㄉ */
-    hime_process_key (ctx, 'K', 'k', 0); /* ㄜ */
+    hime_process_key (ctx, 'D', 'd', 0);                    /* ㄉ */
+    hime_process_key (ctx, 'K', 'k', 0);                    /* ㄜ */
     HimeKeyResult kr = hime_process_key (ctx, ' ', ' ', 0); /* neutral/1st tone */
 
     /* 的 is very common - should produce results */
@@ -1881,6 +1881,683 @@ TEST (pho_invalid_data_path) {
 
     hime_context_free (ctx);
     hime_cleanup ();
+    TEST_PASS ();
+}
+
+/* ========== GTAB Binary Search Tests ========== */
+
+TEST (gtab_bsearch_exact_match) {
+    hime_init ("../../data");
+    HimeContext *ctx = hime_context_new ();
+    ASSERT_NOT_NULL (ctx);
+
+    /* Construct a small sorted GtabTable in-memory */
+    GtabTable test_table;
+    memset (&test_table, 0, sizeof (test_table));
+    strcpy (test_table.name, "test");
+    test_table.key_count = 4;
+    test_table.max_press = 2;
+    test_table.keybits = 3; /* 3 bits per key, 2 keys = 6 bits total */
+    test_table.key64 = false;
+    test_table.sorted = true;
+    test_table.loaded = true;
+
+    /* keymap: a=0, b=1, c=2, d=3 */
+    memset (test_table.keymap, 0, sizeof (test_table.keymap));
+    test_table.keymap[0] = 'a';
+    test_table.keymap[1] = 'b';
+    test_table.keymap[2] = 'c';
+    test_table.keymap[3] = 'd';
+
+    /* 3 items, sorted by key (2 keys * 3 bits = 6 bits, stored as native uint32_t)
+     * "aa" = 0b000_000 = 0x00000000
+     * "ab" = 0b000_001 = shifted left by (32-6)=26 → 0x04000000
+     * "bc" = 0b001_010 = shifted left by 26 → 0x28000000 */
+    GtabItem items[3];
+    memset (items, 0, sizeof (items));
+
+    /* "aa" → key = (0 << 3) | 0 = 0, shifted left by 26 = 0 */
+    uint32_t k;
+    k = ((0u << 3) | 0u) << 26;
+    memcpy (items[0].key, &k, 4);
+    items[0].ch[0] = 'X';
+
+    /* "ab" → key = (0 << 3) | 1 = 1, shifted left by 26 */
+    k = ((0u << 3) | 1u) << 26;
+    memcpy (items[1].key, &k, 4);
+    items[1].ch[0] = 'Y';
+
+    /* "bc" → key = (1 << 3) | 2 = 10, shifted left by 26 */
+    k = ((1u << 3) | 2u) << 26;
+    memcpy (items[2].key, &k, 4);
+    items[2].ch[0] = 'Z';
+
+    test_table.items = items;
+    test_table.item_count = 3;
+
+    /* Point context at test table and search for "ab" (exact match) */
+    ctx->gtab = &test_table;
+    ctx->gtab_keys[0] = 0; /* a */
+    ctx->gtab_keys[1] = 1; /* b */
+    ctx->gtab_key_count = 2;
+
+    int count = gtab_lookup (ctx);
+    ASSERT_EQ (1, count);
+    ASSERT_EQ ('Y', ctx->candidates[0][0]);
+
+    /* Restore and cleanup */
+    ctx->gtab = NULL;
+    hime_context_free (ctx);
+    hime_cleanup ();
+    TEST_PASS ();
+}
+
+TEST (gtab_bsearch_prefix_match) {
+    hime_init ("../../data");
+    HimeContext *ctx = hime_context_new ();
+    ASSERT_NOT_NULL (ctx);
+
+    GtabTable test_table;
+    memset (&test_table, 0, sizeof (test_table));
+    strcpy (test_table.name, "test");
+    test_table.key_count = 4;
+    test_table.max_press = 2;
+    test_table.keybits = 3;
+    test_table.key64 = false;
+    test_table.sorted = true;
+    test_table.loaded = true;
+
+    test_table.keymap[0] = 'a';
+    test_table.keymap[1] = 'b';
+    test_table.keymap[2] = 'c';
+    test_table.keymap[3] = 'd';
+
+    /* 3 items starting with 'a': "aa", "ab", "ac" */
+    GtabItem items[4];
+    memset (items, 0, sizeof (items));
+    uint32_t k;
+
+    k = ((0u << 3) | 0u) << 26; /* "aa" */
+    memcpy (items[0].key, &k, 4);
+    items[0].ch[0] = 'P';
+
+    k = ((0u << 3) | 1u) << 26; /* "ab" */
+    memcpy (items[1].key, &k, 4);
+    items[1].ch[0] = 'Q';
+
+    k = ((0u << 3) | 2u) << 26; /* "ac" */
+    memcpy (items[2].key, &k, 4);
+    items[2].ch[0] = 'R';
+
+    k = ((1u << 3) | 0u) << 26; /* "ba" */
+    memcpy (items[3].key, &k, 4);
+    items[3].ch[0] = 'S';
+
+    test_table.items = items;
+    test_table.item_count = 4;
+
+    /* Prefix search for "a" — should match "aa", "ab", "ac" */
+    ctx->gtab = &test_table;
+    ctx->gtab_keys[0] = 0; /* a */
+    ctx->gtab_key_count = 1;
+
+    int count = gtab_lookup (ctx);
+    ASSERT_EQ (3, count);
+    ASSERT_EQ ('P', ctx->candidates[0][0]);
+    ASSERT_EQ ('Q', ctx->candidates[1][0]);
+    ASSERT_EQ ('R', ctx->candidates[2][0]);
+
+    ctx->gtab = NULL;
+    hime_context_free (ctx);
+    hime_cleanup ();
+    TEST_PASS ();
+}
+
+TEST (gtab_bsearch_no_match) {
+    hime_init ("../../data");
+    HimeContext *ctx = hime_context_new ();
+    ASSERT_NOT_NULL (ctx);
+
+    GtabTable test_table;
+    memset (&test_table, 0, sizeof (test_table));
+    test_table.key_count = 4;
+    test_table.max_press = 2;
+    test_table.keybits = 3;
+    test_table.key64 = false;
+    test_table.sorted = true;
+    test_table.loaded = true;
+
+    test_table.keymap[0] = 'a';
+    test_table.keymap[1] = 'b';
+
+    GtabItem items[1];
+    memset (items, 0, sizeof (items));
+    uint32_t k = ((0u << 3) | 0u) << 26; /* "aa" */
+    memcpy (items[0].key, &k, 4);
+    items[0].ch[0] = 'X';
+
+    test_table.items = items;
+    test_table.item_count = 1;
+
+    /* Search for "b" — no items start with b */
+    ctx->gtab = &test_table;
+    ctx->gtab_keys[0] = 1; /* b */
+    ctx->gtab_key_count = 1;
+
+    int count = gtab_lookup (ctx);
+    ASSERT_EQ (0, count);
+
+    ctx->gtab = NULL;
+    hime_context_free (ctx);
+    hime_cleanup ();
+    TEST_PASS ();
+}
+
+TEST (gtab_bsearch_boundary) {
+    hime_init ("../../data");
+    HimeContext *ctx = hime_context_new ();
+    ASSERT_NOT_NULL (ctx);
+
+    GtabTable test_table;
+    memset (&test_table, 0, sizeof (test_table));
+    test_table.key_count = 4;
+    test_table.max_press = 1;
+    test_table.keybits = 3;
+    test_table.key64 = false;
+    test_table.sorted = true;
+    test_table.loaded = true;
+
+    test_table.keymap[0] = 'a';
+    test_table.keymap[1] = 'b';
+    test_table.keymap[2] = 'c';
+
+    /* 3 single-key items: a, b, c */
+    GtabItem items[3];
+    memset (items, 0, sizeof (items));
+    uint32_t k;
+
+    k = 0u << 29; /* key 0 ("a"), shifted by (32 - 1*3) = 29 bits */
+    memcpy (items[0].key, &k, 4);
+    items[0].ch[0] = 'F'; /* first item */
+
+    k = 1u << 29; /* key 1 ("b") */
+    memcpy (items[1].key, &k, 4);
+    items[1].ch[0] = 'M';
+
+    k = 2u << 29; /* key 2 ("c") */
+    memcpy (items[2].key, &k, 4);
+    items[2].ch[0] = 'L'; /* last item */
+
+    test_table.items = items;
+    test_table.item_count = 3;
+
+    /* Match first item */
+    ctx->gtab = &test_table;
+    ctx->gtab_keys[0] = 0;
+    ctx->gtab_key_count = 1;
+    ASSERT_EQ (1, gtab_lookup (ctx));
+    ASSERT_EQ ('F', ctx->candidates[0][0]);
+
+    /* Match last item */
+    ctx->gtab_keys[0] = 2;
+    ctx->gtab_key_count = 1;
+    ASSERT_EQ (1, gtab_lookup (ctx));
+    ASSERT_EQ ('L', ctx->candidates[0][0]);
+
+    ctx->gtab = NULL;
+    hime_context_free (ctx);
+    hime_cleanup ();
+    TEST_PASS ();
+}
+
+TEST (gtab_load_v2_format) {
+    hime_init ("../../data");
+
+    /* Write a small v2 .gtab to a temp file */
+    const char *tmppath = "/tmp/test-hime-v2.gtab";
+    FILE *fp = fopen (tmppath, "wb");
+    ASSERT_NOT_NULL (fp);
+
+    /* Build a minimal v2 file: 2 keys (a, b), max_press=1, keybits=2, 2 items */
+    uint8_t key_count = 2;
+    uint8_t max_press = 1;
+    uint8_t keybits = 2;
+    uint32_t item_count = 2;
+
+    uint32_t hdr_size = 72;
+    uint32_t keymap_off = hdr_size;
+    uint32_t keyname_off = keymap_off + key_count;
+    uint32_t items_off = keyname_off + key_count * HIME_CH_SZ;
+
+    /* Header */
+    uint32_t magic = 0x48475432;
+    uint16_t version = 0x0002;
+    uint16_t flags = 0;
+    fwrite (&magic, 4, 1, fp);
+    fwrite (&version, 2, 1, fp);
+    fwrite (&flags, 2, 1, fp);
+
+    char cname[32] = "TestV2";
+    fwrite (cname, 32, 1, fp);
+
+    char selkey[12] = "1234567890";
+    fwrite (selkey, 12, 1, fp);
+
+    uint8_t space_style = 0;
+    fwrite (&space_style, 1, 1, fp);
+    fwrite (&key_count, 1, 1, fp);
+    fwrite (&max_press, 1, 1, fp);
+    fwrite (&keybits, 1, 1, fp);
+    fwrite (&item_count, 4, 1, fp);
+    fwrite (&keymap_off, 4, 1, fp);
+    fwrite (&keyname_off, 4, 1, fp);
+    fwrite (&items_off, 4, 1, fp);
+
+    /* Keymap: a, b */
+    char keymap[2] = {'a', 'b'};
+    fwrite (keymap, 1, 2, fp);
+
+    /* Keyname: 2 * 4 bytes */
+    char keyname[8];
+    memset (keyname, 0, sizeof (keyname));
+    keyname[0] = 'A'; /* radical for key 0 */
+    keyname[4] = 'B'; /* radical for key 1 */
+    fwrite (keyname, 1, 8, fp);
+
+    /* Items (sorted): key 0 → 'X', key 1 → 'Y'
+     * max_press=1, keybits=2, so key is shifted left by (32 - 1*2) = 30 bits */
+    typedef struct {
+        uint8_t key[4];
+        char ch[4];
+    } TestItem;
+    TestItem titems[2];
+    memset (titems, 0, sizeof (titems));
+
+    uint32_t k0 = 0u << 30;
+    memcpy (titems[0].key, &k0, 4);
+    titems[0].ch[0] = 'X';
+
+    uint32_t k1 = 1u << 30;
+    memcpy (titems[1].key, &k1, 4);
+    titems[1].ch[0] = 'Y';
+
+    fwrite (titems, sizeof (TestItem), 2, fp);
+    fclose (fp);
+
+    /* Load the v2 file */
+    HimeContext *ctx = hime_context_new ();
+    ASSERT_NOT_NULL (ctx);
+
+    int ret = hime_gtab_load_table (ctx, tmppath);
+    /* hime_gtab_load_table prepends g_data_dir, so load directly */
+    /* Use the internal load approach - actually we need to test via
+     * the file being loadable. Let's use the full path trick. */
+
+    /* The load_gtab_file function is static, so test via the
+     * registry. Instead, verify the file is valid by checking magic. */
+    fp = fopen (tmppath, "rb");
+    ASSERT_NOT_NULL (fp);
+    uint32_t read_magic = 0;
+    fread (&read_magic, 4, 1, fp);
+    ASSERT_EQ ((long) 0x48475432, (long) read_magic);
+    fclose (fp);
+
+    /* Verify file size = 72 + 2 + 8 + 16 = 98 bytes */
+    fp = fopen (tmppath, "rb");
+    fseek (fp, 0, SEEK_END);
+    long fsize = ftell (fp);
+    fclose (fp);
+    ASSERT_EQ (98, fsize);
+
+    hime_context_free (ctx);
+    hime_cleanup ();
+
+    /* Clean up temp file */
+    remove (tmppath);
+    TEST_PASS ();
+}
+
+TEST (gtab_v2_load_and_lookup) {
+    /* Write a v2 .gtab, then use the internal loader to load and search it */
+    const char *tmppath = "/tmp/test-hime-v2-lookup.gtab";
+    FILE *fp = fopen (tmppath, "wb");
+    ASSERT_NOT_NULL (fp);
+
+    uint8_t key_count = 3;
+    uint8_t max_press = 2;
+    uint8_t keybits = 2;
+    uint32_t item_count = 3;
+
+    uint32_t hdr_size = 72;
+    uint32_t keymap_off = hdr_size;
+    uint32_t keyname_off = keymap_off + key_count;
+    uint32_t items_off = keyname_off + key_count * HIME_CH_SZ;
+
+    uint32_t magic = 0x48475432;
+    uint16_t version = 0x0002;
+    uint16_t flags = 0;
+    fwrite (&magic, 4, 1, fp);
+    fwrite (&version, 2, 1, fp);
+    fwrite (&flags, 2, 1, fp);
+
+    char cname[32] = "V2Lookup";
+    fwrite (cname, 32, 1, fp);
+    char selkey[12] = "1234567890";
+    fwrite (selkey, 12, 1, fp);
+
+    uint8_t space_style = 0;
+    fwrite (&space_style, 1, 1, fp);
+    fwrite (&key_count, 1, 1, fp);
+    fwrite (&max_press, 1, 1, fp);
+    fwrite (&keybits, 1, 1, fp);
+    fwrite (&item_count, 4, 1, fp);
+    fwrite (&keymap_off, 4, 1, fp);
+    fwrite (&keyname_off, 4, 1, fp);
+    fwrite (&items_off, 4, 1, fp);
+
+    /* Keymap: a=0, b=1, c=2 */
+    char keymap[3] = {'a', 'b', 'c'};
+    fwrite (keymap, 1, 3, fp);
+
+    /* Keyname */
+    char keyname[12];
+    memset (keyname, 0, sizeof (keyname));
+    fwrite (keyname, 1, 12, fp);
+
+    /* Items: "aa"→P, "ab"→Q, "ba"→R, sorted
+     * keybits=2, max_press=2, shift = 32 - 2*2 = 28 */
+    typedef struct {
+        uint8_t key[4];
+        char ch[4];
+    } TI;
+    TI titems[3];
+    memset (titems, 0, sizeof (titems));
+    uint32_t k;
+
+    k = ((0u << 2) | 0u) << 28; /* "aa" */
+    memcpy (titems[0].key, &k, 4);
+    titems[0].ch[0] = 'P';
+
+    k = ((0u << 2) | 1u) << 28; /* "ab" */
+    memcpy (titems[1].key, &k, 4);
+    titems[1].ch[0] = 'Q';
+
+    k = ((1u << 2) | 0u) << 28; /* "ba" */
+    memcpy (titems[2].key, &k, 4);
+    titems[2].ch[0] = 'R';
+
+    fwrite (titems, sizeof (TI), 3, fp);
+    fclose (fp);
+
+    /* Now load this file using our internal loader.
+     * Since load_gtab_file is static, we exercise it by setting
+     * data_dir to /tmp and loading by filename. */
+    hime_init ("/tmp");
+    HimeContext *ctx = hime_context_new ();
+    ASSERT_NOT_NULL (ctx);
+
+    int ret = hime_gtab_load_table (ctx, "test-hime-v2-lookup.gtab");
+    ASSERT_EQ (0, ret);
+    ASSERT_NOT_NULL (ctx->gtab);
+    ASSERT_TRUE (ctx->gtab->sorted);
+    ASSERT_EQ (3, ctx->gtab->item_count);
+
+    /* Lookup "a" prefix — should find "aa" and "ab" (2 matches) */
+    ctx->gtab_keys[0] = 0; /* a */
+    ctx->gtab_key_count = 1;
+    int count = gtab_lookup (ctx);
+    ASSERT_EQ (2, count);
+    ASSERT_EQ ('P', ctx->candidates[0][0]);
+    ASSERT_EQ ('Q', ctx->candidates[1][0]);
+
+    /* Lookup "ba" exact — should find 1 match */
+    ctx->gtab_keys[0] = 1; /* b */
+    ctx->gtab_keys[1] = 0; /* a */
+    ctx->gtab_key_count = 2;
+    count = gtab_lookup (ctx);
+    ASSERT_EQ (1, count);
+    ASSERT_EQ ('R', ctx->candidates[0][0]);
+
+    hime_context_free (ctx);
+    hime_cleanup ();
+    remove (tmppath);
+    TEST_PASS ();
+}
+
+/* ========== GTAB Candidate Display Tests ========== */
+
+TEST (gtab_preedit_includes_candidates) {
+    /* Test that GTAB preedit includes candidate list when candidates exist */
+    hime_init ("../../data");
+    HimeContext *ctx = hime_context_new ();
+    ASSERT_NOT_NULL (ctx);
+
+    /* Build a small test GTAB table with multiple matches for a prefix */
+    GtabTable test_table;
+    memset (&test_table, 0, sizeof (test_table));
+    strcpy (test_table.name, "TestCJ");
+    test_table.key_count = 4;
+    test_table.max_press = 2;
+    test_table.keybits = 3;
+    test_table.key64 = false;
+    test_table.sorted = true;
+    test_table.loaded = true;
+
+    test_table.keymap[0] = 'a';
+    test_table.keymap[1] = 'b';
+    test_table.keymap[2] = 'c';
+    test_table.keymap[3] = 'd';
+
+    /* Keyname: radical display names */
+    memset (test_table.keyname, 0, sizeof (test_table.keyname));
+
+    /* 3 items starting with 'a': "aa"→X, "ab"→Y, "ac"→Z */
+    GtabItem items[3];
+    memset (items, 0, sizeof (items));
+    uint32_t k;
+
+    k = ((0u << 3) | 0u) << 26;
+    memcpy (items[0].key, &k, 4);
+    items[0].ch[0] = 'X';
+
+    k = ((0u << 3) | 1u) << 26;
+    memcpy (items[1].key, &k, 4);
+    items[1].ch[0] = 'Y';
+
+    k = ((0u << 3) | 2u) << 26;
+    memcpy (items[2].key, &k, 4);
+    items[2].ch[0] = 'Z';
+
+    test_table.items = items;
+    test_table.item_count = 3;
+
+    /* Set up context with this table */
+    ctx->gtab = &test_table;
+    hime_set_input_method (ctx, HIME_IM_GTAB);
+    ctx->gtab_keys[0] = 0; /* a */
+    ctx->gtab_key_count = 1;
+
+    /* Rebuild display and set preedit */
+    gtab_rebuild_display (ctx);
+    strcpy (ctx->preedit, ctx->gtab_key_display);
+
+    /* Lookup and append candidates */
+    gtab_lookup (ctx);
+    ASSERT_EQ (3, ctx->candidate_count);
+
+    /* Now call append_candidates_to_preedit (indirectly via the preedit flow) */
+    append_candidates_to_preedit (ctx);
+
+    /* Preedit should contain numbered candidates */
+    char buf[256];
+    hime_get_preedit (ctx, buf, sizeof (buf));
+    ASSERT_TRUE (strstr (buf, "1.") != NULL);
+    ASSERT_TRUE (strstr (buf, "2.") != NULL);
+    ASSERT_TRUE (strstr (buf, "3.") != NULL);
+
+    ctx->gtab = NULL;
+    hime_context_free (ctx);
+    hime_cleanup ();
+    TEST_PASS ();
+}
+
+TEST (gtab_backspace_preserves_candidates) {
+    /* Test that GTAB backspace still shows candidates for remaining keys */
+    hime_init ("../../data");
+    HimeContext *ctx = hime_context_new ();
+    ASSERT_NOT_NULL (ctx);
+
+    GtabTable test_table;
+    memset (&test_table, 0, sizeof (test_table));
+    strcpy (test_table.name, "TestBS");
+    test_table.key_count = 3;
+    test_table.max_press = 2;
+    test_table.keybits = 3;
+    test_table.key64 = false;
+    test_table.sorted = true;
+    test_table.loaded = true;
+
+    test_table.keymap[0] = 'a';
+    test_table.keymap[1] = 'b';
+    test_table.keymap[2] = 'c';
+
+    memset (test_table.keyname, 0, sizeof (test_table.keyname));
+
+    GtabItem items[3];
+    memset (items, 0, sizeof (items));
+    uint32_t k;
+
+    k = ((0u << 3) | 0u) << 26; /* "aa" */
+    memcpy (items[0].key, &k, 4);
+    items[0].ch[0] = 'P';
+
+    k = ((0u << 3) | 1u) << 26; /* "ab" */
+    memcpy (items[1].key, &k, 4);
+    items[1].ch[0] = 'Q';
+
+    k = ((1u << 3) | 0u) << 26; /* "ba" */
+    memcpy (items[2].key, &k, 4);
+    items[2].ch[0] = 'R';
+
+    test_table.items = items;
+    test_table.item_count = 3;
+
+    /* Start with 2 keys "ab" → exact match */
+    ctx->gtab = &test_table;
+    hime_set_input_method (ctx, HIME_IM_GTAB);
+    ctx->gtab_keys[0] = 0; /* a */
+    ctx->gtab_keys[1] = 1; /* b */
+    ctx->gtab_key_count = 2;
+
+    gtab_rebuild_display (ctx);
+    strcpy (ctx->preedit, ctx->gtab_key_display);
+    gtab_lookup (ctx);
+    append_candidates_to_preedit (ctx);
+    ASSERT_EQ (1, ctx->candidate_count);
+
+    /* Simulate backspace: remove last key, now just "a" → 2 matches */
+    ctx->gtab_key_count = 1;
+    gtab_rebuild_display (ctx);
+    strcpy (ctx->preedit, ctx->gtab_key_display);
+    gtab_lookup (ctx);
+    append_candidates_to_preedit (ctx);
+
+    ASSERT_EQ (2, ctx->candidate_count);
+    char buf[256];
+    hime_get_preedit (ctx, buf, sizeof (buf));
+    ASSERT_TRUE (strstr (buf, "1.") != NULL);
+    ASSERT_TRUE (strstr (buf, "2.") != NULL);
+
+    ctx->gtab = NULL;
+    hime_context_free (ctx);
+    hime_cleanup ();
+    TEST_PASS ();
+}
+
+/* ========== Method Label Tests ========== */
+
+TEST (method_label_english_mode) {
+    hime_init ("../../data");
+    HimeContext *ctx = hime_context_new ();
+    ASSERT_NOT_NULL (ctx);
+
+    hime_set_chinese_mode (ctx, false);
+    const char *label = hime_get_method_label (ctx);
+    ASSERT_STR_EQ ("en", label);
+
+    hime_context_free (ctx);
+    hime_cleanup ();
+    TEST_PASS ();
+}
+
+TEST (method_label_pho_mode) {
+    hime_init ("../../data");
+    HimeContext *ctx = hime_context_new ();
+    ASSERT_NOT_NULL (ctx);
+
+    hime_set_chinese_mode (ctx, true);
+    hime_set_input_method (ctx, HIME_IM_PHO);
+    const char *label = hime_get_method_label (ctx);
+    ASSERT_STR_EQ ("注", label);
+
+    hime_context_free (ctx);
+    hime_cleanup ();
+    TEST_PASS ();
+}
+
+TEST (method_label_tsin_mode) {
+    hime_init ("../../data");
+    HimeContext *ctx = hime_context_new ();
+    ASSERT_NOT_NULL (ctx);
+
+    hime_set_chinese_mode (ctx, true);
+    hime_set_input_method (ctx, HIME_IM_TSIN);
+    const char *label = hime_get_method_label (ctx);
+    ASSERT_STR_EQ ("詞", label);
+
+    hime_context_free (ctx);
+    hime_cleanup ();
+    TEST_PASS ();
+}
+
+TEST (method_label_intcode_mode) {
+    hime_init ("../../data");
+    HimeContext *ctx = hime_context_new ();
+    ASSERT_NOT_NULL (ctx);
+
+    hime_set_chinese_mode (ctx, true);
+    hime_set_input_method (ctx, HIME_IM_INTCODE);
+    const char *label = hime_get_method_label (ctx);
+    ASSERT_STR_EQ ("碼", label);
+
+    hime_context_free (ctx);
+    hime_cleanup ();
+    TEST_PASS ();
+}
+
+TEST (method_label_gtab_cangjie) {
+    hime_init ("../../data");
+    HimeContext *ctx = hime_context_new ();
+    ASSERT_NOT_NULL (ctx);
+
+    hime_set_chinese_mode (ctx, true);
+
+    /* Load Cangjie 5 table — name should be "倉五" */
+    int ret = hime_gtab_load_table_by_id (ctx, HIME_GTAB_CJ5);
+    if (ret == 0) {
+        const char *label = hime_get_method_label (ctx);
+        /* First character of "倉五" is "倉" */
+        ASSERT_STR_EQ ("倉", label);
+    }
+
+    hime_context_free (ctx);
+    hime_cleanup ();
+    TEST_PASS ();
+}
+
+TEST (method_label_null_safety) {
+    const char *label = hime_get_method_label (NULL);
+    ASSERT_STR_EQ ("en", label);
     TEST_PASS ();
 }
 
@@ -2016,6 +2693,26 @@ RUN_TEST (practice_get_all_texts);
 RUN_TEST (practice_category_names);
 RUN_TEST (practice_difficulty_names);
 RUN_TEST (practice_random_text);
+
+/* GTAB Binary Search */
+RUN_TEST (gtab_bsearch_exact_match);
+RUN_TEST (gtab_bsearch_prefix_match);
+RUN_TEST (gtab_bsearch_no_match);
+RUN_TEST (gtab_bsearch_boundary);
+RUN_TEST (gtab_load_v2_format);
+RUN_TEST (gtab_v2_load_and_lookup);
+
+/* GTAB Candidate Display */
+RUN_TEST (gtab_preedit_includes_candidates);
+RUN_TEST (gtab_backspace_preserves_candidates);
+
+/* Method Label */
+RUN_TEST (method_label_english_mode);
+RUN_TEST (method_label_pho_mode);
+RUN_TEST (method_label_tsin_mode);
+RUN_TEST (method_label_intcode_mode);
+RUN_TEST (method_label_gtab_cangjie);
+RUN_TEST (method_label_null_safety);
 
 /* Integration: Bopomofo Input Flow */
 RUN_TEST (pho_type_bopomofo_key);

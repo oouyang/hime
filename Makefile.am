@@ -34,6 +34,18 @@ distclean:
 	@$(MAKE) clean
 	@rm -f config.mak
 
+.PHONY: clean-all
+clean-all:
+	@$(MAKE) distclean
+	@$(ECHO) -e "\x1b[1;31m** cleanup windows\x1b[0m"
+	@rm -rf windows/build
+	@$(ECHO) -e "\x1b[1;31m** cleanup macos\x1b[0m"
+	@rm -rf macos/build
+	@$(ECHO) -e "\x1b[1;31m** cleanup android\x1b[0m"
+	@if [ -x android/gradlew ]; then cd android && ./gradlew clean -q; fi
+	@$(ECHO) -e "\x1b[1;31m** cleanup shared/tests\x1b[0m"
+	@$(MAKE) -C shared/tests clean 2>/dev/null || true
+
 .PHONY: clang-format
 clang-format:
 	./scripts/format_code.py

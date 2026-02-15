@@ -74,7 +74,10 @@
 #pragma mark - IMKInputController Override
 
 - (BOOL)handleEvent:(NSEvent *)event client:(id)sender {
-    NSLog(@"HIME: handleEvent type=%lu keyCode=%hu chars=%@", (unsigned long)event.type, event.keyCode, event.characters);
+    NSLog(@"HIME: handleEvent type=%lu keyCode=%hu chars=%@",
+          (unsigned long) event.type,
+          event.keyCode,
+          event.characters);
     if (!self.engine) {
         NSLog(@"HIME: No engine!");
         return NO;
@@ -271,11 +274,11 @@
 
 + (NSArray<NSString *> *)inputModes {
     NSLog(@"HIME: +inputModes called");
-    return @[@"org.hime-ime.inputmethod.HIME.Zhuyin"];
+    return @[ @"org.hime-ime.inputmethod.HIME.Zhuyin" ];
 }
 
 - (NSArray<NSString *> *)recognizedEvents:(id)sender {
-    return @[(NSString *)kTISNotifySelectedKeyboardInputSourceChanged];
+    return @[ (NSString *) kTISNotifySelectedKeyboardInputSourceChanged ];
 }
 
 #pragma mark - Session Management

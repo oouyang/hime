@@ -533,6 +533,20 @@ HIME_API bool hime_is_method_available (HimeInputMethod method);
  */
 HIME_API const char *hime_get_method_name (HimeInputMethod method);
 
+/**
+ * Get short label for the current input method (for status bar display)
+ * @param ctx Context handle
+ * @return Short label string (e.g., "en", "注", "倉")
+ *
+ * Returns:
+ * - "en" when in English mode
+ * - "注" for Zhuyin (PHO) mode
+ * - "倉" for Cangjie (CJ/CJ5) GTAB table
+ * - First character of the GTAB table's display name for other tables
+ * - "詞" for TSIN, "碼" for Intcode, etc.
+ */
+HIME_API const char *hime_get_method_label (HimeContext *ctx);
+
 /* ========== Settings/Preferences (New Features) ========== */
 
 /**
