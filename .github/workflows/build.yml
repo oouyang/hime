@@ -58,10 +58,8 @@ jobs:
 
       - name: Run tests
         run: |
-          cd platform/windows/build/bin
-          wine64 test-hime-crypt.exe
-          wine64 test-hime-conf.exe
-          wine64 test-hime-core.exe
+          cd platform/windows/build
+          ctest --output-on-failure
 
       - name: Upload Windows artifacts
         uses: actions/upload-artifact@v4
@@ -143,3 +141,26 @@ jobs:
           mkdir build && cd build
           cmake .. -G Xcode -DCMAKE_SYSTEM_NAME=iOS -DBUILD_TESTS=ON
           cmake --build . --config Release -- -sdk iphoneos -allowProvisioningUpdates CODE_SIGNING_ALLOWED=NO
+
+  all-tests:
+    runs-on: ubuntu-latest
+    if: always()
+    needs: [shared-tests, linux, windows, android, macos, ios]
+    steps:
+      - name: Check all platform results
+        run: |
+          echo "shared-tests: ${{ needs.shared-tests.result }}"
+          echo "linux: ${{ needs.linux.result }}"
+          echo "windows: ${{ needs.windows.result }}"
+          echo "android: ${{ needs.android.result }}"
+          echo "macos: ${{ needs.macos.result }}"
+          echo "ios: ${{ needs.ios.result }}"
+          if [ "${{ needs.shared-tests.result }}" != "success" ] || \
+             [ "${{ needs.linux.result }}" != "success" ] || \
+             [ "${{ needs.windows.result }}" != "success" ] || \
+             [ "${{ needs.android.result }}" != "success" ] || \
+             [ "${{ needs.macos.result }}" != "success" ] || \
+             [ "${{ needs.ios.result }}" != "success" ]; then
+            echo "One or more platform jobs failed"
+            exit 1
+          fi

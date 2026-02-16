@@ -35,3 +35,9 @@ set(CMAKE_FIND_ROOT_PATH_MODE_PACKAGE ONLY)
 # Static linking for standalone executables
 set(CMAKE_EXE_LINKER_FLAGS_INIT "-static-libgcc -static-libstdc++")
 set(CMAKE_SHARED_LINKER_FLAGS_INIT "-static-libgcc -static-libstdc++")
+
+# Use Wine to run cross-compiled tests via ctest
+find_program(WINE_EXECUTABLE NAMES wine64 wine)
+if(WINE_EXECUTABLE)
+    set(CMAKE_CROSSCOMPILING_EMULATOR "${WINE_EXECUTABLE}" CACHE STRING "")
+endif()
