@@ -36,6 +36,9 @@ jobs:
           ./configure
           make -j$(nproc)
 
+      - name: Run tests
+        run: make test
+
   windows:
     runs-on: ubuntu-latest
     steps:
@@ -46,7 +49,7 @@ jobs:
 
       - name: Build
         run: |
-          cd windows
+          cd platform/windows
           mkdir build && cd build
           cmake .. -DCMAKE_TOOLCHAIN_FILE=../mingw-w64-x86_64.cmake -DCMAKE_BUILD_TYPE=Release
           make -j$(nproc)
@@ -56,12 +59,12 @@ jobs:
         with:
           name: hime-windows
           path: |
-            windows/build/bin/hime-core.dll
-            windows/build/bin/hime-tsf.dll
-            windows/build/bin/hime-install.exe
-            windows/build/bin/hime-uninstall.exe
-            windows/build/bin/test-hime-core.exe
-            windows/build/bin/data/
+            platform/windows/build/bin/hime-core.dll
+            platform/windows/build/bin/hime-tsf.dll
+            platform/windows/build/bin/hime-install.exe
+            platform/windows/build/bin/hime-uninstall.exe
+            platform/windows/build/bin/test-hime-core.exe
+            platform/windows/build/bin/data/
 
   android:
     runs-on: ubuntu-latest
@@ -82,20 +85,20 @@ jobs:
         run: sdkmanager "ndk;25.2.9519653"
 
       - name: Build debug APK
-        working-directory: android
+        working-directory: platform/android
         run: |
           chmod +x gradlew 2>/dev/null || gradle wrapper
           ./gradlew assembleDebug
 
       - name: Run unit tests
-        working-directory: android
+        working-directory: platform/android
         run: ./gradlew test
 
       - name: Upload Android artifacts
         uses: actions/upload-artifact@v4
         with:
           name: hime-android
-          path: android/app/build/outputs/apk/debug/app-debug.apk
+          path: platform/android/app/build/outputs/apk/debug/app-debug.apk
 
   macos:
     runs-on: macos-latest
@@ -104,7 +107,7 @@ jobs:
 
       - name: Build
         run: |
-          cd macos
+          cd platform/macos
           mkdir build && cd build
           cmake .. -DCMAKE_BUILD_TYPE=Release
           make -j$(sysctl -n hw.ncpu)
@@ -113,7 +116,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: hime-macos
-          path: macos/build/HIME.app
+          path: platform/macos/build/HIME.app
 
   ios:
     runs-on: macos-latest
@@ -122,7 +125,7 @@ jobs:
 
       - name: Build
         run: |
-          cd ios
+          cd platform/ios
           mkdir build && cd build
           cmake .. -G Xcode -DCMAKE_SYSTEM_NAME=iOS
           cmake --build . --config Release -- -sdk iphoneos -allowProvisioningUpdates CODE_SIGNING_ALLOWED=NO

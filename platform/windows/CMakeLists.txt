@@ -15,6 +15,9 @@
 cmake_minimum_required(VERSION 3.16)
 project(hime-ime VERSION 0.10.1 LANGUAGES C CXX)
 
+# Project root (two levels up from platform/windows/)
+get_filename_component(HIME_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/../.." ABSOLUTE)
+
 # C++ standard
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -50,7 +53,7 @@ add_library(hime-core SHARED
 
 target_include_directories(hime-core PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/../shared/include
+    ${HIME_ROOT}/shared/include
 )
 
 target_compile_definitions(hime-core PRIVATE
@@ -99,9 +102,9 @@ endif()
 # Copy pho.tab2, .gtab tables, and .kbm files next to the DLL
 # Exclude liu.gtab (Boshiamy) — licensed separately, not shipped in build
 file(GLOB DATA_FILES
-    ${CMAKE_CURRENT_SOURCE_DIR}/../data/pho.tab2
-    ${CMAKE_CURRENT_SOURCE_DIR}/../data/*.gtab
-    ${CMAKE_CURRENT_SOURCE_DIR}/../data/*.kbm
+    ${HIME_ROOT}/data/pho.tab2
+    ${HIME_ROOT}/data/*.gtab
+    ${HIME_ROOT}/data/*.kbm
 )
 list(FILTER DATA_FILES EXCLUDE REGEX "liu\\.gtab$")
 file(MAKE_DIRECTORY ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/data)
@@ -122,7 +125,7 @@ foreach(ICON_FILE ${ICON_FILES})
 endforeach()
 
 # Copy method icons from icons/blue/ (don't overwrite custom windows/icons)
-file(GLOB BLUE_ICON_FILES ${CMAKE_CURRENT_SOURCE_DIR}/../icons/blue/*.png)
+file(GLOB BLUE_ICON_FILES ${HIME_ROOT}/icons/blue/*.png)
 foreach(ICON_FILE ${BLUE_ICON_FILES})
     get_filename_component(ICON_FILENAME ${ICON_FILE} NAME)
     if(NOT EXISTS ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/icons/${ICON_FILENAME})
@@ -132,8 +135,8 @@ endforeach()
 
 # Copy hime.png app icon from root icons/ if not already present
 if(NOT EXISTS ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/icons/hime.png)
-    if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/../icons/hime.png)
-        configure_file(${CMAKE_CURRENT_SOURCE_DIR}/../icons/hime.png
+    if(EXISTS ${HIME_ROOT}/icons/hime.png)
+        configure_file(${HIME_ROOT}/icons/hime.png
                        ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/icons/hime.png COPYONLY)
     endif()
 endif()
@@ -151,7 +154,7 @@ install(FILES include/hime-core.h
 
 # Install data files alongside DLLs for easy deployment
 # Exclude liu.gtab (Boshiamy) — licensed separately
-install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/../data/
+install(DIRECTORY ${HIME_ROOT}/data/
     DESTINATION bin/data
     FILES_MATCHING
     PATTERN "pho.tab2"
@@ -167,14 +170,14 @@ install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/icons/
     PATTERN "*.png"
     PATTERN "*.ico"
 )
-install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/../icons/blue/
+install(DIRECTORY ${HIME_ROOT}/icons/blue/
     DESTINATION bin/icons
     FILES_MATCHING
     PATTERN "*.png"
 )
 
 # Also install to separate data directory for reference
-install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/../data/
+install(DIRECTORY ${HIME_ROOT}/data/
     DESTINATION data
     FILES_MATCHING
     PATTERN "pho.tab2"
@@ -272,6 +275,28 @@ set_target_properties(test-hime-installer PROPERTIES
 )
 
 add_test(NAME hime-installer-test COMMAND test-hime-installer)
+
+# Test program for encryption functions (self-contained)
+add_executable(test-hime-crypt
+    tests/test-hime-crypt.c
+)
+
+set_target_properties(test-hime-crypt PROPERTIES
+    OUTPUT_NAME "test-hime-crypt"
+)
+
+add_test(NAME hime-crypt-test COMMAND test-hime-crypt)
+
+# Test program for config path functions (self-contained)
+add_executable(test-hime-conf
+    tests/test-hime-conf.c
+)
+
+set_target_properties(test-hime-conf PROPERTIES
+    OUTPUT_NAME "test-hime-conf"
+)
+
+add_test(NAME hime-conf-test COMMAND test-hime-conf)
 
 # ========== Package ==========
 set(CPACK_GENERATOR "ZIP")

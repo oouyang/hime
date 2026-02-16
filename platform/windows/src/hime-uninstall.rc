@@ -9,8 +9,9 @@
 /* Application icon from hime.png mascot */
 1 ICON "../res/hime.ico"
 
-/* Embed UAC manifest */
-CREATEPROCESS_MANIFEST_RESOURCE_ID RT_MANIFEST "hime-install.manifest"
+/* Embed UAC manifest (use numeric IDs for windres compatibility) */
+/* CREATEPROCESS_MANIFEST_RESOURCE_ID = 1, RT_MANIFEST = 24 */
+1 24 "hime-install.manifest"
 
 #define VER_FILEVERSION             0,10,1,0
 #define VER_FILEVERSION_STR         "0.10.1\0"

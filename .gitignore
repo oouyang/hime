@@ -30,7 +30,7 @@ data/tsin-1.src
 data/tsin32
 data/tsin32.idx
 distro/archlinux/pkg/hime-git/
-hime
+/hime
 hime-cin2gtab
 hime-exit
 hime-gb-toggle
@@ -66,6 +66,13 @@ android/app/build/
 android/.gradle/
 android/app/.cxx/
 android/local.properties
+platform/windows/build/
+platform/macos/build/
+platform/ios/build/
+platform/android/app/build/
+platform/android/.gradle/
+platform/android/app/.cxx/
+platform/android/local.properties
 
 # Test binaries
 shared/tests/test-hime-core
@@ -74,6 +81,8 @@ tests/test-pho
 tests/test-seq
 tests/test-utf8
 tests/test-util
+tests/test-hime-crypt
+tests/test-hime-conf
 
 # Autotools
 aclocal.m4

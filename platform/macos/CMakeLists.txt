@@ -12,24 +12,28 @@
 #   # Then logout/login or restart
 
 cmake_minimum_required(VERSION 3.16)
-project(hime-macos VERSION 0.10.1 LANGUAGES C OBJC)
-
-# Require macOS
-if(NOT APPLE)
-    message(FATAL_ERROR "This project requires macOS to build (Input Method Kit)")
+if(APPLE)
+    project(hime-macos VERSION 0.10.1 LANGUAGES C OBJC)
+else()
+    project(hime-macos VERSION 0.10.1 LANGUAGES C)
 endif()
 
-# macOS deployment target
-set(CMAKE_OSX_DEPLOYMENT_TARGET "10.13" CACHE STRING "Minimum macOS version")
+# Project root (two levels up from platform/macos/)
+get_filename_component(HIME_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/../.." ABSOLUTE)
 
 # C standard
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 
-# Find required frameworks
-find_library(COCOA_FRAMEWORK Cocoa REQUIRED)
-find_library(INPUTMETHODKIT_FRAMEWORK InputMethodKit REQUIRED)
-find_library(CARBON_FRAMEWORK Carbon REQUIRED)
+# macOS-specific configuration
+if(APPLE)
+    set(CMAKE_OSX_DEPLOYMENT_TARGET "10.13" CACHE STRING "Minimum macOS version")
+
+    # Find required frameworks (only available on macOS)
+    find_library(COCOA_FRAMEWORK Cocoa REQUIRED)
+    find_library(INPUTMETHODKIT_FRAMEWORK InputMethodKit REQUIRED)
+    find_library(CARBON_FRAMEWORK Carbon REQUIRED)
+endif()
 
 # ========== HIME Core Library (Static) ==========
 add_library(hime-core-static STATIC
@@ -38,13 +42,14 @@ add_library(hime-core-static STATIC
 
 target_include_directories(hime-core-static PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/../shared/include
+    ${HIME_ROOT}/shared/include
 )
 
 target_compile_definitions(hime-core-static PRIVATE
     HIME_CORE_EXPORTS
 )
 
+if(APPLE)
 # ========== HIME Input Method Application ==========
 set(HIME_BUNDLE_NAME "HIME")
 set(HIME_BUNDLE_IDENTIFIER "org.hime-ime.inputmethod.HIME")
@@ -95,7 +100,7 @@ set_target_properties(${HIME_BUNDLE_NAME} PROPERTIES
 
 # Copy resources to bundle
 set(HIME_RESOURCES
-    ${CMAKE_CURRENT_SOURCE_DIR}/../data/pho.tab2
+    ${HIME_ROOT}/data/pho.tab2
 )
 
 # Add resources to bundle
@@ -161,11 +166,44 @@ if(EXISTS ${LPROJ_ZH_HANS})
     target_sources(${HIME_BUNDLE_NAME} PRIVATE ${LPROJ_ZH_HANS})
 endif()
 
+endif() # APPLE
+
 # ========== Unit Tests ==========
 option(BUILD_TESTS "Build unit tests" OFF)
 
+# Standalone C tests (no macOS framework dependencies)
+# These can be built and run on any platform for cross-compilation verification.
+enable_testing()
+
+add_executable(test-hime-core-macos
+    tests/test-hime-core.c
+    src/hime-core.c
+)
+target_include_directories(test-hime-core-macos PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+    ${HIME_ROOT}/shared/include
+    ${HIME_ROOT}/tests
+)
+add_test(NAME hime-core-test COMMAND test-hime-core-macos)
+
+add_executable(test-hime-crypt-macos
+    tests/test-hime-crypt.c
+)
+target_include_directories(test-hime-crypt-macos PRIVATE
+    ${HIME_ROOT}/tests
+)
+add_test(NAME hime-crypt-test COMMAND test-hime-crypt-macos)
+
+add_executable(test-hime-conf-macos
+    tests/test-hime-conf.c
+)
+target_include_directories(test-hime-conf-macos PRIVATE
+    ${HIME_ROOT}/tests
+)
+add_test(NAME hime-conf-test COMMAND test-hime-conf-macos)
+
+# XCTest-based tests (require macOS with Xcode)
 if(BUILD_TESTS)
-    enable_testing()
     find_library(XCTEST_FRAMEWORK XCTest REQUIRED)
 
     add_executable(hime-tests
@@ -186,8 +224,9 @@ if(BUILD_TESTS)
     set_target_properties(hime-tests PROPERTIES
         XCODE_ATTRIBUTE_CLANG_ENABLE_OBJC_ARC YES
     )
+    target_compile_options(hime-tests PRIVATE -fobjc-arc)
 
-    add_test(NAME HimeEngineTests COMMAND hime-tests)
+    add_test(NAME HimeEngineXCTests COMMAND hime-tests)
 endif()
 
 # ========== Installation ==========

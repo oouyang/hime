@@ -3,7 +3,7 @@
 CFLAGS += -std=gnu17 -Wall $(GTKINC) -I../src
 
 # Test programs
-PROGS = test-utf8 test-util test-pho test-gtab test-seq
+PROGS = test-utf8 test-util test-pho test-gtab test-seq test-hime-crypt test-hime-conf
 
 # Build all test programs
 all: $(PROGS)
@@ -27,6 +27,14 @@ test-gtab: test-gtab.c test-framework.h
 # test-seq: Sequence comparison function tests (self-contained implementations)
 test-seq: test-seq.c test-framework.h
 	$(CC) $(CFLAGS) -o $@ test-seq.c $(GTKLDFLAGS)
+
+# test-hime-crypt: Encryption function tests (self-contained implementations)
+test-hime-crypt: test-hime-crypt.c test-framework.h
+	$(CC) $(CFLAGS) -o $@ test-hime-crypt.c
+
+# test-hime-conf: Config path function tests (self-contained implementations)
+test-hime-conf: test-hime-conf.c test-framework.h
+	$(CC) $(CFLAGS) -o $@ test-hime-conf.c
 
 # Run all tests
 .PHONY: run-tests check test

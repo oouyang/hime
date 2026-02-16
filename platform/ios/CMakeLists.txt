@@ -13,6 +13,9 @@
 cmake_minimum_required(VERSION 3.16)
 project(HIME-iOS VERSION 0.10.1 LANGUAGES C OBJC)
 
+# Project root (two levels up from platform/ios/)
+get_filename_component(HIME_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/../.." ABSOLUTE)
+
 # Require iOS or macOS (for simulator)
 if(NOT APPLE)
     message(FATAL_ERROR "This project requires macOS with Xcode to build iOS apps")
@@ -39,7 +42,7 @@ add_library(hime-shared STATIC
 
 target_include_directories(hime-shared PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/Shared/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/../shared/include
+    ${HIME_ROOT}/shared/include
 )
 
 target_compile_definitions(hime-shared PRIVATE
@@ -134,7 +137,7 @@ set_target_properties(HIMEKeyboard PROPERTIES
 
 # Copy data files to keyboard extension
 set(HIME_DATA_FILES
-    ${CMAKE_CURRENT_SOURCE_DIR}/../data/pho.tab2
+    ${HIME_ROOT}/data/pho.tab2
 )
 
 # Note: In Xcode, add these files to the keyboard extension target manually
@@ -149,6 +152,8 @@ if(BUILD_TESTS)
 
     add_library(HIMEKeyboardTests MODULE
         HIMEKeyboardTests/HimeEngineTests.m
+        HIMEKeyboardTests/HimeCryptTests.m
+        HIMEKeyboardTests/HimeConfTests.m
     )
 
     target_link_libraries(HIMEKeyboardTests PRIVATE
