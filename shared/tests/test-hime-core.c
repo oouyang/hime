@@ -7,13 +7,15 @@
  * License: GNU LGPL v2.1
  */
 
-#include "../../tests/test-framework.h"
-#include "../include/hime-core.h"
-
 #include <stdbool.h>
 #include <stdint.h>
-#include <sys/stat.h>
+
 #include <unistd.h>
+
+#include <sys/stat.h>
+
+#include "../../tests/test-framework.h"
+#include "../include/hime-core.h"
 
 /* ========== pho.tab2 Test Fixture ========== */
 
@@ -31,8 +33,7 @@ static char _pho_tab2_path[1024];
  *   PhoItem[ch_phoN]     (8 bytes each: char[4] ch, int32_t count)
  */
 static void
-generate_test_pho_tab2 (const char *dir)
-{
+generate_test_pho_tab2 (const char *dir) {
     snprintf (_pho_tab2_path, sizeof (_pho_tab2_path), "%s/pho.tab2", dir);
 
     /* Don't overwrite if it already exists (e.g. from a full build) */
@@ -95,8 +96,7 @@ generate_test_pho_tab2 (const char *dir)
 }
 
 static void
-cleanup_test_pho_tab2 (void)
-{
+cleanup_test_pho_tab2 (void) {
     if (_pho_tab2_created) {
         unlink (_pho_tab2_path);
         _pho_tab2_created = false;

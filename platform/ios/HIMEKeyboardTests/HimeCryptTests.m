@@ -28,10 +28,7 @@ static uint32_t test_hime_rand(uint32_t *next) {
 }
 
 /* Local copy of __hime_enc_mem from hime-crypt.c */
-static void test_hime_enc_mem(unsigned char *p,
-                               const int n,
-                               const TestHimePasswd *passwd,
-                               uint32_t *seed) {
+static void test_hime_enc_mem(unsigned char *p, const int n, const TestHimePasswd *passwd, uint32_t *seed) {
     for (int i = 0; i < n; i++) {
         uint32_t v = test_hime_rand(seed) % __HIME_PASSWD_N_;
         p[i] ^= passwd->passwd[v];
@@ -42,7 +39,7 @@ static void test_hime_enc_mem(unsigned char *p,
 static void fill_passwd(TestHimePasswd *pw, unsigned char base) {
     pw->seed = 0;
     for (int i = 0; i < __HIME_PASSWD_N_; i++)
-        pw->passwd[i] = (unsigned char)(base + i);
+        pw->passwd[i] = (unsigned char) (base + i);
 }
 
 #pragma mark - PRNG Tests
@@ -56,14 +53,14 @@ static void fill_passwd(TestHimePasswd *pw, unsigned char base) {
     uint32_t seed = 0;
     uint32_t r = test_hime_rand(&seed);
     /* seed = 0*1103515245 + 12345 = 12345, return (12345/65536)%32768 = 0 */
-    XCTAssertEqual(r, (uint32_t)0);
+    XCTAssertEqual(r, (uint32_t) 0);
 }
 
 - (void)testRandDeterministicSeed1 {
     uint32_t seed = 1;
     uint32_t r = test_hime_rand(&seed);
     /* seed = 1*1103515245 + 12345 = 1103527590, return (1103527590/65536)%32768 = 16838 */
-    XCTAssertEqual(r, (uint32_t)16838);
+    XCTAssertEqual(r, (uint32_t) 16838);
 }
 
 - (void)testRandSequenceReproducible {
@@ -147,7 +144,7 @@ static void fill_passwd(TestHimePasswd *pw, unsigned char base) {
     fill_passwd(&pw, 0x20);
 
     for (int i = 0; i < 16; i++)
-        original[i] = buf[i] = (unsigned char)(i * 7 + 3);
+        original[i] = buf[i] = (unsigned char) (i * 7 + 3);
 
     uint32_t seed = 999;
     test_hime_enc_mem(buf, 16, &pw, &seed);
@@ -211,7 +208,7 @@ static void fill_passwd(TestHimePasswd *pw, unsigned char base) {
     fill_passwd(&pw, 0x42);
 
     for (int i = 0; i < 1024; i++)
-        original[i] = buf[i] = (unsigned char)(i & 0xFF);
+        original[i] = buf[i] = (unsigned char) (i & 0xFF);
 
     uint32_t seed = 77777;
     test_hime_enc_mem(buf, 1024, &pw, &seed);

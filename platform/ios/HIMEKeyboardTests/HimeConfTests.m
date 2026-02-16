@@ -167,7 +167,7 @@ static char *test_get_hime_xim_name(void) {
 - (void)testXimNameLongName {
     setenv("XMODIFIERS", "@im=abcdefghijklmnopqrstuvwxyz12345678", 1);
     char *name = test_get_hime_xim_name();
-    XCTAssertEqual((int)strlen(name), 31, @"Should be truncated to 31 chars");
+    XCTAssertEqual((int) strlen(name), 31, @"Should be truncated to 31 chars");
     XCTAssertEqual(strncmp(name, "abcdefghijklmnopqrstuvwxyz12345", 31), 0);
 }
 

@@ -25,7 +25,6 @@ import org.junit.Test;
  * inlined by javac and don't trigger the static initializer.
  */
 public class HimeEngineUninitializedTest {
-
     /* ========== Constant Range Validation ========== */
 
     @Test
@@ -55,10 +54,8 @@ public class HimeEngineUninitializedTest {
 
     @Test
     public void candidateStyleConstants_areSequential() {
-        assertEquals(HimeEngine.CANDIDATE_STYLE_HORIZONTAL + 1,
-                     HimeEngine.CANDIDATE_STYLE_VERTICAL);
-        assertEquals(HimeEngine.CANDIDATE_STYLE_VERTICAL + 1,
-                     HimeEngine.CANDIDATE_STYLE_POPUP);
+        assertEquals(HimeEngine.CANDIDATE_STYLE_HORIZONTAL + 1, HimeEngine.CANDIDATE_STYLE_VERTICAL);
+        assertEquals(HimeEngine.CANDIDATE_STYLE_VERTICAL + 1, HimeEngine.CANDIDATE_STYLE_POPUP);
     }
 
     @Test
@@ -72,39 +69,24 @@ public class HimeEngineUninitializedTest {
     @Test
     public void keyboardLayouts_cover7Options() {
         /* 7 distinct layouts from STANDARD to DVORAK */
-        int[] layouts = {
-            HimeEngine.KB_STANDARD,
-            HimeEngine.KB_HSU,
-            HimeEngine.KB_ETEN,
-            HimeEngine.KB_ETEN26,
-            HimeEngine.KB_IBM,
-            HimeEngine.KB_PINYIN,
-            HimeEngine.KB_DVORAK
-        };
+        int[] layouts = {HimeEngine.KB_STANDARD, HimeEngine.KB_HSU, HimeEngine.KB_ETEN, HimeEngine.KB_ETEN26,
+                HimeEngine.KB_IBM, HimeEngine.KB_PINYIN, HimeEngine.KB_DVORAK};
         for (int i = 0; i < layouts.length; i++) {
             for (int j = i + 1; j < layouts.length; j++) {
-                assertNotEquals("Layouts " + i + " and " + j + " should differ",
-                                layouts[i], layouts[j]);
+                assertNotEquals("Layouts " + i + " and " + j + " should differ", layouts[i], layouts[j]);
             }
         }
     }
 
     @Test
     public void feedbackTypes_cover7Events() {
-        int[] types = {
-            HimeEngine.FEEDBACK_KEY_PRESS,
-            HimeEngine.FEEDBACK_KEY_DELETE,
-            HimeEngine.FEEDBACK_KEY_ENTER,
-            HimeEngine.FEEDBACK_KEY_SPACE,
-            HimeEngine.FEEDBACK_CANDIDATE,
-            HimeEngine.FEEDBACK_MODE_CHANGE,
-            HimeEngine.FEEDBACK_ERROR
-        };
+        int[] types = {HimeEngine.FEEDBACK_KEY_PRESS, HimeEngine.FEEDBACK_KEY_DELETE, HimeEngine.FEEDBACK_KEY_ENTER,
+                HimeEngine.FEEDBACK_KEY_SPACE, HimeEngine.FEEDBACK_CANDIDATE, HimeEngine.FEEDBACK_MODE_CHANGE,
+                HimeEngine.FEEDBACK_ERROR};
         /* All 7 types should be distinct */
         for (int i = 0; i < types.length; i++) {
             for (int j = i + 1; j < types.length; j++) {
-                assertNotEquals("Types " + i + " and " + j + " should differ",
-                                types[i], types[j]);
+                assertNotEquals("Types " + i + " and " + j + " should differ", types[i], types[j]);
             }
         }
     }

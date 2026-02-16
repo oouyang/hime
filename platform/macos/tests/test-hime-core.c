@@ -8,10 +8,10 @@
  * License: GNU LGPL v2.1
  */
 
+#include <stdbool.h>
+
 #include "../../../tests/test-framework.h"
 #include "hime-core.h"
-
-#include <stdbool.h>
 
 /* --- Version Tests --- */
 

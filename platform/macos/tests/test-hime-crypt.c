@@ -11,9 +11,9 @@
  * License: GNU LGPL v2.1
  */
 
-#include "../../../tests/test-framework.h"
-
 #include <stdint.h>
+
+#include "../../../tests/test-framework.h"
 
 /* Local definitions matching hime-protocol.h */
 #define __HIME_PASSWD_N_ (31)
@@ -25,8 +25,7 @@ typedef struct {
 
 /* Local copy of __hime_rand__ from hime-crypt.c */
 static uint32_t
-test_hime_rand (uint32_t *next)
-{
+test_hime_rand (uint32_t *next) {
     *next = *next * 1103515245 + 12345;
     return (*next / 65536) % 32768;
 }
@@ -36,8 +35,7 @@ static void
 test_hime_enc_mem (unsigned char *p,
                    const int n,
                    const TestHimePasswd *passwd,
-                   uint32_t *seed)
-{
+                   uint32_t *seed) {
     for (int i = 0; i < n; i++) {
         uint32_t v = test_hime_rand (seed) % __HIME_PASSWD_N_;
         p[i] ^= passwd->passwd[v];
@@ -45,8 +43,7 @@ test_hime_enc_mem (unsigned char *p,
 }
 
 static void
-fill_passwd (TestHimePasswd *pw, unsigned char base)
-{
+fill_passwd (TestHimePasswd *pw, unsigned char base) {
     pw->seed = 0;
     for (int i = 0; i < __HIME_PASSWD_N_; i++)
         pw->passwd[i] = (unsigned char) (base + i);

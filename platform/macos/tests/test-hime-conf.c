@@ -15,8 +15,7 @@
 
 /* Local reimplementation of get_hime_dir from hime-conf.c */
 static void
-get_hime_dir (char *tt)
-{
+get_hime_dir (char *tt) {
     char *home = getenv ("HOME");
     if (!home)
         home = "";
@@ -26,16 +25,14 @@ get_hime_dir (char *tt)
 
 /* Local reimplementation of get_hime_conf_fname from hime-conf.c */
 static void
-get_hime_conf_fname (char *name, char fname[])
-{
+get_hime_conf_fname (char *name, char fname[]) {
     get_hime_dir (fname);
     strcat (strcat (fname, "/config/"), name);
 }
 
 /* Local reimplementation of get_hime_xim_name from hime-conf.c */
 static char *
-get_hime_xim_name (void)
-{
+get_hime_xim_name (void) {
     char *xim_name;
 
     if ((xim_name = getenv ("XMODIFIERS"))) {

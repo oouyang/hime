@@ -37,8 +37,7 @@ public class HimeCryptTest {
     /**
      * XOR cipher matching __hime_enc_mem in hime-crypt.c.
      */
-    private static void himeEncMem(byte[] data, int offset, int length,
-                                    byte[] passwd, long[] seed) {
+    private static void himeEncMem(byte[] data, int offset, int length, byte[] passwd, long[] seed) {
         for (int i = 0; i < length; i++) {
             int v = himeRand(seed) % HIME_PASSWD_N;
             data[offset + i] ^= passwd[v];
@@ -162,8 +161,8 @@ public class HimeCryptTest {
         java.util.Arrays.fill(buf2, (byte) 0xAA);
         byte[] passwd = makePasswd(0x30);
 
-        himeEncMem(buf1, 0, 8, passwd, new long[]{1});
-        himeEncMem(buf2, 0, 8, passwd, new long[]{2});
+        himeEncMem(buf1, 0, 8, passwd, new long[] {1});
+        himeEncMem(buf2, 0, 8, passwd, new long[] {2});
 
         assertFalse(java.util.Arrays.equals(buf1, buf2));
     }
@@ -175,8 +174,8 @@ public class HimeCryptTest {
         java.util.Arrays.fill(buf1, (byte) 0x55);
         java.util.Arrays.fill(buf2, (byte) 0x55);
 
-        himeEncMem(buf1, 0, 8, makePasswd(0x10), new long[]{42});
-        himeEncMem(buf2, 0, 8, makePasswd(0x80), new long[]{42});
+        himeEncMem(buf1, 0, 8, makePasswd(0x10), new long[] {42});
+        himeEncMem(buf2, 0, 8, makePasswd(0x80), new long[] {42});
 
         assertFalse(java.util.Arrays.equals(buf1, buf2));
     }

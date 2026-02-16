@@ -23,7 +23,6 @@ import org.junit.Test;
  * the C implementation in hime-conf.c.
  */
 public class HimeConfTest {
-
     /**
      * Java reimplementation of get_hime_dir from hime-conf.c.
      */
@@ -103,20 +102,17 @@ public class HimeConfTest {
 
     @Test
     public void getHimeConfFname_simple() {
-        assertEquals("/home/user/.config/hime/config/foo",
-                     getHimeConfFname("/home/user", "foo"));
+        assertEquals("/home/user/.config/hime/config/foo", getHimeConfFname("/home/user", "foo"));
     }
 
     @Test
     public void getHimeConfFname_nestedName() {
-        assertEquals("/home/user/.config/hime/config/bar.conf",
-                     getHimeConfFname("/home/user", "bar.conf"));
+        assertEquals("/home/user/.config/hime/config/bar.conf", getHimeConfFname("/home/user", "bar.conf"));
     }
 
     @Test
     public void getHimeConfFname_emptyName() {
-        assertEquals("/home/user/.config/hime/config/",
-                     getHimeConfFname("/home/user", ""));
+        assertEquals("/home/user/.config/hime/config/", getHimeConfFname("/home/user", ""));
     }
 
     /* ========== get_hime_xim_name tests ========== */

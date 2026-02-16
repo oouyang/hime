@@ -221,20 +221,20 @@
 }
 
 - (void)testCApiEnumConsistency {
-    XCTAssertEqual((int)HimeKeyResultIgnored, (int)HIME_KEY_IGNORED);
-    XCTAssertEqual((int)HimeKeyResultAbsorbed, (int)HIME_KEY_ABSORBED);
-    XCTAssertEqual((int)HimeKeyResultCommit, (int)HIME_KEY_COMMIT);
-    XCTAssertEqual((int)HimeKeyResultPreedit, (int)HIME_KEY_PREEDIT);
+    XCTAssertEqual((int) HimeKeyResultIgnored, (int) HIME_KEY_IGNORED);
+    XCTAssertEqual((int) HimeKeyResultAbsorbed, (int) HIME_KEY_ABSORBED);
+    XCTAssertEqual((int) HimeKeyResultCommit, (int) HIME_KEY_COMMIT);
+    XCTAssertEqual((int) HimeKeyResultPreedit, (int) HIME_KEY_PREEDIT);
 
-    XCTAssertEqual((int)HimeCharsetTraditional, (int)HIME_CHARSET_TRADITIONAL);
-    XCTAssertEqual((int)HimeCharsetSimplified, (int)HIME_CHARSET_SIMPLIFIED);
+    XCTAssertEqual((int) HimeCharsetTraditional, (int) HIME_CHARSET_TRADITIONAL);
+    XCTAssertEqual((int) HimeCharsetSimplified, (int) HIME_CHARSET_SIMPLIFIED);
 
-    XCTAssertEqual((int)HimeColorSchemeLight, (int)HIME_COLOR_SCHEME_LIGHT);
-    XCTAssertEqual((int)HimeColorSchemeDark, (int)HIME_COLOR_SCHEME_DARK);
-    XCTAssertEqual((int)HimeColorSchemeSystem, (int)HIME_COLOR_SCHEME_SYSTEM);
+    XCTAssertEqual((int) HimeColorSchemeLight, (int) HIME_COLOR_SCHEME_LIGHT);
+    XCTAssertEqual((int) HimeColorSchemeDark, (int) HIME_COLOR_SCHEME_DARK);
+    XCTAssertEqual((int) HimeColorSchemeSystem, (int) HIME_COLOR_SCHEME_SYSTEM);
 
-    XCTAssertEqual((int)HimeKeyboardLayoutStandard, (int)HIME_KB_STANDARD);
-    XCTAssertEqual((int)HimeKeyboardLayoutDvorak, (int)HIME_KB_DVORAK);
+    XCTAssertEqual((int) HimeKeyboardLayoutStandard, (int) HIME_KB_STANDARD);
+    XCTAssertEqual((int) HimeKeyboardLayoutDvorak, (int) HIME_KB_DVORAK);
 }
 
 @end
