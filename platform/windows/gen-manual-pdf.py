@@ -35,6 +35,62 @@ ROOT_ICONS = os.path.join(SCRIPT_DIR, "..", "icons")
 OUTPUT_PDF = os.path.join(SCRIPT_DIR, "HIME-Manual.pdf")
 
 # ---------------------------------------------------------------------------
+# CJK Font Registration
+# ---------------------------------------------------------------------------
+# Search for a CJK-capable font in common locations across platforms.
+# Without this, Chinese characters render as garbled text (亂碼).
+_CJK_FONT_CANDIDATES = [
+    # Linux
+    "/usr/share/fonts/truetype/droid/DroidSansFallbackFull.ttf",
+    "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
+    "/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttc",
+    "/usr/share/fonts/noto-cjk/NotoSansCJK-Regular.ttc",
+    # macOS
+    "/System/Library/Fonts/PingFang.ttc",
+    "/System/Library/Fonts/STHeiti Light.ttc",
+    "/Library/Fonts/Arial Unicode.ttf",
+    # Windows
+    os.path.expandvars(r"%SystemRoot%\Fonts\msjh.ttc"),      # Microsoft JhengHei
+    os.path.expandvars(r"%SystemRoot%\Fonts\msyh.ttc"),      # Microsoft YaHei
+    os.path.expandvars(r"%SystemRoot%\Fonts\mingliu.ttc"),    # MingLiU
+    os.path.expandvars(r"%SystemRoot%\Fonts\simsun.ttc"),     # SimSun
+    r"C:\Windows\Fonts\msjh.ttc",
+    r"C:\Windows\Fonts\msyh.ttc",
+]
+
+CJK_FONT_NAME = "HimeCJK"
+CJK_FONT_BOLD = "HimeCJK-Bold"
+_cjk_registered = False
+
+for _font_path in _CJK_FONT_CANDIDATES:
+    if os.path.exists(_font_path):
+        try:
+            if _font_path.endswith(".ttc"):
+                pdfmetrics.registerFont(TTFont(CJK_FONT_NAME, _font_path, subfontIndex=0))
+            else:
+                pdfmetrics.registerFont(TTFont(CJK_FONT_NAME, _font_path))
+            # Register bold as same font (ReportLab uses it for <b> tags)
+            if _font_path.endswith(".ttc"):
+                pdfmetrics.registerFont(TTFont(CJK_FONT_BOLD, _font_path, subfontIndex=0))
+            else:
+                pdfmetrics.registerFont(TTFont(CJK_FONT_BOLD, _font_path))
+            pdfmetrics.registerFontFamily(CJK_FONT_NAME,
+                                          normal=CJK_FONT_NAME,
+                                          bold=CJK_FONT_BOLD,
+                                          italic=CJK_FONT_NAME,
+                                          boldItalic=CJK_FONT_BOLD)
+            _cjk_registered = True
+            break
+        except Exception as e:
+            print(f"Warning: failed to load font {_font_path}: {e}")
+
+if not _cjk_registered:
+    print("WARNING: No CJK font found. Chinese characters may not render correctly.")
+    print("Install a CJK font (e.g. Noto Sans CJK, Droid Sans Fallback, or PingFang).")
+    CJK_FONT_NAME = "Helvetica"
+    CJK_FONT_BOLD = "Helvetica-Bold"
+
+# ---------------------------------------------------------------------------
 # Colors (HIME brand)
 # ---------------------------------------------------------------------------
 C_PRIMARY = HexColor("#2E5A88")      # Deep blue
@@ -53,35 +109,35 @@ styles = getSampleStyleSheet()
 
 S_TITLE = ParagraphStyle(
     "HimeTitle", parent=styles["Title"],
-    fontSize=28, leading=34,
+    fontName=CJK_FONT_BOLD, fontSize=28, leading=34,
     textColor=C_PRIMARY, spaceAfter=4*mm,
     alignment=TA_CENTER,
 )
 S_SUBTITLE = ParagraphStyle(
     "HimeSubtitle", parent=styles["Normal"],
-    fontSize=13, leading=17,
+    fontName=CJK_FONT_NAME, fontSize=13, leading=17,
     textColor=C_MID_GRAY, spaceAfter=12*mm,
     alignment=TA_CENTER,
 )
 S_H1 = ParagraphStyle(
     "HimeH1", parent=styles["Heading1"],
-    fontSize=20, leading=26,
+    fontName=CJK_FONT_BOLD, fontSize=20, leading=26,
     textColor=C_PRIMARY, spaceBefore=10*mm, spaceAfter=4*mm,
     borderWidth=0, borderPadding=0,
 )
 S_H2 = ParagraphStyle(
     "HimeH2", parent=styles["Heading2"],
-    fontSize=14, leading=19,
+    fontName=CJK_FONT_BOLD, fontSize=14, leading=19,
     textColor=C_PRIMARY, spaceBefore=6*mm, spaceAfter=3*mm,
 )
 S_H3 = ParagraphStyle(
     "HimeH3", parent=styles["Heading3"],
-    fontSize=12, leading=16,
+    fontName=CJK_FONT_BOLD, fontSize=12, leading=16,
     textColor=C_DARK_TEXT, spaceBefore=4*mm, spaceAfter=2*mm,
 )
 S_BODY = ParagraphStyle(
     "HimeBody", parent=styles["Normal"],
-    fontSize=10.5, leading=16,
+    fontName=CJK_FONT_NAME, fontSize=10.5, leading=16,
     textColor=C_DARK_TEXT, spaceAfter=3*mm,
     alignment=TA_JUSTIFY,
 )
@@ -96,7 +152,7 @@ S_BULLET = ParagraphStyle(
 )
 S_CODE = ParagraphStyle(
     "HimeCode", parent=styles["Code"],
-    fontSize=9.5, leading=13,
+    fontName=CJK_FONT_NAME, fontSize=9.5, leading=13,
     textColor=C_DARK_TEXT,
     backColor=C_LIGHT_BG,
     borderWidth=0.5, borderColor=lightgrey, borderPadding=6,
@@ -112,7 +168,7 @@ S_NOTE = ParagraphStyle(
 )
 S_TH = ParagraphStyle(
     "HimeTH", parent=S_BODY,
-    fontSize=10, leading=14,
+    fontName=CJK_FONT_BOLD, fontSize=10, leading=14,
     textColor=white, alignment=TA_CENTER,
 )
 S_TD = ParagraphStyle(
@@ -127,12 +183,12 @@ S_TD_L = ParagraphStyle(
 )
 S_FOOTER = ParagraphStyle(
     "HimeFooter", parent=styles["Normal"],
-    fontSize=8, leading=10,
+    fontName=CJK_FONT_NAME, fontSize=8, leading=10,
     textColor=C_MID_GRAY, alignment=TA_CENTER,
 )
 S_COVER_CHAR = ParagraphStyle(
     "HimeCoverChar", parent=styles["Normal"],
-    fontSize=72, leading=80,
+    fontName=CJK_FONT_NAME, fontSize=72, leading=80,
     textColor=C_PRIMARY, alignment=TA_CENTER,
     spaceAfter=2*mm,
 )
@@ -194,7 +250,7 @@ def _on_first_page(canvas, doc):
 
 def _on_later_pages(canvas, doc):
     canvas.saveState()
-    canvas.setFont("Helvetica", 8)
+    canvas.setFont(CJK_FONT_NAME, 8)
     canvas.setFillColor(C_MID_GRAY)
     w, h = A4
     canvas.drawString(20*mm, 10*mm, "HIME Input Method Editor — User Manual")
