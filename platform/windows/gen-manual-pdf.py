@@ -37,8 +37,9 @@ OUTPUT_PDF = os.path.join(SCRIPT_DIR, "HIME-Manual.pdf")
 # ---------------------------------------------------------------------------
 # CJK Font Registration
 # ---------------------------------------------------------------------------
-# Search for a CJK-capable font in common locations across platforms.
-# Without this, Chinese characters render as garbled text (亂碼).
+# Register a CJK font alongside Helvetica. Latin text stays in Helvetica
+# (proper bold/italic), CJK characters are wrapped in <font> tags via the
+# cjk() helper below.
 _CJK_FONT_CANDIDATES = [
     # Linux
     "/usr/share/fonts/truetype/droid/DroidSansFallbackFull.ttf",
@@ -50,45 +51,32 @@ _CJK_FONT_CANDIDATES = [
     "/System/Library/Fonts/STHeiti Light.ttc",
     "/Library/Fonts/Arial Unicode.ttf",
     # Windows
-    os.path.expandvars(r"%SystemRoot%\Fonts\msjh.ttc"),      # Microsoft JhengHei
-    os.path.expandvars(r"%SystemRoot%\Fonts\msyh.ttc"),      # Microsoft YaHei
-    os.path.expandvars(r"%SystemRoot%\Fonts\mingliu.ttc"),    # MingLiU
-    os.path.expandvars(r"%SystemRoot%\Fonts\simsun.ttc"),     # SimSun
+    os.path.expandvars(r"%SystemRoot%\Fonts\msjh.ttc"),
+    os.path.expandvars(r"%SystemRoot%\Fonts\msyh.ttc"),
+    os.path.expandvars(r"%SystemRoot%\Fonts\mingliu.ttc"),
+    os.path.expandvars(r"%SystemRoot%\Fonts\simsun.ttc"),
     r"C:\Windows\Fonts\msjh.ttc",
     r"C:\Windows\Fonts\msyh.ttc",
 ]
 
-CJK_FONT_NAME = "HimeCJK"
-CJK_FONT_BOLD = "HimeCJK-Bold"
-_cjk_registered = False
+CJK_FONT = "HimeCJK"
+_cjk_available = False
 
 for _font_path in _CJK_FONT_CANDIDATES:
     if os.path.exists(_font_path):
         try:
             if _font_path.endswith(".ttc"):
-                pdfmetrics.registerFont(TTFont(CJK_FONT_NAME, _font_path, subfontIndex=0))
+                pdfmetrics.registerFont(TTFont(CJK_FONT, _font_path, subfontIndex=0))
             else:
-                pdfmetrics.registerFont(TTFont(CJK_FONT_NAME, _font_path))
-            # Register bold as same font (ReportLab uses it for <b> tags)
-            if _font_path.endswith(".ttc"):
-                pdfmetrics.registerFont(TTFont(CJK_FONT_BOLD, _font_path, subfontIndex=0))
-            else:
-                pdfmetrics.registerFont(TTFont(CJK_FONT_BOLD, _font_path))
-            pdfmetrics.registerFontFamily(CJK_FONT_NAME,
-                                          normal=CJK_FONT_NAME,
-                                          bold=CJK_FONT_BOLD,
-                                          italic=CJK_FONT_NAME,
-                                          boldItalic=CJK_FONT_BOLD)
-            _cjk_registered = True
+                pdfmetrics.registerFont(TTFont(CJK_FONT, _font_path))
+            _cjk_available = True
             break
         except Exception as e:
             print(f"Warning: failed to load font {_font_path}: {e}")
 
-if not _cjk_registered:
+if not _cjk_available:
     print("WARNING: No CJK font found. Chinese characters may not render correctly.")
     print("Install a CJK font (e.g. Noto Sans CJK, Droid Sans Fallback, or PingFang).")
-    CJK_FONT_NAME = "Helvetica"
-    CJK_FONT_BOLD = "Helvetica-Bold"
 
 # ---------------------------------------------------------------------------
 # Colors (HIME brand)
@@ -109,35 +97,35 @@ styles = getSampleStyleSheet()
 
 S_TITLE = ParagraphStyle(
     "HimeTitle", parent=styles["Title"],
-    fontName=CJK_FONT_BOLD, fontSize=28, leading=34,
+    fontSize=28, leading=34,
     textColor=C_PRIMARY, spaceAfter=4*mm,
     alignment=TA_CENTER,
 )
 S_SUBTITLE = ParagraphStyle(
     "HimeSubtitle", parent=styles["Normal"],
-    fontName=CJK_FONT_NAME, fontSize=13, leading=17,
+    fontSize=13, leading=17,
     textColor=C_MID_GRAY, spaceAfter=12*mm,
     alignment=TA_CENTER,
 )
 S_H1 = ParagraphStyle(
     "HimeH1", parent=styles["Heading1"],
-    fontName=CJK_FONT_BOLD, fontSize=20, leading=26,
+    fontSize=20, leading=26,
     textColor=C_PRIMARY, spaceBefore=10*mm, spaceAfter=4*mm,
     borderWidth=0, borderPadding=0,
 )
 S_H2 = ParagraphStyle(
     "HimeH2", parent=styles["Heading2"],
-    fontName=CJK_FONT_BOLD, fontSize=14, leading=19,
+    fontSize=14, leading=19,
     textColor=C_PRIMARY, spaceBefore=6*mm, spaceAfter=3*mm,
 )
 S_H3 = ParagraphStyle(
     "HimeH3", parent=styles["Heading3"],
-    fontName=CJK_FONT_BOLD, fontSize=12, leading=16,
+    fontSize=12, leading=16,
     textColor=C_DARK_TEXT, spaceBefore=4*mm, spaceAfter=2*mm,
 )
 S_BODY = ParagraphStyle(
     "HimeBody", parent=styles["Normal"],
-    fontName=CJK_FONT_NAME, fontSize=10.5, leading=16,
+    fontSize=10.5, leading=16,
     textColor=C_DARK_TEXT, spaceAfter=3*mm,
     alignment=TA_JUSTIFY,
 )
@@ -152,7 +140,7 @@ S_BULLET = ParagraphStyle(
 )
 S_CODE = ParagraphStyle(
     "HimeCode", parent=styles["Code"],
-    fontName=CJK_FONT_NAME, fontSize=9.5, leading=13,
+    fontSize=9.5, leading=13,
     textColor=C_DARK_TEXT,
     backColor=C_LIGHT_BG,
     borderWidth=0.5, borderColor=lightgrey, borderPadding=6,
@@ -168,7 +156,7 @@ S_NOTE = ParagraphStyle(
 )
 S_TH = ParagraphStyle(
     "HimeTH", parent=S_BODY,
-    fontName=CJK_FONT_BOLD, fontSize=10, leading=14,
+    fontSize=10, leading=14,
     textColor=white, alignment=TA_CENTER,
 )
 S_TD = ParagraphStyle(
@@ -183,12 +171,12 @@ S_TD_L = ParagraphStyle(
 )
 S_FOOTER = ParagraphStyle(
     "HimeFooter", parent=styles["Normal"],
-    fontName=CJK_FONT_NAME, fontSize=8, leading=10,
+    fontSize=8, leading=10,
     textColor=C_MID_GRAY, alignment=TA_CENTER,
 )
 S_COVER_CHAR = ParagraphStyle(
     "HimeCoverChar", parent=styles["Normal"],
-    fontName=CJK_FONT_NAME, fontSize=72, leading=80,
+    fontSize=72, leading=80,
     textColor=C_PRIMARY, alignment=TA_CENTER,
     spaceAfter=2*mm,
 )
@@ -196,6 +184,37 @@ S_COVER_CHAR = ParagraphStyle(
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+import re
+
+def cjk(text):
+    """Wrap CJK characters in <font> tags so they render with the CJK font.
+
+    Keeps Helvetica for Latin text (proper bold/italic) while switching to
+    the registered CJK font for Chinese/Japanese/Korean characters.
+    Returns the original text unchanged if no CJK font is available.
+    """
+    if not _cjk_available:
+        return text
+    # Match runs of CJK Unified Ideographs, CJK symbols, Bopomofo,
+    # fullwidth forms, and CJK punctuation
+    _CJK_RE = re.compile(
+        r'([\u2E80-\u2FFF'   # CJK radicals, Kangxi
+        r'\u3000-\u303F'      # CJK symbols and punctuation
+        r'\u3100-\u312F'      # Bopomofo
+        r'\u31A0-\u31BF'      # Bopomofo Extended
+        r'\u3400-\u4DBF'      # CJK Extension A
+        r'\u4E00-\u9FFF'      # CJK Unified Ideographs
+        r'\uF900-\uFAFF'      # CJK Compatibility
+        r'\uFE30-\uFE4F'      # CJK Compatibility Forms
+        r'\uFF00-\uFFEF'      # Fullwidth Forms
+        r'\U00020000-\U0002A6DF'  # CJK Extension B
+        r']+)'
+    )
+    return _CJK_RE.sub(
+        rf'<font face="{CJK_FONT}">\1</font>', text
+    )
+
+
 def icon_path(name):
     p = os.path.join(ICONS_DIR, name)
     if os.path.exists(p):
@@ -219,11 +238,16 @@ def kbd(key):
     """Render a keyboard key inline."""
     return f'<font face="Courier" size="10" color="#333333"><b>&nbsp;{key}&nbsp;</b></font>'
 
+def P(text, style):
+    """Create a Paragraph with CJK characters auto-wrapped."""
+    return Paragraph(cjk(text), style)
+
+
 def make_table(headers, rows, col_widths=None):
     """Create a styled table."""
-    data = [[Paragraph(h, S_TH) for h in headers]]
+    data = [[P(h, S_TH) for h in headers]]
     for row in rows:
-        data.append([Paragraph(str(c), S_TD_L if i == 0 else S_TD)
+        data.append([P(str(c), S_TD_L if i == 0 else S_TD)
                       for i, c in enumerate(row)])
 
     t = Table(data, colWidths=col_widths, repeatRows=1)
@@ -250,7 +274,7 @@ def _on_first_page(canvas, doc):
 
 def _on_later_pages(canvas, doc):
     canvas.saveState()
-    canvas.setFont(CJK_FONT_NAME, 8)
+    canvas.setFont("Helvetica", 8)
     canvas.setFillColor(C_MID_GRAY)
     w, h = A4
     canvas.drawString(20*mm, 10*mm, "HIME Input Method Editor — User Manual")
@@ -271,9 +295,9 @@ def build_content():
 
     # ===== COVER PAGE =====
     story.append(Spacer(1, 40*mm))
-    story.append(Paragraph("姬", S_COVER_CHAR))
-    story.append(Paragraph("HIME Input Method Editor", S_TITLE))
-    story.append(Paragraph("Windows User Manual", S_SUBTITLE))
+    story.append(P("姬", S_COVER_CHAR))
+    story.append(P("HIME Input Method Editor", S_TITLE))
+    story.append(P("Windows User Manual", S_SUBTITLE))
     story.append(Spacer(1, 10*mm))
 
     # Icon row
@@ -284,7 +308,7 @@ def build_content():
         if img:
             icon_imgs.append(img)
         else:
-            icon_imgs.append(Paragraph("?", S_BODY_C))
+            icon_imgs.append(P("?", S_BODY_C))
     if icon_imgs:
         t = Table([icon_imgs], colWidths=[30*mm]*len(icon_imgs))
         t.setStyle(TableStyle([
@@ -294,18 +318,18 @@ def build_content():
         story.append(t)
 
     story.append(Spacer(1, 15*mm))
-    story.append(Paragraph(
+    story.append(P(
         "A lightweight input method editor for Traditional Chinese,<br/>"
         "supporting Zhuyin (注音), Cangjie (倉頡), and Boshiamy (嘸蝦米).",
         S_BODY_C
     ))
     story.append(Spacer(1, 20*mm))
-    story.append(Paragraph("Version 0.10.1 — February 2026", S_NOTE))
-    story.append(Paragraph("https://github.com/nicehime/hime", S_NOTE))
+    story.append(P("Version 0.10.1 — February 2026", S_NOTE))
+    story.append(P("https://github.com/nicehime/hime", S_NOTE))
     story.append(PageBreak())
 
     # ===== TABLE OF CONTENTS =====
-    story.append(Paragraph("Table of Contents", S_H1))
+    story.append(P("Table of Contents", S_H1))
     story.append(hr())
     toc_items = [
         ("1.", "Installation", "3"),
@@ -323,9 +347,9 @@ def build_content():
     toc_data = []
     for num, title, page in toc_items:
         toc_data.append([
-            Paragraph(f'<b>{num}</b>', S_TD_L),
-            Paragraph(title, S_TD_L),
-            Paragraph(page, S_TD),
+            P(f'<b>{num}</b>', S_TD_L),
+            P(cjk(title), S_TD_L),
+            P(page, S_TD),
         ])
     toc_t = Table(toc_data, colWidths=[12*mm, 110*mm, 15*mm])
     toc_t.setStyle(TableStyle([
@@ -338,19 +362,19 @@ def build_content():
     story.append(PageBreak())
 
     # ===== 1. INSTALLATION =====
-    story.append(Paragraph("1. Installation", S_H1))
+    story.append(P("1. Installation", S_H1))
     story.append(hr())
 
-    story.append(Paragraph("1.1 System Requirements", S_H2))
+    story.append(P("1.1 System Requirements", S_H2))
     for item in [
         "Windows 10 or Windows 11 (64-bit)",
         "50 MB free disk space",
         "Administrator privileges (for installation only)",
     ]:
-        story.append(Paragraph(f"• {item}", S_BULLET))
+        story.append(P(f"• {item}", S_BULLET))
 
-    story.append(Paragraph("1.2 Install", S_H2))
-    story.append(Paragraph(
+    story.append(P("1.2 Install", S_H2))
+    story.append(P(
         "Run <b>hime-install.exe</b>. An administrator prompt (UAC) will appear — "
         "click <b>Yes</b> to continue.",
         S_BODY,
@@ -360,27 +384,27 @@ def build_content():
         "It registers the IME with Windows automatically.",
         "An entry appears in <b>Settings → Apps</b> for uninstalling later.",
     ]:
-        story.append(Paragraph(f"• {step}", S_BULLET))
-    story.append(Paragraph(
+        story.append(P(f"• {step}", S_BULLET))
+    story.append(P(
         "<i>To upgrade, simply run hime-install.exe again — it removes the old version first.</i>",
         S_NOTE,
     ))
 
-    story.append(Paragraph("1.3 Enable HIME in Windows", S_H2))
+    story.append(P("1.3 Enable HIME in Windows", S_H2))
     for i, step in enumerate([
         "Open <b>Settings → Time &amp; Language → Language &amp; region</b>.",
         "Click your language (e.g. 中文 (繁體，台灣)) → <b>Language options</b>.",
         'Under "Keyboards", click <b>Add a keyboard</b>.',
         'Select <b>"姬 HIME"</b> (or "姬 HIME [DEBUG]" for debug builds).',
     ], 1):
-        story.append(Paragraph(f"{i}. {step}", S_BULLET))
-    story.append(Paragraph(
+        story.append(P(f"{i}. {step}", S_BULLET))
+    story.append(P(
         "HIME will now appear in the language bar / system tray when you switch to it.",
         S_BODY,
     ))
 
-    story.append(Paragraph("1.4 Uninstall", S_H2))
-    story.append(Paragraph(
+    story.append(P("1.4 Uninstall", S_H2))
+    story.append(P(
         "Run <b>hime-uninstall.exe</b> from C:\\Program Files\\HIME\\, "
         "or use <b>Settings → Apps → HIME Input Method Editor → Uninstall</b>.",
         S_BODY,
@@ -388,19 +412,19 @@ def build_content():
     story.append(PageBreak())
 
     # ===== 2. GETTING STARTED =====
-    story.append(Paragraph("2. Getting Started", S_H1))
+    story.append(P("2. Getting Started", S_H1))
     story.append(hr())
 
-    story.append(Paragraph("2.1 Switching to HIME", S_H2))
-    story.append(Paragraph(
+    story.append(P("2.1 Switching to HIME", S_H2))
+    story.append(P(
         "Press <b>Win + Space</b> to cycle through installed input methods. "
         "When HIME is active, you will see the HIME icon (姬) in the system tray "
         "alongside a mode indicator icon showing your current input method.",
         S_BODY,
     ))
 
-    story.append(Paragraph("2.2 System Tray Icons", S_H2))
-    story.append(Paragraph(
+    story.append(P("2.2 System Tray Icons", S_H2))
+    story.append(P(
         "When HIME is active, two icons appear in the system tray area:",
         S_BODY,
     ))
@@ -415,8 +439,8 @@ def build_content():
     ]
     story.append(make_table(tray_headers, tray_rows, col_widths=[40*mm, 100*mm]))
 
-    story.append(Paragraph("2.3 Quick Mode Switching", S_H2))
-    story.append(Paragraph(
+    story.append(P("2.3 Quick Mode Switching", S_H2))
+    story.append(P(
         "Click the <b>mode indicator icon</b> (注/倉/蝦/EN) to cycle through "
         "enabled input methods. You can also use keyboard shortcuts:",
         S_BODY,
@@ -425,8 +449,8 @@ def build_content():
         "<b>Ctrl + `</b> (backtick) — Cycle: EN → Zhuyin → Cangjie → [Boshiamy] → EN",
         "<b>F4</b> — Same cycle as Ctrl + `",
     ]:
-        story.append(Paragraph(f"• {item}", S_BULLET))
-    story.append(Paragraph(
+        story.append(P(f"• {item}", S_BULLET))
+    story.append(P(
         "<i>Only enabled methods participate in the cycle. "
         "Use Settings to enable/disable methods.</i>",
         S_NOTE,
@@ -434,43 +458,43 @@ def build_content():
     story.append(PageBreak())
 
     # ===== 3. SYSTEM TRAY & MODE SWITCHING =====
-    story.append(Paragraph("3. System Tray &amp; Mode Switching", S_H1))
+    story.append(P("3. System Tray &amp; Mode Switching", S_H1))
     story.append(hr())
 
-    story.append(Paragraph("3.1 Two Tray Icons", S_H2))
-    story.append(Paragraph(
+    story.append(P("3.1 Two Tray Icons", S_H2))
+    story.append(P(
         "HIME displays <b>two icons</b> in the system tray:",
         S_BODY,
     ))
-    story.append(Paragraph(
+    story.append(P(
         "<b>① HIME App Icon (姬)</b> — The main icon. "
         "Left-click cycles modes. Right-click opens the context menu with input method "
         "selection, toolbar toggle, settings, and about dialog.",
         S_BULLET,
     ))
-    story.append(Paragraph(
+    story.append(P(
         "<b>② Mode Indicator</b> — Shows the current input mode "
         "(注 for Zhuyin, 倉 for Cangjie, 蝦 for Boshiamy, EN for English). "
         "Left-click cycles modes.",
         S_BULLET,
     ))
 
-    story.append(Paragraph("3.2 Mode Cycle Order", S_H2))
-    story.append(Paragraph(
+    story.append(P("3.2 Mode Cycle Order", S_H2))
+    story.append(P(
         "Each click or Ctrl+` press moves to the next enabled method in this order:",
         S_BODY,
     ))
     # Cycle diagram as a table
     cycle_data = [
-        [Paragraph("<b>EN</b><br/>(English)", S_TD),
-         Paragraph("→", S_TD),
-         Paragraph("<b>注音</b><br/>(Zhuyin)", S_TD),
-         Paragraph("→", S_TD),
-         Paragraph("<b>倉五</b><br/>(Cangjie)", S_TD),
-         Paragraph("→", S_TD),
-         Paragraph("<b>嘸蝦米</b><br/>(Boshiamy)", S_TD),
-         Paragraph("→", S_TD),
-         Paragraph("<b>EN</b><br/>...", S_TD)],
+        [P("<b>EN</b><br/>(English)", S_TD),
+         P("→", S_TD),
+         P("<b>注音</b><br/>(Zhuyin)", S_TD),
+         P("→", S_TD),
+         P("<b>倉五</b><br/>(Cangjie)", S_TD),
+         P("→", S_TD),
+         P("<b>嘸蝦米</b><br/>(Boshiamy)", S_TD),
+         P("→", S_TD),
+         P("<b>EN</b><br/>...", S_TD)],
     ]
     cycle_t = Table(cycle_data, colWidths=[20*mm, 8*mm, 20*mm, 8*mm, 20*mm, 8*mm, 20*mm, 8*mm, 20*mm])
     cycle_t.setStyle(TableStyle([
@@ -489,13 +513,13 @@ def build_content():
     ]))
     story.append(cycle_t)
     story.append(Spacer(1, 3*mm))
-    story.append(Paragraph(
+    story.append(P(
         "<i>Disabled methods are skipped. Boshiamy only appears if liu.gtab is installed.</i>",
         S_NOTE,
     ))
 
-    story.append(Paragraph("3.3 Switching Directly via Menu", S_H2))
-    story.append(Paragraph(
+    story.append(P("3.3 Switching Directly via Menu", S_H2))
+    story.append(P(
         "Right-click the HIME app icon (姬) and select the desired input method "
         "from the menu. A checkmark (✓) indicates the currently active method.",
         S_BODY,
@@ -503,17 +527,17 @@ def build_content():
     story.append(PageBreak())
 
     # ===== 4. ZHUYIN (注音) INPUT =====
-    story.append(Paragraph("4. Zhuyin (注音) Input", S_H1))
+    story.append(P("4. Zhuyin (注音) Input", S_H1))
     story.append(hr())
 
-    story.append(Paragraph(
+    story.append(P(
         "Zhuyin (Bopomofo) is the standard phonetic input method for Traditional Chinese, "
         "widely used in Taiwan.",
         S_BODY,
     ))
 
-    story.append(Paragraph("4.1 Keyboard Layout", S_H2))
-    story.append(Paragraph(
+    story.append(P("4.1 Keyboard Layout", S_H2))
+    story.append(P(
         "The standard Zhuyin keyboard layout maps Bopomofo symbols to letter keys:",
         S_BODY,
     ))
@@ -549,7 +573,7 @@ def build_content():
     story.append(make_table(kb_headers, kb_row3,
                             col_widths=[12*mm, 14*mm]*4))
 
-    story.append(Paragraph("4.2 Tone Keys", S_H2))
+    story.append(P("4.2 Tone Keys", S_H2))
     tone_headers = ["Key", "Tone", "Name", "Example"]
     tone_rows = [
         ["Space", "First (ˉ)", "陰平 yīnpíng", "媽 mā"],
@@ -561,16 +585,16 @@ def build_content():
     story.append(make_table(tone_headers, tone_rows,
                             col_widths=[18*mm, 28*mm, 42*mm, 30*mm]))
 
-    story.append(Paragraph("4.3 Input Flow", S_H2))
+    story.append(P("4.3 Input Flow", S_H2))
     for i, step in enumerate([
         "Type the Bopomofo consonant, medial, and vowel keys.",
         "Press a tone key (Space for 1st tone, 3/4/6/7 for others).",
         "A candidate list appears — press a number key (1–9, 0) to select.",
         "The selected character is inserted into your document.",
     ], 1):
-        story.append(Paragraph(f"<b>{i}.</b> {step}", S_BULLET))
+        story.append(P(f"<b>{i}.</b> {step}", S_BULLET))
 
-    story.append(Paragraph("4.4 Example: Typing 你好 (nǐ hǎo)", S_H2))
+    story.append(P("4.4 Example: Typing 你好 (nǐ hǎo)", S_H2))
     example_headers = ["Step", "Keys", "Preedit", "Result"]
     example_rows = [
         ["1", "j (ㄋ) → u (ㄧ)", "[注]ㄋㄧ", "—"],
@@ -585,17 +609,17 @@ def build_content():
     story.append(PageBreak())
 
     # ===== 5. CANGJIE 5 (倉五) INPUT =====
-    story.append(Paragraph("5. Cangjie 5 (倉五) Input", S_H1))
+    story.append(P("5. Cangjie 5 (倉五) Input", S_H1))
     story.append(hr())
 
-    story.append(Paragraph(
+    story.append(P(
         "Cangjie is a shape-based input method that decomposes Chinese characters "
         "into components mapped to letter keys. Cangjie 5 is the most widely used version.",
         S_BODY,
     ))
 
-    story.append(Paragraph("5.1 Key Layout", S_H2))
-    story.append(Paragraph(
+    story.append(P("5.1 Key Layout", S_H2))
+    story.append(P(
         "Each letter A–Y maps to a Cangjie radical. Z is not used in standard Cangjie.",
         S_BODY,
     ))
@@ -610,7 +634,7 @@ def build_content():
     story.append(make_table(cj_headers, cj_rows,
                             col_widths=[10*mm, 12*mm]*5))
 
-    story.append(Paragraph("5.2 Input Flow", S_H2))
+    story.append(P("5.2 Input Flow", S_H2))
     for i, step in enumerate([
         "Decompose the character into Cangjie radicals (1–5 keys).",
         "Type the corresponding letter keys.",
@@ -618,9 +642,9 @@ def build_content():
         "If multiple candidates exist, press a number key to select.",
         "Press <b>Space</b> to confirm the first candidate.",
     ], 1):
-        story.append(Paragraph(f"<b>{i}.</b> {step}", S_BULLET))
+        story.append(P(f"<b>{i}.</b> {step}", S_BULLET))
 
-    story.append(Paragraph("5.3 Examples", S_H2))
+    story.append(P("5.3 Examples", S_H2))
     cj_ex_headers = ["Character", "Code", "Keys", "Meaning"]
     cj_ex_rows = [
         ["明", "日月", "A B", "Bright"],
@@ -631,7 +655,7 @@ def build_content():
     ]
     story.append(make_table(cj_ex_headers, cj_ex_rows,
                             col_widths=[20*mm, 28*mm, 28*mm, 30*mm]))
-    story.append(Paragraph(
+    story.append(P(
         "<i>The preedit display shows the method label and radicals: "
         "[倉]竹手一 1.嗨</i>",
         S_NOTE,
@@ -639,17 +663,17 @@ def build_content():
     story.append(PageBreak())
 
     # ===== 6. BOSHIAMY (嘸蝦米) INPUT =====
-    story.append(Paragraph("6. Boshiamy (嘸蝦米) Input", S_H1))
+    story.append(P("6. Boshiamy (嘸蝦米) Input", S_H1))
     story.append(hr())
 
-    story.append(Paragraph(
+    story.append(P(
         "Boshiamy (嘸蝦米) is a shape-based input method using letter keys to represent "
         "character components. It requires a separate table file (<b>liu.gtab</b>) "
         "that is not included with HIME by default.",
         S_BODY,
     ))
 
-    story.append(Paragraph("6.1 Installing the Boshiamy Table", S_H2))
+    story.append(P("6.1 Installing the Boshiamy Table", S_H2))
     for i, step in enumerate([
         "Obtain <b>liu-uni.tab</b> from your Boshiamy installation "
         "(typically at C:\\Program Files\\BoshiamyTIP\\liu-uni.tab).",
@@ -661,23 +685,23 @@ def build_content():
         "C:\\Program Files\\HIME\\data\\.",
         "Restart the application or re-register HIME.",
     ], 1):
-        story.append(Paragraph(f"<b>{i}.</b> {step}", S_BULLET))
+        story.append(P(f"<b>{i}.</b> {step}", S_BULLET))
 
-    story.append(Paragraph("6.2 Usage", S_H2))
-    story.append(Paragraph(
+    story.append(P("6.2 Usage", S_H2))
+    story.append(P(
         "Once installed, Boshiamy appears in the mode cycle (Ctrl+`, F4, or click) "
         "and in the right-click menu. The tray icon shows the Boshiamy icon (嘸蝦米 logo) "
         "when active.",
         S_BODY,
     ))
-    story.append(Paragraph(
+    story.append(P(
         "Boshiamy input works the same as Cangjie: type letter codes, then select "
         "from candidates. Refer to the official Boshiamy manual for the code table.",
         S_BODY,
     ))
 
-    story.append(Paragraph("6.3 Enabling/Disabling", S_H2))
-    story.append(Paragraph(
+    story.append(P("6.3 Enabling/Disabling", S_H2))
+    story.append(P(
         "If you have Boshiamy installed but don't want it in the cycle, "
         "open <b>Settings</b> (right-click menu → Settings) and uncheck "
         "嘸蝦米 (Boshiamy). It will be skipped when cycling modes.",
@@ -686,10 +710,10 @@ def build_content():
     story.append(PageBreak())
 
     # ===== 7. RIGHT-CLICK MENU =====
-    story.append(Paragraph("7. Right-Click Menu", S_H1))
+    story.append(P("7. Right-Click Menu", S_H1))
     story.append(hr())
 
-    story.append(Paragraph(
+    story.append(P(
         "Right-click the <b>HIME app icon</b> (姬) in the system tray "
         "to open the context menu:",
         S_BODY,
@@ -709,7 +733,7 @@ def build_content():
     story.append(make_table(menu_headers, menu_rows,
                             col_widths=[42*mm, 98*mm]))
     story.append(Spacer(1, 3*mm))
-    story.append(Paragraph(
+    story.append(P(
         "Only <b>enabled</b> input methods appear in the menu. "
         "Use Settings to control which methods are available.",
         S_NOTE,
@@ -717,27 +741,27 @@ def build_content():
     story.append(PageBreak())
 
     # ===== 8. SETTINGS =====
-    story.append(Paragraph("8. Settings", S_H1))
+    story.append(P("8. Settings", S_H1))
     story.append(hr())
 
-    story.append(Paragraph(
+    story.append(P(
         "Open Settings from the right-click menu → <b>Settings...</b>",
         S_BODY,
     ))
 
-    story.append(Paragraph("8.1 Input Method Selection", S_H2))
-    story.append(Paragraph(
+    story.append(P("8.1 Input Method Selection", S_H2))
+    story.append(P(
         "The Settings dialog shows checkboxes for each available input method:",
         S_BODY,
     ))
 
     settings_data = [
-        [Paragraph("☑", S_TD), Paragraph("注音 (Zhuyin)", S_TD_L),
-         Paragraph("Phonetic/Bopomofo input", S_TD_L)],
-        [Paragraph("☑", S_TD), Paragraph("倉五 (Cangjie 5)", S_TD_L),
-         Paragraph("Shape-based Cangjie input", S_TD_L)],
-        [Paragraph("☐", S_TD), Paragraph("嘸蝦米 (Boshiamy)", S_TD_L),
-         Paragraph("Boshiamy input (requires liu.gtab)", S_TD_L)],
+        [P("☑", S_TD), P("注音 (Zhuyin)", S_TD_L),
+         P("Phonetic/Bopomofo input", S_TD_L)],
+        [P("☑", S_TD), P("倉五 (Cangjie 5)", S_TD_L),
+         P("Shape-based Cangjie input", S_TD_L)],
+        [P("☐", S_TD), P("嘸蝦米 (Boshiamy)", S_TD_L),
+         P("Boshiamy input (requires liu.gtab)", S_TD_L)],
     ]
     st = Table(settings_data, colWidths=[12*mm, 45*mm, 70*mm])
     st.setStyle(TableStyle([
@@ -750,7 +774,7 @@ def build_content():
     ]))
     story.append(st)
 
-    story.append(Paragraph("8.2 Rules", S_H2))
+    story.append(P("8.2 Rules", S_H2))
     for item in [
         "<b>At least one</b> input method must remain enabled at all times.",
         "If you disable the currently active method, HIME automatically switches "
@@ -759,15 +783,15 @@ def build_content():
         "English (EN) passthrough mode is always available regardless of settings.",
         "Only enabled methods participate in the Ctrl+`/F4 and click cycle.",
     ]:
-        story.append(Paragraph(f"• {item}", S_BULLET))
+        story.append(P(f"• {item}", S_BULLET))
 
-    story.append(Paragraph("8.3 About Dialog", S_H2))
-    story.append(Paragraph(
+    story.append(P("8.3 About Dialog", S_H2))
+    story.append(P(
         "Select <b>About HIME</b> from the right-click menu to see:",
         S_BODY,
     ))
     about_box = Table(
-        [[Paragraph(
+        [[P(
             "<b>姬 HIME Input Method Editor</b><br/><br/>"
             "Version: 0.10.1<br/>"
             "Updated: 2026-02-15<br/><br/>"
@@ -787,32 +811,32 @@ def build_content():
     story.append(PageBreak())
 
     # ===== 9. FLOATING TOOLBAR =====
-    story.append(Paragraph("9. Floating Toolbar", S_H1))
+    story.append(P("9. Floating Toolbar", S_H1))
     story.append(hr())
 
-    story.append(Paragraph(
+    story.append(P(
         "The floating toolbar is a small popup window that provides quick access "
         "to common functions without needing the system tray.",
         S_BODY,
     ))
 
-    story.append(Paragraph("9.1 Enabling the Toolbar", S_H2))
-    story.append(Paragraph(
+    story.append(P("9.1 Enabling the Toolbar", S_H2))
+    story.append(P(
         "Right-click the HIME icon → select <b>IME Toolbar</b>. "
         "A checkmark indicates the toolbar is visible. Select again to hide it.",
         S_BODY,
     ))
 
-    story.append(Paragraph("9.2 Toolbar Layout", S_H2))
+    story.append(P("9.2 Toolbar Layout", S_H2))
     toolbar_data = [
-        [Paragraph("<b>注</b>", S_TD),
-         Paragraph("<b>Ａ</b>", S_TD),
-         Paragraph("<b>⚙</b>", S_TD)],
+        [P("<b>注</b>", S_TD),
+         P("<b>Ａ</b>", S_TD),
+         P("<b>⚙</b>", S_TD)],
     ]
     toolbar_labels = [
-        [Paragraph("Mode<br/>Icon", S_TD),
-         Paragraph("Full/<br/>Half", S_TD),
-         Paragraph("Settings", S_TD)],
+        [P("Mode<br/>Icon", S_TD),
+         P("Full/<br/>Half", S_TD),
+         P("Settings", S_TD)],
     ]
     tb = Table(toolbar_data, colWidths=[24*mm, 24*mm, 24*mm])
     tb.setStyle(TableStyle([
@@ -843,8 +867,8 @@ def build_content():
     story.append(make_table(tb_func_headers, tb_func_rows,
                             col_widths=[45*mm, 95*mm]))
 
-    story.append(Paragraph("9.3 Position", S_H2))
-    story.append(Paragraph(
+    story.append(P("9.3 Position", S_H2))
+    story.append(P(
         "The toolbar appears in the bottom-right corner of the screen, "
         "above the Windows taskbar. It stays on top of other windows.",
         S_BODY,
@@ -852,7 +876,7 @@ def build_content():
     story.append(PageBreak())
 
     # ===== 10. KEYBOARD SHORTCUTS =====
-    story.append(Paragraph("10. Keyboard Shortcuts", S_H1))
+    story.append(P("10. Keyboard Shortcuts", S_H1))
     story.append(hr())
 
     shortcut_headers = ["Shortcut", "Function", "Context"]
@@ -871,7 +895,7 @@ def build_content():
     story.append(PageBreak())
 
     # ===== 11. TROUBLESHOOTING =====
-    story.append(Paragraph("11. Troubleshooting", S_H1))
+    story.append(P("11. Troubleshooting", S_H1))
     story.append(hr())
 
     problems = [
@@ -909,19 +933,19 @@ def build_content():
     ]
 
     for title, fixes in problems:
-        story.append(Paragraph(f"<b>{title}</b>", S_H3))
+        story.append(P(f"<b>{title}</b>", S_H3))
         for fix in fixes:
-            story.append(Paragraph(f"• {fix}", S_BULLET))
+            story.append(P(f"• {fix}", S_BULLET))
         story.append(Spacer(1, 2*mm))
 
     story.append(Spacer(1, 10*mm))
     story.append(hr())
-    story.append(Paragraph(
+    story.append(P(
         "<b>Need more help?</b> Visit https://github.com/nicehime/hime/issues",
         S_BODY_C,
     ))
     story.append(Spacer(1, 15*mm))
-    story.append(Paragraph(
+    story.append(P(
         "© 2026 The HIME Team, Taiwan — GNU LGPL v2.1",
         S_NOTE,
     ))
