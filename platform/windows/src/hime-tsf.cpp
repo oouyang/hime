@@ -67,11 +67,11 @@ extern "C" {
 #endif
 
 /* Right-click menu item IDs */
-#define HIME_MENU_ID_ZHUYIN     10
-#define HIME_MENU_ID_GTAB_BASE  11   /* ID for GTAB index i = 11 + i */
-#define HIME_MENU_ID_TOOLBAR    50
-#define HIME_MENU_ID_SETTINGS   51
-#define HIME_MENU_ID_ABOUT      52
+#define HIME_MENU_ID_ZHUYIN 10
+#define HIME_MENU_ID_GTAB_BASE 11 /* ID for GTAB index i = 11 + i */
+#define HIME_MENU_ID_TOOLBAR 50
+#define HIME_MENU_ID_SETTINGS 51
+#define HIME_MENU_ID_ABOUT 52
 
 /* Maximum number of input method slots */
 #define HIME_MAX_METHODS 32
@@ -108,6 +108,27 @@ ITfLangBarItemButton : public ITfLangBarItem {
     virtual HRESULT STDMETHODCALLTYPE GetIcon (HICON * phIcon) = 0;
     virtual HRESULT STDMETHODCALLTYPE GetText (BSTR * pbstrText) = 0;
 };
+
+/* ITfFunction and ITfFnConfigure — not in MinGW headers */
+// IID_ITfFunction = {DB593490-098F-11D3-8DF0-00105A2799B5}
+MIDL_INTERFACE ("db593490-098f-11d3-8df0-00105a2799b5")
+ITfFunction : public IUnknown {
+  public:
+    virtual HRESULT STDMETHODCALLTYPE GetDisplayName (BSTR * pbstrName) = 0;
+};
+
+// IID_ITfFnConfigure = {88F567C6-1757-49F8-A1B2-89234C1EEFF9}
+MIDL_INTERFACE ("88f567c6-1757-49f8-a1b2-89234c1eeff9")
+ITfFnConfigure : public ITfFunction {
+  public:
+    virtual HRESULT STDMETHODCALLTYPE Show (HWND hwndParent, LANGID langid,
+                                            REFGUID rguidProfile) = 0;
+};
+
+static const IID IID_ITfFunction = {
+    0xdb593490, 0x098f, 0x11d3, {0x8d, 0xf0, 0x00, 0x10, 0x5a, 0x27, 0x99, 0xb5}};
+static const IID IID_ITfFnConfigure = {
+    0x88f567c6, 0x1757, 0x49f8, {0xa1, 0xb2, 0x89, 0x23, 0x4c, 0x1e, 0xef, 0xf9}};
 
 /* GUIDs */
 // {B8A45C32-5F6D-4E2A-9C1B-0D3E4F5A6B7C}
@@ -170,14 +191,14 @@ static class HimeTextService *g_pActiveService = NULL;
 
 /* Method slot: one entry per discoverable input method */
 typedef struct {
-    int gtab_index;          /* Index in core GTAB registry, -1 for Zhuyin */
-    HimeGtabTable gtab_id;   /* GTAB table ID */
-    BOOL available;          /* .gtab file exists on disk */
-    BOOL enabled;            /* User preference: include in toggle cycle */
-    WCHAR display_name[64];  /* e.g. L"倉五 (Cangjie 5)" */
-    char icon_filename[64];  /* e.g. "cj5.png" */
-    HICON cached_icon;       /* Per-method icon cache */
-    int group;               /* 0=Chinese, 1=International, 2=Symbols */
+    int gtab_index;         /* Index in core GTAB registry, -1 for Zhuyin */
+    HimeGtabTable gtab_id;  /* GTAB table ID */
+    BOOL available;         /* .gtab file exists on disk */
+    BOOL enabled;           /* User preference: include in toggle cycle */
+    WCHAR display_name[64]; /* e.g. L"倉五 (Cangjie 5)" */
+    char icon_filename[64]; /* e.g. "cj5.png" */
+    HICON cached_icon;      /* Per-method icon cache */
+    int group;              /* 0=Chinese, 1=International, 2=Symbols */
 } HimeMethodSlot;
 
 static HimeMethodSlot g_methods[HIME_MAX_METHODS];
@@ -186,30 +207,33 @@ static BOOL g_methodsDiscovered = FALSE;
 
 /* Static metadata: English names and groups for GTAB tables.
  * HimeGtabInfo only has Chinese names; we need English for Windows UI. */
-static const struct { const char *filename; const WCHAR *ename; int group; } GTAB_META[] = {
-    {"cj.gtab",            L"Cangjie",       0},
-    {"cj5.gtab",           L"Cangjie 5",     0},
-    {"cj543.gtab",         L"Cangjie 543",   0},
-    {"cj-punc.gtab",       L"CJ Punc",       0},
-    {"simplex.gtab",       L"Simplex",        0},
-    {"simplex-punc.gtab",  L"Simplex Punc",   0},
-    {"dayi3.gtab",         L"DaYi",           0},
-    {"ar30.gtab",          L"Array 30",       0},
-    {"array40.gtab",       L"Array 40",       0},
-    {"ar30-big.gtab",      L"Array 30 Big",   0},
-    {"liu.gtab",           L"Boshiamy",        0},
-    {"pinyin.gtab",        L"Pinyin",          0},
-    {"jyutping.gtab",      L"Jyutping",        0},
-    {"hangul.gtab",        L"Hangul",          1},
-    {"hangul-roman.gtab",  L"Hangul Roman",    1},
-    {"vims.gtab",          L"VIMS",            1},
-    {"symbols.gtab",       L"Symbols",         2},
-    {"greek.gtab",         L"Greek",           2},
-    {"russian.gtab",       L"Russian",         2},
-    {"esperanto.gtab",     L"Esperanto",       2},
-    {"latin-letters.gtab", L"Latin",           2},
-    {NULL, NULL, 0}
-};
+static const struct {
+    const char *filename;
+    const WCHAR *ename;
+    int group;
+} GTAB_META[] = {
+    {"cj.gtab", L"Cangjie", 0},
+    {"cj5.gtab", L"Cangjie 5", 0},
+    {"cj543.gtab", L"Cangjie 543", 0},
+    {"cj-punc.gtab", L"CJ Punc", 0},
+    {"simplex.gtab", L"Simplex", 0},
+    {"simplex-punc.gtab", L"Simplex Punc", 0},
+    {"dayi3.gtab", L"DaYi", 0},
+    {"ar30.gtab", L"Array 30", 0},
+    {"array40.gtab", L"Array 40", 0},
+    {"ar30-big.gtab", L"Array 30 Big", 0},
+    {"liu.gtab", L"Boshiamy", 0},
+    {"pinyin.gtab", L"Pinyin", 0},
+    {"jyutping.gtab", L"Jyutping", 0},
+    {"hangul.gtab", L"Hangul", 1},
+    {"hangul-roman.gtab", L"Hangul Roman", 1},
+    {"vims.gtab", L"VIMS", 1},
+    {"symbols.gtab", L"Symbols", 2},
+    {"greek.gtab", L"Greek", 2},
+    {"russian.gtab", L"Russian", 2},
+    {"esperanto.gtab", L"Esperanto", 2},
+    {"latin-letters.gtab", L"Latin", 2},
+    {NULL, NULL, 0}};
 
 static void
 _EnsureGdiplusInit (void) {
@@ -485,7 +509,7 @@ _LoadSettings (void) {
     DWORD dwordSize = sizeof (savedCount);
     DWORD type = 0;
     rc = RegQueryValueExW (hKey, L"MethodCount", NULL, &type,
-                            (BYTE *) &savedCount, &dwordSize);
+                           (BYTE *) &savedCount, &dwordSize);
     if (rc != ERROR_SUCCESS || type != REG_DWORD || (int) savedCount != g_methodCount) {
         hime_log ("LoadSettings: skipping stale settings (saved=%lu current=%d)",
                   (unsigned long) savedCount, g_methodCount);
@@ -515,7 +539,8 @@ _LoadSettings (void) {
     WCHAR *token = wcstok (data, L",");
     while (token) {
         /* Trim whitespace */
-        while (*token == L' ') token++;
+        while (*token == L' ')
+            token++;
 
         if (wcscmp (token, L"zhuyin") == 0) {
             g_methods[0].enabled = TRUE;
@@ -554,7 +579,7 @@ static void
 _SaveSettings (void) {
     HKEY hKey;
     LONG rc = RegCreateKeyExW (HKEY_CURRENT_USER, L"Software\\HIME", 0, NULL,
-                                REG_OPTION_NON_VOLATILE, KEY_WRITE, NULL, &hKey, NULL);
+                               REG_OPTION_NON_VOLATILE, KEY_WRITE, NULL, &hKey, NULL);
     if (rc != ERROR_SUCCESS)
         return;
 
@@ -586,12 +611,12 @@ _SaveSettings (void) {
     data[pos] = L'\0';
 
     RegSetValueExW (hKey, L"EnabledMethods", 0, REG_SZ,
-                     (const BYTE *) data, (pos + 1) * sizeof (WCHAR));
+                    (const BYTE *) data, (pos + 1) * sizeof (WCHAR));
 
     /* Save method count so _LoadSettings can detect stale settings */
     DWORD count = (DWORD) g_methodCount;
     RegSetValueExW (hKey, L"MethodCount", 0, REG_DWORD,
-                     (const BYTE *) &count, sizeof (count));
+                    (const BYTE *) &count, sizeof (count));
 
     RegCloseKey (hKey);
     hime_log ("SaveSettings: '%ls' (count=%d)", data, g_methodCount);
@@ -696,6 +721,62 @@ class HimeModeButton : public ITfLangBarItemButton,
     DWORD m_dwSinkCookie;
 };
 
+/* ========== HimeFnConfigure Class ========== */
+
+/* Implements ITfFnConfigure so Windows Settings shows "Keyboard options" */
+class HimeFnConfigure : public ITfFnConfigure {
+  public:
+    HimeFnConfigure () : m_cRef (1) {}
+
+    /* IUnknown */
+    STDMETHODIMP QueryInterface (REFIID riid, void **ppvObj) {
+        if (ppvObj == NULL)
+            return E_INVALIDARG;
+        *ppvObj = NULL;
+        if (IsEqualIID (riid, IID_IUnknown) ||
+            IsEqualIID (riid, IID_ITfFunction)) {
+            *ppvObj = (ITfFunction *) this;
+        } else if (IsEqualIID (riid, IID_ITfFnConfigure)) {
+            *ppvObj = (ITfFnConfigure *) this;
+        }
+        if (*ppvObj) {
+            AddRef ();
+            return S_OK;
+        }
+        return E_NOINTERFACE;
+    }
+
+    STDMETHODIMP_ (ULONG)
+    AddRef () { return InterlockedIncrement (&m_cRef); }
+    STDMETHODIMP_ (ULONG)
+    Release () {
+        LONG cr = InterlockedDecrement (&m_cRef);
+        if (cr == 0)
+            delete this;
+        return cr;
+    }
+
+    /* ITfFunction */
+    STDMETHODIMP GetDisplayName (BSTR *pbstrName) {
+        if (!pbstrName)
+            return E_INVALIDARG;
+        *pbstrName = SysAllocString (L"HIME Settings");
+        return *pbstrName ? S_OK : E_OUTOFMEMORY;
+    }
+
+    /* ITfFnConfigure */
+    STDMETHODIMP Show (HWND hwndParent, LANGID langid, REFGUID rguidProfile) {
+        (void) hwndParent;
+        (void) langid;
+        (void) rguidProfile;
+        _ShowSettingsDialog ();
+        return S_OK;
+    }
+
+  private:
+    LONG m_cRef;
+};
+
 /* ========== HimeTextService Class ========== */
 
 /* Edit session for composition updates */
@@ -750,7 +831,8 @@ class HimeEditSession : public ITfEditSession {
 
 class HimeTextService : public ITfTextInputProcessor,
                         public ITfKeyEventSink,
-                        public ITfCompositionSink {
+                        public ITfCompositionSink,
+                        public ITfFunctionProvider {
   public:
     HimeTextService ();
     ~HimeTextService ();
@@ -776,6 +858,11 @@ class HimeTextService : public ITfTextInputProcessor,
 
     /* ITfCompositionSink */
     STDMETHODIMP OnCompositionTerminated (TfEditCookie ecWrite, ITfComposition *pComposition);
+
+    /* ITfFunctionProvider */
+    STDMETHODIMP GetType (GUID *pguid);
+    STDMETHODIMP GetDescription (BSTR *pbstrDesc);
+    STDMETHODIMP GetFunction (REFGUID rguid, REFIID riid, IUnknown **ppunk);
 
     /* Called by edit session */
     HRESULT DoStartComposition (TfEditCookie ec, ITfContext *pContext);
@@ -870,6 +957,8 @@ STDMETHODIMP HimeTextService::QueryInterface (REFIID riid, void **ppvObj) {
         *ppvObj = (ITfKeyEventSink *) this;
     } else if (IsEqualIID (riid, IID_ITfCompositionSink)) {
         *ppvObj = (ITfCompositionSink *) this;
+    } else if (IsEqualIID (riid, IID_ITfFunctionProvider)) {
+        *ppvObj = (ITfFunctionProvider *) this;
     }
 
     if (*ppvObj) {
@@ -892,6 +981,34 @@ HimeTextService::Release () {
         delete this;
     }
     return cr;
+}
+
+/* ITfFunctionProvider */
+STDMETHODIMP HimeTextService::GetType (GUID *pguid) {
+    if (!pguid)
+        return E_INVALIDARG;
+    *pguid = CLSID_HimeTextService;
+    return S_OK;
+}
+
+STDMETHODIMP HimeTextService::GetDescription (BSTR *pbstrDesc) {
+    if (!pbstrDesc)
+        return E_INVALIDARG;
+    *pbstrDesc = SysAllocString (TEXTSERVICE_DESC);
+    return *pbstrDesc ? S_OK : E_OUTOFMEMORY;
+}
+
+STDMETHODIMP HimeTextService::GetFunction (REFGUID rguid, REFIID riid, IUnknown **ppunk) {
+    if (!ppunk)
+        return E_INVALIDARG;
+    *ppunk = NULL;
+
+    if (IsEqualIID (riid, IID_ITfFnConfigure)) {
+        *ppunk = (ITfFnConfigure *) new HimeFnConfigure ();
+        return *ppunk ? S_OK : E_OUTOFMEMORY;
+    }
+
+    return E_NOINTERFACE;
 }
 
 STDMETHODIMP HimeTextService::Activate (ITfThreadMgr *pThreadMgr, TfClientId tfClientId) {
@@ -1003,6 +1120,14 @@ STDMETHODIMP HimeTextService::Activate (ITfThreadMgr *pThreadMgr, TfClientId tfC
     hr = _InitLanguageBar ();
     hime_log ("Activate: _InitLanguageBar returned 0x%08lx", (unsigned long) hr);
 
+    /* Register as function provider so Windows Settings shows "Keyboard options" */
+    ITfSourceSingle *pSourceSingle = NULL;
+    if (SUCCEEDED (m_pThreadMgr->QueryInterface (IID_ITfSourceSingle, (void **) &pSourceSingle))) {
+        pSourceSingle->AdviseSingleSink (m_tfClientId, IID_ITfFunctionProvider,
+                                         (ITfFunctionProvider *) this);
+        pSourceSingle->Release ();
+    }
+
     return S_OK;
 }
 
@@ -1022,6 +1147,13 @@ STDMETHODIMP HimeTextService::Deactivate () {
     }
 
     if (m_pThreadMgr) {
+        /* Unregister function provider */
+        ITfSourceSingle *pSourceSingle = NULL;
+        if (SUCCEEDED (m_pThreadMgr->QueryInterface (IID_ITfSourceSingle, (void **) &pSourceSingle))) {
+            pSourceSingle->UnadviseSingleSink (m_tfClientId, IID_ITfFunctionProvider);
+            pSourceSingle->Release ();
+        }
+
         m_pThreadMgr->Release ();
         m_pThreadMgr = NULL;
     }
@@ -1793,7 +1925,8 @@ _CreateModeIconForContext (HimeContext *ctx) {
             WCHAR dllDir[MAX_PATH];
             GetModuleFileNameW (g_hInst, dllDir, MAX_PATH);
             WCHAR *sep = wcsrchr (dllDir, L'\\');
-            if (sep) *sep = L'\0';
+            if (sep)
+                *sep = L'\0';
             WCHAR pngPath[MAX_PATH];
             _snwprintf (pngPath, MAX_PATH, L"%ls\\icons\\hime-tray.png", dllDir);
             hIcon = _LoadPngAsIcon (pngPath, SIZE);
@@ -1801,7 +1934,8 @@ _CreateModeIconForContext (HimeContext *ctx) {
         if (!hIcon)
             hIcon = _CreateFallbackIcon ("EN", RGB (80, 80, 80), SIZE);
         if (hIcon) {
-            if (g_enIcon) DestroyIcon (g_enIcon);
+            if (g_enIcon)
+                DestroyIcon (g_enIcon);
             g_enIcon = hIcon;
             return CopyIcon (hIcon);
         }
@@ -1823,7 +1957,8 @@ _CreateModeIconForContext (HimeContext *ctx) {
         WCHAR dllDir[MAX_PATH];
         GetModuleFileNameW (g_hInst, dllDir, MAX_PATH);
         WCHAR *sep = wcsrchr (dllDir, L'\\');
-        if (sep) *sep = L'\0';
+        if (sep)
+            *sep = L'\0';
 
         WCHAR iconW[64];
         MultiByteToWideChar (CP_UTF8, 0, slot->icon_filename, -1, iconW, 64);
@@ -1837,18 +1972,19 @@ _CreateModeIconForContext (HimeContext *ctx) {
         const char *label = ctx ? hime_get_method_label (ctx) : "?";
         COLORREF bgColor;
         if (methodIdx == 0)
-            bgColor = RGB (0, 90, 180);   /* Blue for Zhuyin */
+            bgColor = RGB (0, 90, 180); /* Blue for Zhuyin */
         else if (slot->group == 1)
-            bgColor = RGB (180, 90, 0);   /* Orange for International */
+            bgColor = RGB (180, 90, 0); /* Orange for International */
         else if (slot->group == 2)
-            bgColor = RGB (128, 0, 128);  /* Purple for Symbols */
+            bgColor = RGB (128, 0, 128); /* Purple for Symbols */
         else
-            bgColor = RGB (0, 130, 60);   /* Green for Chinese GTAB */
+            bgColor = RGB (0, 130, 60); /* Green for Chinese GTAB */
         hIcon = _CreateFallbackIcon (label, bgColor, SIZE);
     }
 
     if (hIcon) {
-        if (slot->cached_icon) DestroyIcon (slot->cached_icon);
+        if (slot->cached_icon)
+            DestroyIcon (slot->cached_icon);
         slot->cached_icon = hIcon;
         return CopyIcon (hIcon);
     }
@@ -2063,7 +2199,7 @@ STDMETHODIMP HimeLangBarButton::InitMenu (ITfMenu *pMenu) {
 
         DWORD flags = (i == currentIdx) ? TF_LBMENUF_CHECKED : 0;
         UINT menuId = (i == 0) ? HIME_MENU_ID_ZHUYIN
-                                : (UINT) (HIME_MENU_ID_GTAB_BASE + g_methods[i].gtab_index);
+                               : (UINT) (HIME_MENU_ID_GTAB_BASE + g_methods[i].gtab_index);
 
         pMenu->AddMenuItem (menuId, flags, NULL, NULL,
                             g_methods[i].display_name,
@@ -2481,7 +2617,8 @@ _ShowSettingsDialog (void) {
     int totalItems = availCount + groupHeaders + 2; /* +2 for OK/Cancel */
     int yBase = 10;
     int dialogHeight = yBase + (availCount + groupHeaders) * 16 + 30;
-    if (dialogHeight < 100) dialogHeight = 100;
+    if (dialogHeight < 100)
+        dialogHeight = 100;
 
     /* DLGTEMPLATE */
     DLGTEMPLATE *dlg = (DLGTEMPLATE *) p;
@@ -2512,27 +2649,27 @@ _ShowSettingsDialog (void) {
     p += fontLen;
 
     /* Helper macro for adding DLGITEMTEMPLATE */
-#define ADD_ITEM(id_, style_, x_, y_, cx_, cy_, cls_, text_) \
-    do {                                                     \
-        p = ALIGN_DWORD (p);                                 \
-        DLGITEMTEMPLATE *item = (DLGITEMTEMPLATE *) p;       \
-        item->style = (style_) | WS_CHILD | WS_VISIBLE;      \
-        item->x = (x_);                                      \
-        item->y = (y_);                                      \
-        item->cx = (cx_);                                    \
-        item->cy = (cy_);                                    \
-        item->id = (id_);                                    \
-        p += sizeof (DLGITEMTEMPLATE);                       \
-        *(WORD *) p = 0xFFFF;                                \
-        p += sizeof (WORD);                                  \
-        *(WORD *) p = (cls_);                                \
-        p += sizeof (WORD);                                  \
-        const WCHAR *_t = (text_);                           \
+#define ADD_ITEM(id_, style_, x_, y_, cx_, cy_, cls_, text_)      \
+    do {                                                          \
+        p = ALIGN_DWORD (p);                                      \
+        DLGITEMTEMPLATE *item = (DLGITEMTEMPLATE *) p;            \
+        item->style = (style_) | WS_CHILD | WS_VISIBLE;           \
+        item->x = (x_);                                           \
+        item->y = (y_);                                           \
+        item->cx = (cx_);                                         \
+        item->cy = (cy_);                                         \
+        item->id = (id_);                                         \
+        p += sizeof (DLGITEMTEMPLATE);                            \
+        *(WORD *) p = 0xFFFF;                                     \
+        p += sizeof (WORD);                                       \
+        *(WORD *) p = (cls_);                                     \
+        p += sizeof (WORD);                                       \
+        const WCHAR *_t = (text_);                                \
         int _tl = (int) (wcslen (_t) + 1) * (int) sizeof (WCHAR); \
-        memcpy (p, _t, _tl);                                 \
-        p += _tl;                                            \
-        *(WORD *) p = 0;                                     \
-        p += sizeof (WORD);                                  \
+        memcpy (p, _t, _tl);                                      \
+        p += _tl;                                                 \
+        *(WORD *) p = 0;                                          \
+        p += sizeof (WORD);                                       \
     } while (0)
 
     int y = yBase;
@@ -2914,18 +3051,18 @@ STDAPI DllRegisterServer () {
         HRESULT hr2;
         /* Register as keyboard */
         hr2 = pCategoryMgr->RegisterCategory (CLSID_HimeTextService,
-                                        GUID_TFCAT_TIP_KEYBOARD,
-                                        CLSID_HimeTextService);
+                                              GUID_TFCAT_TIP_KEYBOARD,
+                                              CLSID_HimeTextService);
         hime_log ("DllRegisterServer: RegisterCategory(KEYBOARD) hr=0x%08lx", (unsigned long) hr2);
         /* Register systray support (shows language bar in system tray) */
         hr2 = pCategoryMgr->RegisterCategory (CLSID_HimeTextService,
-                                        GUID_TFCAT_TIPCAP_SYSTRAYSUPPORT,
-                                        CLSID_HimeTextService);
+                                              GUID_TFCAT_TIPCAP_SYSTRAYSUPPORT,
+                                              CLSID_HimeTextService);
         hime_log ("DllRegisterServer: RegisterCategory(SYSTRAYSUPPORT) hr=0x%08lx", (unsigned long) hr2);
         /* Register immersive/UWP support (Windows 8+) */
         hr2 = pCategoryMgr->RegisterCategory (CLSID_HimeTextService,
-                                        GUID_TFCAT_TIPCAP_IMMERSIVESUPPORT,
-                                        CLSID_HimeTextService);
+                                              GUID_TFCAT_TIPCAP_IMMERSIVESUPPORT,
+                                              CLSID_HimeTextService);
         hime_log ("DllRegisterServer: RegisterCategory(IMMERSIVESUPPORT) hr=0x%08lx", (unsigned long) hr2);
         pCategoryMgr->Release ();
     }
