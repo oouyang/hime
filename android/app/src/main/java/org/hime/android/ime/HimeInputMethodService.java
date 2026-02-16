@@ -170,15 +170,26 @@ public class HimeInputMethodService extends InputMethodService implements HimeKe
 
     /* Key processing */
 
+    /* Key processing result from hime-core (must match HimeKeyResult enum) */
+    private static final int RESULT_PREEDIT = 3;
+
     private boolean processKeyInput(char c) {
         int result = engine.processKey(c, 0);
+        Log.d(TAG, "processKeyInput: char=" + c + " result=" + result);
 
         switch (result) {
             case HimeEngine.RESULT_COMMIT:
                 String commit = engine.getCommit();
+                Log.d(TAG, "processKeyInput: commit='" + commit + "'");
                 if (commit != null && !commit.isEmpty()) {
                     commitText(commit);
                 }
+                updatePreedit();
+                updateCandidates();
+                return true;
+
+            case RESULT_PREEDIT:
+                /* Preedit updated (e.g. Bopomofo symbols entered, candidates shown) */
                 updatePreedit();
                 updateCandidates();
                 return true;
@@ -231,14 +242,26 @@ public class HimeInputMethodService extends InputMethodService implements HimeKe
             return;
         }
 
-        String[] candidates = engine.getCandidates(0);
-        if (candidates != null && candidates.length > 0) {
-            /* Select first candidate */
-            onCandidateSelected(0);
+        /* In Zhuyin, Space is tone-1 key. Process it through the engine first
+         * so the tone triggers candidate lookup. */
+        int result = engine.processKey(' ', 0);
+        Log.d(TAG, "handleSpace: processKey result=" + result);
+
+        if (result == HimeEngine.RESULT_COMMIT) {
+            String commit = engine.getCommit();
+            Log.d(TAG, "handleSpace: commit='" + commit + "'");
+            if (commit != null && !commit.isEmpty()) {
+                commitText(commit);
+            }
+            updatePreedit();
+            updateCandidates();
+        } else if (result == RESULT_PREEDIT || result == HimeEngine.RESULT_CONSUMED) {
+            updatePreedit();
+            updateCandidates();
         } else {
+            /* Engine didn't handle it — treat as literal space */
             String preedit = engine.getPreedit();
             if (preedit != null && !preedit.isEmpty()) {
-                /* Commit preedit */
                 commitText(preedit);
                 engine.clearPreedit();
                 updatePreedit();
@@ -286,9 +309,21 @@ public class HimeInputMethodService extends InputMethodService implements HimeKe
         if (engine == null)
             return;
 
+        /* Handle navigation from CandidateView (-1=prev, -2=next) */
+        if (index == -1) {
+            navigateCandidates(-1);
+            return;
+        }
+        if (index == -2) {
+            navigateCandidates(1);
+            return;
+        }
+
         int actualIndex = currentPage * HimeEngine.CANDIDATES_PER_PAGE + index;
+        Log.d(TAG, "onCandidateSelected: index=" + index + " actual=" + actualIndex);
         if (engine.selectCandidate(actualIndex)) {
             String commit = engine.getCommit();
+            Log.d(TAG, "onCandidateSelected: commit='" + commit + "'");
             if (commit != null && !commit.isEmpty()) {
                 commitText(commit);
             }
