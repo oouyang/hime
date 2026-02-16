@@ -44,8 +44,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install MinGW
-        run: sudo apt-get update && sudo apt-get install -y mingw-w64 cmake
+      - name: Install MinGW and Wine
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y mingw-w64 cmake wine64
 
       - name: Build
         run: |
@@ -53,6 +55,13 @@ jobs:
           mkdir build && cd build
           cmake .. -DCMAKE_TOOLCHAIN_FILE=../mingw-w64-x86_64.cmake -DCMAKE_BUILD_TYPE=Release
           make -j$(nproc)
+
+      - name: Run tests
+        run: |
+          cd platform/windows/build/bin
+          wine64 test-hime-crypt.exe
+          wine64 test-hime-conf.exe
+          wine64 test-hime-core.exe
 
       - name: Upload Windows artifacts
         uses: actions/upload-artifact@v4
@@ -112,6 +121,11 @@ jobs:
           cmake .. -DCMAKE_BUILD_TYPE=Release
           make -j$(sysctl -n hw.ncpu)
 
+      - name: Run tests
+        run: |
+          cd platform/macos/build
+          ctest --output-on-failure
+
       - name: Upload macOS artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -127,5 +141,5 @@ jobs:
         run: |
           cd platform/ios
           mkdir build && cd build
-          cmake .. -G Xcode -DCMAKE_SYSTEM_NAME=iOS
+          cmake .. -G Xcode -DCMAKE_SYSTEM_NAME=iOS -DBUILD_TESTS=ON
           cmake --build . --config Release -- -sdk iphoneos -allowProvisioningUpdates CODE_SIGNING_ALLOWED=NO
