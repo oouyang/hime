@@ -58,6 +58,9 @@ PLAN.md
 install-sh
 pkgconfig/
 
+# Python
+__pycache__/
+
 # Build directories
 windows/build/
 macos/build/
