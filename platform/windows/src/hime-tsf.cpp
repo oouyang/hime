@@ -18,6 +18,9 @@
 #include <olectl.h>
 #include <windows.h>
 
+/* Shell_NotifyIcon for system tray */
+#include <shellapi.h>
+
 /* GDI+ for PNG icon loading */
 #include <gdiplus.h>
 
@@ -183,6 +186,14 @@ static BOOL g_toolbarVisible = FALSE;
 static const WCHAR TOOLBAR_CLASS[] = L"HimeToolbarClass";
 static BOOL g_toolbarClassRegistered = FALSE;
 static BOOL g_fullWidth = TRUE; /* Full-width character mode */
+
+/* System tray icon state */
+#define HIME_WM_TRAY (WM_USER + 100)
+#define HIME_TRAY_ID 1
+static HWND g_hwndTrayMsg = NULL;
+static BOOL g_trayIconAdded = FALSE;
+static const WCHAR TRAYMSG_CLASS[] = L"HimeTrayMsgClass";
+static BOOL g_trayClassRegistered = FALSE;
 
 /* Active service pointer for toolbar and dialogs */
 static class HimeTextService *g_pActiveService = NULL;
@@ -636,6 +647,9 @@ static void _ShowSettingsDialog (void);
 static HICON _CreateModeIconForContext (HimeContext *ctx);
 static HICON _CreateAppIcon (void);
 static void _CycleInputMethod (HimeContext *ctx);
+static void _CreateTrayIcon (void);
+static void _DestroyTrayIcon (void);
+static void _UpdateTrayIcon (void);
 
 /* ========== HimeLangBarButton Class (declaration only — implementation after HimeTextService) ========== */
 
@@ -1120,6 +1134,9 @@ STDMETHODIMP HimeTextService::Activate (ITfThreadMgr *pThreadMgr, TfClientId tfC
     hr = _InitLanguageBar ();
     hime_log ("Activate: _InitLanguageBar returned 0x%08lx", (unsigned long) hr);
 
+    /* Create system tray icon */
+    _CreateTrayIcon ();
+
     /* Register as function provider so Windows Settings shows "Keyboard options" */
     ITfSourceSingle *pSourceSingle = NULL;
     if (SUCCEEDED (m_pThreadMgr->QueryInterface (IID_ITfSourceSingle, (void **) &pSourceSingle))) {
@@ -1132,6 +1149,9 @@ STDMETHODIMP HimeTextService::Activate (ITfThreadMgr *pThreadMgr, TfClientId tfC
 }
 
 STDMETHODIMP HimeTextService::Deactivate () {
+    /* Remove system tray icon */
+    _DestroyTrayIcon ();
+
     /* Hide and destroy floating toolbar */
     _ShowToolbar (FALSE);
 
@@ -1264,6 +1284,7 @@ void HimeTextService::UpdateLanguageBar () {
         m_pModeButton->Update ();
     }
     _UpdateToolbar ();
+    _UpdateTrayIcon ();
 }
 
 HRESULT HimeTextService::_RequestEditSession (ITfContext *pContext, int action) {
@@ -2719,6 +2740,229 @@ _ShowSettingsDialog (void) {
               (long long) dlgResult, (dlgResult == -1) ? GetLastError () : 0);
 }
 
+/* ========== System Tray Icon ========== */
+
+/* Handle a WM_COMMAND menu selection from the tray popup.
+ * Reuses the same HIME_MENU_ID_* constants as InitMenu/OnMenuSelect. */
+static void
+_TrayMenuDispatch (UINT wID) {
+    hime_log ("_TrayMenuDispatch: wID=%u", wID);
+    HimeContext *ctx = g_pActiveService ? g_pActiveService->GetHimeContext () : NULL;
+
+    if (wID == HIME_MENU_ID_ZHUYIN) {
+        if (ctx) {
+            _SwitchToMethod (ctx, 0);
+            g_pActiveService->UpdateLanguageBar ();
+        }
+    } else if (wID >= HIME_MENU_ID_GTAB_BASE && wID < HIME_MENU_ID_TOOLBAR) {
+        int gtabIdx = (int) wID - HIME_MENU_ID_GTAB_BASE;
+        if (ctx) {
+            for (int i = 1; i < g_methodCount; i++) {
+                if (g_methods[i].gtab_index == gtabIdx) {
+                    _SwitchToMethod (ctx, i);
+                    g_pActiveService->UpdateLanguageBar ();
+                    break;
+                }
+            }
+        }
+    } else if (wID == HIME_MENU_ID_TOOLBAR) {
+        g_toolbarVisible = !g_toolbarVisible;
+        _ShowToolbar (g_toolbarVisible);
+    } else if (wID == HIME_MENU_ID_SETTINGS) {
+        _ShowSettingsDialog ();
+    } else if (wID == HIME_MENU_ID_ABOUT) {
+        _ShowAboutDialog ();
+    }
+}
+
+/* Build and show a Win32 popup menu mirroring InitMenu items */
+static void
+_ShowTrayPopupMenu (HWND hwnd) {
+    hime_log ("_ShowTrayPopupMenu: building menu");
+    HMENU hMenu = CreatePopupMenu ();
+    if (!hMenu)
+        return;
+
+    int currentIdx = -1;
+    HimeContext *ctx = g_pActiveService ? g_pActiveService->GetHimeContext () : NULL;
+    if (ctx)
+        currentIdx = _GetCurrentMethodIndex (ctx);
+
+    /* Input methods grouped by category */
+    static const WCHAR *groupNames[] = {L"--- Chinese ---", L"--- International ---",
+                                        L"--- Symbols ---"};
+    int lastGroup = -1;
+
+    for (int i = 0; i < g_methodCount; i++) {
+        if (!g_methods[i].available)
+            continue;
+
+        if (g_methods[i].group != lastGroup) {
+            if (lastGroup >= 0) {
+                AppendMenuW (hMenu, MF_SEPARATOR, 0, NULL);
+            }
+            if (g_methods[i].group > 0) {
+                AppendMenuW (hMenu, MF_STRING | MF_GRAYED, 0, groupNames[g_methods[i].group]);
+            }
+            lastGroup = g_methods[i].group;
+        }
+
+        UINT menuId = (i == 0) ? HIME_MENU_ID_ZHUYIN
+                               : (UINT) (HIME_MENU_ID_GTAB_BASE + g_methods[i].gtab_index);
+        UINT flags = MF_STRING;
+        if (i == currentIdx)
+            flags |= MF_CHECKED;
+
+        AppendMenuW (hMenu, flags, menuId, g_methods[i].display_name);
+    }
+
+    /* Separator */
+    AppendMenuW (hMenu, MF_SEPARATOR, 0, NULL);
+
+    /* IME Toolbar toggle */
+    UINT flagToolbar = g_toolbarVisible ? MF_CHECKED : 0;
+    AppendMenuW (hMenu, MF_STRING | flagToolbar, HIME_MENU_ID_TOOLBAR, L"IME Toolbar");
+
+    /* Separator */
+    AppendMenuW (hMenu, MF_SEPARATOR, 0, NULL);
+
+    /* Settings and About */
+    AppendMenuW (hMenu, MF_STRING, HIME_MENU_ID_SETTINGS, L"Settings...");
+    AppendMenuW (hMenu, MF_STRING, HIME_MENU_ID_ABOUT, L"About HIME");
+
+    /* TrackPopupMenu requires the window to be foreground */
+    POINT pt;
+    GetCursorPos (&pt);
+    SetForegroundWindow (hwnd);
+    UINT cmd = (UINT) TrackPopupMenu (hMenu, TPM_RETURNCMD | TPM_NONOTIFY | TPM_RIGHTBUTTON,
+                                      pt.x, pt.y, 0, hwnd, NULL);
+    /* Send WM_NULL to dismiss the menu properly */
+    PostMessage (hwnd, WM_NULL, 0, 0);
+    DestroyMenu (hMenu);
+
+    hime_log ("_ShowTrayPopupMenu: user selected cmd=%u", cmd);
+    if (cmd)
+        _TrayMenuDispatch (cmd);
+}
+
+static LRESULT CALLBACK
+_TrayMsgWndProc (HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
+    switch (msg) {
+    case HIME_WM_TRAY:
+        if (lParam == WM_RBUTTONUP) {
+            hime_log ("_TrayMsgWndProc: WM_RBUTTONUP — opening popup menu");
+            _ShowTrayPopupMenu (hwnd);
+            return 0;
+        } else if (lParam == WM_LBUTTONUP) {
+            hime_log ("_TrayMsgWndProc: WM_LBUTTONUP — cycling input method");
+            HimeContext *ctx = g_pActiveService ? g_pActiveService->GetHimeContext () : NULL;
+            if (ctx) {
+                _CycleInputMethod (ctx);
+                if (g_pActiveService)
+                    g_pActiveService->UpdateLanguageBar ();
+            }
+            return 0;
+        }
+        break;
+    }
+    return DefWindowProc (hwnd, msg, wParam, lParam);
+}
+
+static void
+_CreateTrayIcon (void) {
+    if (g_trayIconAdded)
+        return;
+
+    /* Register hidden message-only window class */
+    if (!g_trayClassRegistered) {
+        WNDCLASSW wc;
+        ZeroMemory (&wc, sizeof (wc));
+        wc.lpfnWndProc = _TrayMsgWndProc;
+        wc.hInstance = g_hInst;
+        wc.lpszClassName = TRAYMSG_CLASS;
+        if (RegisterClassW (&wc))
+            g_trayClassRegistered = TRUE;
+        else
+            return;
+    }
+
+    /* Create message-only window (HWND_MESSAGE parent) */
+    g_hwndTrayMsg = CreateWindowExW (0, TRAYMSG_CLASS, L"HimeTrayMsg", 0,
+                                     0, 0, 0, 0, HWND_MESSAGE, NULL, g_hInst, NULL);
+    if (!g_hwndTrayMsg)
+        return;
+
+    /* Fill NOTIFYICONDATAW and add the icon */
+    NOTIFYICONDATAW nid;
+    ZeroMemory (&nid, sizeof (nid));
+    nid.cbSize = sizeof (nid);
+    nid.hWnd = g_hwndTrayMsg;
+    nid.uID = HIME_TRAY_ID;
+    nid.uFlags = NIF_ICON | NIF_MESSAGE | NIF_TIP;
+    nid.uCallbackMessage = HIME_WM_TRAY;
+    nid.hIcon = _CreateAppIcon ();
+    wcscpy (nid.szTip, L"\x59EC HIME"); /* 姬 HIME */
+
+    if (Shell_NotifyIconW (NIM_ADD, &nid)) {
+        g_trayIconAdded = TRUE;
+        hime_log ("_CreateTrayIcon: added OK");
+    } else {
+        hime_log ("_CreateTrayIcon: Shell_NotifyIconW(NIM_ADD) failed err=%lu",
+                  GetLastError ());
+    }
+
+    if (nid.hIcon)
+        DestroyIcon (nid.hIcon);
+}
+
+static void
+_DestroyTrayIcon (void) {
+    if (g_trayIconAdded && g_hwndTrayMsg) {
+        NOTIFYICONDATAW nid;
+        ZeroMemory (&nid, sizeof (nid));
+        nid.cbSize = sizeof (nid);
+        nid.hWnd = g_hwndTrayMsg;
+        nid.uID = HIME_TRAY_ID;
+        Shell_NotifyIconW (NIM_DELETE, &nid);
+        g_trayIconAdded = FALSE;
+        hime_log ("_DestroyTrayIcon: removed");
+    }
+    if (g_hwndTrayMsg) {
+        DestroyWindow (g_hwndTrayMsg);
+        g_hwndTrayMsg = NULL;
+    }
+}
+
+static void
+_UpdateTrayIcon (void) {
+    if (!g_trayIconAdded || !g_hwndTrayMsg)
+        return;
+
+    HimeContext *ctx = g_pActiveService ? g_pActiveService->GetHimeContext () : NULL;
+
+    NOTIFYICONDATAW nid;
+    ZeroMemory (&nid, sizeof (nid));
+    nid.cbSize = sizeof (nid);
+    nid.hWnd = g_hwndTrayMsg;
+    nid.uID = HIME_TRAY_ID;
+    nid.uFlags = NIF_ICON | NIF_TIP;
+    nid.hIcon = _CreateModeIconForContext (ctx);
+
+    /* Build tooltip with current method name */
+    int idx = ctx ? _GetCurrentMethodIndex (ctx) : -1;
+    if (idx >= 0 && idx < g_methodCount) {
+        _snwprintf (nid.szTip, 128, L"\x59EC HIME - %ls", g_methods[idx].display_name);
+    } else {
+        wcscpy (nid.szTip, L"\x59EC HIME - English");
+    }
+    nid.szTip[127] = L'\0';
+
+    Shell_NotifyIconW (NIM_MODIFY, &nid);
+
+    if (nid.hIcon)
+        DestroyIcon (nid.hIcon);
+}
+
 /* ========== Floating Toolbar ========== */
 
 static LRESULT CALLBACK
@@ -3139,6 +3383,13 @@ BOOL WINAPI DllMain (HINSTANCE hInstance, DWORD dwReason, LPVOID lpReserved) {
         DisableThreadLibraryCalls (hInstance);
         break;
     case DLL_PROCESS_DETACH:
+        /* Destroy system tray icon */
+        _DestroyTrayIcon ();
+        if (g_trayClassRegistered) {
+            UnregisterClassW (TRAYMSG_CLASS, hInstance);
+            g_trayClassRegistered = FALSE;
+        }
+
         /* Destroy floating toolbar */
         if (g_hwndToolbar) {
             DestroyWindow (g_hwndToolbar);

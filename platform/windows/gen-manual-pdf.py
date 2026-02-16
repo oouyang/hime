@@ -461,15 +461,39 @@ def build_content():
     story.append(P("3. System Tray &amp; Mode Switching", S_H1))
     story.append(hr())
 
-    story.append(P("3.1 Two Tray Icons", S_H2))
+    story.append(P("3.1 Notification Area Icon", S_H2))
     story.append(P(
-        "HIME displays <b>two icons</b> in the system tray:",
+        "HIME places a <b>standalone icon</b> in the Windows notification area "
+        "(system tray, near the clock). This icon is always visible when HIME is active, "
+        "regardless of language bar settings — unlike the TSF language bar buttons which "
+        "Windows 10/11 hides behind the system input indicator.",
         S_BODY,
     ))
     story.append(P(
-        "<b>① HIME App Icon (姬)</b> — The main icon. "
-        "Left-click cycles modes. Right-click opens the context menu with input method "
-        "selection, toolbar toggle, settings, and about dialog.",
+        "<b>Left-click</b> the tray icon to cycle through enabled input methods.",
+        S_BULLET,
+    ))
+    story.append(P(
+        "<b>Right-click</b> the tray icon to open a popup menu with input method "
+        "selection, toolbar toggle, Settings, and About.",
+        S_BULLET,
+    ))
+    story.append(P(
+        "The icon updates to reflect the current mode "
+        "(注 for Zhuyin, 倉 for Cangjie, EN for English, etc.), "
+        "and the tooltip shows the active method name.",
+        S_BULLET,
+    ))
+
+    story.append(P("3.2 Language Bar Icons", S_H2))
+    story.append(P(
+        "In addition to the notification area icon, HIME also registers "
+        "<b>two TSF language bar buttons</b>:",
+        S_BODY,
+    ))
+    story.append(P(
+        "<b>① HIME App Icon (姬)</b> — The main language bar button. "
+        "Left-click cycles modes. Right-click opens the context menu.",
         S_BULLET,
     ))
     story.append(P(
@@ -478,8 +502,14 @@ def build_content():
         "Left-click cycles modes.",
         S_BULLET,
     ))
+    story.append(P(
+        "<i>Note: On Windows 10/11, the language bar buttons may only be visible if you "
+        "enable the desktop language bar in Settings → Time &amp; Language → Typing → "
+        "Advanced keyboard settings. The notification area icon works regardless.</i>",
+        S_NOTE,
+    ))
 
-    story.append(P("3.2 Mode Cycle Order", S_H2))
+    story.append(P("3.3 Mode Cycle Order", S_H2))
     story.append(P(
         "Each click or Ctrl+` press moves to the next enabled method in this order:",
         S_BODY,
@@ -518,7 +548,7 @@ def build_content():
         S_NOTE,
     ))
 
-    story.append(P("3.3 Switching Directly via Menu", S_H2))
+    story.append(P("3.4 Switching Directly via Menu", S_H2))
     story.append(P(
         "Right-click the HIME app icon (姬) and select the desired input method "
         "from the menu. A checkmark (✓) indicates the currently active method.",
@@ -714,8 +744,8 @@ def build_content():
     story.append(hr())
 
     story.append(P(
-        "Right-click the <b>HIME app icon</b> (姬) in the system tray "
-        "to open the context menu:",
+        "Right-click the <b>HIME notification area icon</b> or the "
+        "<b>HIME language bar button</b> (姬) to open the context menu:",
         S_BODY,
     ))
 
