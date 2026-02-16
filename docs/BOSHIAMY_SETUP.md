@@ -18,6 +18,7 @@ Boshiamy (嘸蝦米輸入法) is a shape-based Chinese input method that uses th
 ### Method 1: Using HIME with fcitx5
 
 1. **Install HIME**
+
    ```bash
    # Ubuntu/Debian
    sudo apt update && sudo apt install hime
@@ -32,6 +33,7 @@ Boshiamy (嘸蝦米輸入法) is a shape-based Chinese input method that uses th
    ```
 
 2. **Install fcitx5 with table support**
+
    ```bash
    # Ubuntu/Debian
    sudo apt install fcitx5 fcitx5-table-extra
@@ -70,11 +72,13 @@ Boshiamy (嘸蝦米輸入法) is a shape-based Chinese input method that uses th
 ### Method 2: Direct HIME Configuration
 
 1. **Edit gtab.list**
+
    ```bash
    nano ~/.config/hime/gtab.list
    ```
 
 2. **Add Boshiamy entry**
+
    ```
    嘸蝦米,b,liu.gtab,liu.png,0
    ```
@@ -95,6 +99,7 @@ Boshiamy (嘸蝦米輸入法) is a shape-based Chinese input method that uses th
    - Run installer and follow prompts
 
 2. **Configure Boshiamy via API**
+
    ```c
    #include "hime-core.h"
 
@@ -122,6 +127,7 @@ Boshiamy (嘸蝦米輸入法) is a shape-based Chinese input method that uses th
 ### Alternative: Rime (小狼毫)
 
 For Windows users preferring Rime:
+
 1. Install 小狼毫 from https://rime.im/
 2. Add Boshiamy schema to Rime configuration
 
@@ -141,6 +147,7 @@ For Windows users preferring Rime:
    - Ensure `liu.gtab` is in `~/Library/Application Support/HIME/`
 
 3. **Programmatic Setup**
+
    ```objc
    #import "HimeEngine.h"
 
@@ -153,11 +160,13 @@ For Windows users preferring Rime:
 ### Alternative: Rime (鼠鬚管)
 
 1. **Install Rime**
+
    ```bash
    brew install --cask squirrel
    ```
 
 2. **Install Boshiamy Schema**
+
    ```bash
    curl -fsSL https://raw.githubusercontent.com/ryanwuson/rime-liur/main/rime_liur_installer.sh | bash
    ```
@@ -332,7 +341,9 @@ typedef enum {
 **Symptom:** Boshiamy not appearing in input method list
 
 **Solution:**
+
 1. Verify table file exists:
+
    ```bash
    # Linux
    ls ~/.config/hime/liu.gtab
@@ -352,7 +363,9 @@ typedef enum {
 **Symptom:** Keys not producing Chinese characters
 
 **Solution:**
+
 1. Verify GTAB mode is active:
+
    ```c
    HimeInputMethod method = hime_get_input_method(ctx);
    assert(method == HIME_IM_GTAB);
@@ -368,6 +381,7 @@ typedef enum {
 **Symptom:** Simplified instead of Traditional characters
 
 **Solution:**
+
 ```c
 // Set Traditional Chinese output
 hime_set_output_variant(ctx, HIME_OUTPUT_TRADITIONAL);
@@ -380,6 +394,8 @@ hime_set_output_variant(ctx, HIME_OUTPUT_TRADITIONAL);
 - **HIME GitHub:** https://github.com/hime-ime/hime
 - **Boshiamy Official:** https://boshiamy.com/
 - **Rime (alternative):** https://rime.im/
+
+C:\Program Files\BoshiamyTIP\liu-uni.tab
 
 ## License Note
 
