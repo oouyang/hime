@@ -1886,6 +1886,19 @@ TEST (pho_invalid_data_path) {
 
 /* ========== GTAB Binary Search Tests ========== */
 
+/* Helper: encode a GTAB key using hime-cin2gtab's formula:
+ *   LAST_K_bitN = ((32 / keybits) - 1) * keybits
+ *   kk |= idx << (LAST_K_bitN - position * keybits)
+ */
+static uint32_t
+encode_gtab_key (int keybits, const int *indices, int count) {
+    int last_k_bitn = ((32 / keybits) - 1) * keybits;
+    uint32_t kk = 0;
+    for (int i = 0; i < count; i++)
+        kk |= (uint32_t) indices[i] << (last_k_bitn - i * keybits);
+    return kk;
+}
+
 TEST (gtab_bsearch_exact_match) {
     hime_init ("../../data");
     HimeContext *ctx = hime_context_new ();
@@ -1897,7 +1910,7 @@ TEST (gtab_bsearch_exact_match) {
     strcpy (test_table.name, "test");
     test_table.key_count = 4;
     test_table.max_press = 2;
-    test_table.keybits = 3; /* 3 bits per key, 2 keys = 6 bits total */
+    test_table.keybits = 6;
     test_table.key64 = false;
     test_table.sorted = true;
     test_table.loaded = true;
@@ -1909,26 +1922,22 @@ TEST (gtab_bsearch_exact_match) {
     test_table.keymap[2] = 'c';
     test_table.keymap[3] = 'd';
 
-    /* 3 items, sorted by key (2 keys * 3 bits = 6 bits, stored as native uint32_t)
-     * "aa" = 0b000_000 = 0x00000000
-     * "ab" = 0b000_001 = shifted left by (32-6)=26 → 0x04000000
-     * "bc" = 0b001_010 = shifted left by 26 → 0x28000000 */
     GtabItem items[3];
     memset (items, 0, sizeof (items));
-
-    /* "aa" → key = (0 << 3) | 0 = 0, shifted left by 26 = 0 */
     uint32_t k;
-    k = ((0u << 3) | 0u) << 26;
+
+    /* "aa" */
+    k = encode_gtab_key (6, (int[]){0, 0}, 2);
     memcpy (items[0].key, &k, 4);
     items[0].ch[0] = 'X';
 
-    /* "ab" → key = (0 << 3) | 1 = 1, shifted left by 26 */
-    k = ((0u << 3) | 1u) << 26;
+    /* "ab" */
+    k = encode_gtab_key (6, (int[]){0, 1}, 2);
     memcpy (items[1].key, &k, 4);
     items[1].ch[0] = 'Y';
 
-    /* "bc" → key = (1 << 3) | 2 = 10, shifted left by 26 */
-    k = ((1u << 3) | 2u) << 26;
+    /* "bc" */
+    k = encode_gtab_key (6, (int[]){1, 2}, 2);
     memcpy (items[2].key, &k, 4);
     items[2].ch[0] = 'Z';
 
@@ -1962,7 +1971,7 @@ TEST (gtab_bsearch_prefix_match) {
     strcpy (test_table.name, "test");
     test_table.key_count = 4;
     test_table.max_press = 2;
-    test_table.keybits = 3;
+    test_table.keybits = 6;
     test_table.key64 = false;
     test_table.sorted = true;
     test_table.loaded = true;
@@ -1972,24 +1981,23 @@ TEST (gtab_bsearch_prefix_match) {
     test_table.keymap[2] = 'c';
     test_table.keymap[3] = 'd';
 
-    /* 3 items starting with 'a': "aa", "ab", "ac" */
     GtabItem items[4];
     memset (items, 0, sizeof (items));
     uint32_t k;
 
-    k = ((0u << 3) | 0u) << 26; /* "aa" */
+    k = encode_gtab_key (6, (int[]){0, 0}, 2); /* "aa" */
     memcpy (items[0].key, &k, 4);
     items[0].ch[0] = 'P';
 
-    k = ((0u << 3) | 1u) << 26; /* "ab" */
+    k = encode_gtab_key (6, (int[]){0, 1}, 2); /* "ab" */
     memcpy (items[1].key, &k, 4);
     items[1].ch[0] = 'Q';
 
-    k = ((0u << 3) | 2u) << 26; /* "ac" */
+    k = encode_gtab_key (6, (int[]){0, 2}, 2); /* "ac" */
     memcpy (items[2].key, &k, 4);
     items[2].ch[0] = 'R';
 
-    k = ((1u << 3) | 0u) << 26; /* "ba" */
+    k = encode_gtab_key (6, (int[]){1, 0}, 2); /* "ba" */
     memcpy (items[3].key, &k, 4);
     items[3].ch[0] = 'S';
 
@@ -2022,7 +2030,7 @@ TEST (gtab_bsearch_no_match) {
     memset (&test_table, 0, sizeof (test_table));
     test_table.key_count = 4;
     test_table.max_press = 2;
-    test_table.keybits = 3;
+    test_table.keybits = 6;
     test_table.key64 = false;
     test_table.sorted = true;
     test_table.loaded = true;
@@ -2032,7 +2040,7 @@ TEST (gtab_bsearch_no_match) {
 
     GtabItem items[1];
     memset (items, 0, sizeof (items));
-    uint32_t k = ((0u << 3) | 0u) << 26; /* "aa" */
+    uint32_t k = encode_gtab_key (6, (int[]){0, 0}, 2); /* "aa" */
     memcpy (items[0].key, &k, 4);
     items[0].ch[0] = 'X';
 
@@ -2062,7 +2070,7 @@ TEST (gtab_bsearch_boundary) {
     memset (&test_table, 0, sizeof (test_table));
     test_table.key_count = 4;
     test_table.max_press = 1;
-    test_table.keybits = 3;
+    test_table.keybits = 6;
     test_table.key64 = false;
     test_table.sorted = true;
     test_table.loaded = true;
@@ -2076,15 +2084,15 @@ TEST (gtab_bsearch_boundary) {
     memset (items, 0, sizeof (items));
     uint32_t k;
 
-    k = 0u << 29; /* key 0 ("a"), shifted by (32 - 1*3) = 29 bits */
+    k = encode_gtab_key (6, (int[]){0}, 1); /* "a" */
     memcpy (items[0].key, &k, 4);
     items[0].ch[0] = 'F'; /* first item */
 
-    k = 1u << 29; /* key 1 ("b") */
+    k = encode_gtab_key (6, (int[]){1}, 1); /* "b" */
     memcpy (items[1].key, &k, 4);
     items[1].ch[0] = 'M';
 
-    k = 2u << 29; /* key 2 ("c") */
+    k = encode_gtab_key (6, (int[]){2}, 1); /* "c" */
     memcpy (items[2].key, &k, 4);
     items[2].ch[0] = 'L'; /* last item */
 
@@ -2338,7 +2346,7 @@ TEST (gtab_preedit_includes_candidates) {
     strcpy (test_table.name, "TestCJ");
     test_table.key_count = 4;
     test_table.max_press = 2;
-    test_table.keybits = 3;
+    test_table.keybits = 6;
     test_table.key64 = false;
     test_table.sorted = true;
     test_table.loaded = true;
@@ -2356,15 +2364,15 @@ TEST (gtab_preedit_includes_candidates) {
     memset (items, 0, sizeof (items));
     uint32_t k;
 
-    k = ((0u << 3) | 0u) << 26;
+    k = encode_gtab_key (6, (int[]){0, 0}, 2);
     memcpy (items[0].key, &k, 4);
     items[0].ch[0] = 'X';
 
-    k = ((0u << 3) | 1u) << 26;
+    k = encode_gtab_key (6, (int[]){0, 1}, 2);
     memcpy (items[1].key, &k, 4);
     items[1].ch[0] = 'Y';
 
-    k = ((0u << 3) | 2u) << 26;
+    k = encode_gtab_key (6, (int[]){0, 2}, 2);
     memcpy (items[2].key, &k, 4);
     items[2].ch[0] = 'Z';
 
@@ -2412,7 +2420,7 @@ TEST (gtab_backspace_preserves_candidates) {
     strcpy (test_table.name, "TestBS");
     test_table.key_count = 3;
     test_table.max_press = 2;
-    test_table.keybits = 3;
+    test_table.keybits = 6;
     test_table.key64 = false;
     test_table.sorted = true;
     test_table.loaded = true;
@@ -2427,15 +2435,15 @@ TEST (gtab_backspace_preserves_candidates) {
     memset (items, 0, sizeof (items));
     uint32_t k;
 
-    k = ((0u << 3) | 0u) << 26; /* "aa" */
+    k = encode_gtab_key (6, (int[]){0, 0}, 2); /* "aa" */
     memcpy (items[0].key, &k, 4);
     items[0].ch[0] = 'P';
 
-    k = ((0u << 3) | 1u) << 26; /* "ab" */
+    k = encode_gtab_key (6, (int[]){0, 1}, 2); /* "ab" */
     memcpy (items[1].key, &k, 4);
     items[1].ch[0] = 'Q';
 
-    k = ((1u << 3) | 0u) << 26; /* "ba" */
+    k = encode_gtab_key (6, (int[]){1, 0}, 2); /* "ba" */
     memcpy (items[2].key, &k, 4);
     items[2].ch[0] = 'R';
 
@@ -2558,6 +2566,281 @@ TEST (method_label_gtab_cangjie) {
 TEST (method_label_null_safety) {
     const char *label = hime_get_method_label (NULL);
     ASSERT_STR_EQ ("en", label);
+    TEST_PASS ();
+}
+
+/* ========== Boshiamy / GTAB Valid Key Tests ========== */
+
+TEST (gtab_registry_boshiamy_filename) {
+    hime_init ("../../data");
+
+    /* Find the Boshiamy entry in the GTAB registry by name */
+    int count = hime_gtab_get_table_count ();
+    ASSERT_TRUE (count > 0);
+
+    HimeGtabInfo info;
+    int found = 0;
+    for (int i = 0; i < count; i++) {
+        if (hime_gtab_get_table_info (i, &info) == 0) {
+            if (strcmp (info.name, "嘸蝦米") == 0) {
+                found = 1;
+                /* Verify filename is liu.gtab, not noseeing.gtab */
+                ASSERT_STR_EQ ("liu.gtab", info.filename);
+                break;
+            }
+        }
+    }
+    ASSERT_TRUE (found);
+
+    hime_cleanup ();
+    TEST_PASS ();
+}
+
+TEST (gtab_is_valid_key_null_safety) {
+    /* NULL context should return 0 */
+    ASSERT_EQ (0, hime_gtab_is_valid_key (NULL, 'a'));
+
+    /* Context without loaded table should return 0 */
+    hime_init ("../../data");
+    HimeContext *ctx = hime_context_new ();
+    ASSERT_NOT_NULL (ctx);
+
+    /* No table loaded yet in fresh context */
+    hime_set_input_method (ctx, HIME_IM_PHO);
+    ASSERT_EQ (0, hime_gtab_is_valid_key (ctx, 'a'));
+
+    hime_context_free (ctx);
+    hime_cleanup ();
+    TEST_PASS ();
+}
+
+TEST (gtab_is_valid_key_cangjie) {
+    hime_init ("../../data");
+    HimeContext *ctx = hime_context_new ();
+    ASSERT_NOT_NULL (ctx);
+
+    int ret = hime_gtab_load_table_by_id (ctx, HIME_GTAB_CJ5);
+    if (ret == 0) {
+        /* Cangjie uses a-z as input keys */
+        ASSERT_TRUE (hime_gtab_is_valid_key (ctx, 'a'));
+        ASSERT_TRUE (hime_gtab_is_valid_key (ctx, 'z'));
+
+        /* Cangjie does NOT use comma or period as input keys */
+        ASSERT_FALSE (hime_gtab_is_valid_key (ctx, ','));
+        ASSERT_FALSE (hime_gtab_is_valid_key (ctx, '.'));
+        ASSERT_FALSE (hime_gtab_is_valid_key (ctx, ';'));
+    }
+
+    hime_context_free (ctx);
+    hime_cleanup ();
+    TEST_PASS ();
+}
+
+TEST (gtab_is_valid_key_boshiamy) {
+    hime_init ("../../data");
+    HimeContext *ctx = hime_context_new ();
+    ASSERT_NOT_NULL (ctx);
+
+    int ret = hime_gtab_load_table_by_id (ctx, HIME_GTAB_BOSHIAMY);
+    if (ret == 0) {
+        /* Boshiamy uses a-z as input keys */
+        ASSERT_TRUE (hime_gtab_is_valid_key (ctx, 'a'));
+        ASSERT_TRUE (hime_gtab_is_valid_key (ctx, 'z'));
+
+        /* Boshiamy also uses comma and period as input keys */
+        ASSERT_TRUE (hime_gtab_is_valid_key (ctx, ','));
+        ASSERT_TRUE (hime_gtab_is_valid_key (ctx, '.'));
+    }
+
+    hime_context_free (ctx);
+    hime_cleanup ();
+    TEST_PASS ();
+}
+
+TEST (gtab_boshiamy_table_name) {
+    hime_init ("../../data");
+    HimeContext *ctx = hime_context_new ();
+    ASSERT_NOT_NULL (ctx);
+
+    int ret = hime_gtab_load_table_by_id (ctx, HIME_GTAB_BOSHIAMY);
+    if (ret == 0) {
+        const char *name = hime_gtab_get_current_table (ctx);
+        ASSERT_NOT_NULL (name);
+        /* Name should be "嘸蝦米", starting with 嘸 (UTF-8: E5 98 B8) */
+        ASSERT_TRUE ((unsigned char) name[0] == 0xe5);
+        ASSERT_TRUE ((unsigned char) name[1] == 0x98);
+        ASSERT_TRUE ((unsigned char) name[2] == 0xb8);
+    }
+
+    hime_context_free (ctx);
+    hime_cleanup ();
+    TEST_PASS ();
+}
+
+TEST (gtab_boshiamy_space_commits) {
+    /* V1 .gtab tables use 8-bit (byte-per-key) encoding for key indices.
+     * This test verifies that typing a code and pressing Space commits
+     * the first candidate correctly (regression test for keybits fix). */
+    hime_init ("../../data");
+    HimeContext *ctx = hime_context_new ();
+    ASSERT_NOT_NULL (ctx);
+    hime_set_chinese_mode (ctx, true);
+
+    int ret = hime_gtab_load_table_by_id (ctx, HIME_GTAB_BOSHIAMY);
+    if (ret != 0) {
+        hime_context_free (ctx);
+        hime_cleanup ();
+        TEST_PASS (); /* Skip if liu.gtab not available */
+    }
+
+    /* Type 's' — should get candidates (Boshiamy has many 's' entries) */
+    HimeKeyResult kr = hime_process_key (ctx, 's', 's', 0);
+    ASSERT_EQ (HIME_KEY_PREEDIT, (int) kr);
+    ASSERT_TRUE (hime_get_candidate_count (ctx) > 0);
+
+    /* Type 'e' — should narrow candidates */
+    kr = hime_process_key (ctx, 'e', 'e', 0);
+    ASSERT_EQ (HIME_KEY_PREEDIT, (int) kr);
+    int cands = hime_get_candidate_count (ctx);
+    ASSERT_TRUE (cands > 0);
+
+    /* Press Space — should commit first candidate */
+    kr = hime_process_key (ctx, 0x20, ' ', 0);
+    ASSERT_EQ (HIME_KEY_COMMIT, (int) kr);
+
+    char commit[64];
+    int len = hime_get_commit (ctx, commit, sizeof (commit));
+    ASSERT_TRUE (len > 0);
+
+    hime_context_free (ctx);
+    hime_cleanup ();
+    TEST_PASS ();
+}
+
+TEST (gtab_cangjie_table_name_differs_from_boshiamy) {
+    hime_init ("../../data");
+    HimeContext *ctx = hime_context_new ();
+    ASSERT_NOT_NULL (ctx);
+
+    /* Load Cangjie 5 and verify its name does NOT start with 嘸 */
+    int ret = hime_gtab_load_table_by_id (ctx, HIME_GTAB_CJ5);
+    if (ret == 0) {
+        const char *name = hime_gtab_get_current_table (ctx);
+        ASSERT_NOT_NULL (name);
+        /* Cangjie name starts with 倉 (UTF-8: E5 80 89) — same first byte
+         * but different second byte from 嘸 (E5 98 B8) */
+        ASSERT_TRUE ((unsigned char) name[0] == 0xe5);
+        /* Must NOT match 嘸's second byte (0x98) */
+        ASSERT_TRUE ((unsigned char) name[1] != 0x98 ||
+                     (unsigned char) name[2] != 0xb8);
+    }
+
+    hime_context_free (ctx);
+    hime_cleanup ();
+    TEST_PASS ();
+}
+
+TEST (gtab_switch_cangjie_to_boshiamy) {
+    hime_init ("../../data");
+    HimeContext *ctx = hime_context_new ();
+    ASSERT_NOT_NULL (ctx);
+    hime_set_chinese_mode (ctx, true);
+
+    /* Load Cangjie 5 */
+    int ret = hime_gtab_load_table_by_id (ctx, HIME_GTAB_CJ5);
+    if (ret != 0) {
+        hime_context_free (ctx);
+        hime_cleanup ();
+        TEST_PASS (); /* Skip if CJ5 not available */
+    }
+    ASSERT_EQ (HIME_IM_GTAB, hime_get_input_method (ctx));
+    const char *label = hime_get_method_label (ctx);
+    ASSERT_STR_EQ ("倉", label);
+
+    /* Switch to Boshiamy */
+    ret = hime_gtab_load_table_by_id (ctx, HIME_GTAB_BOSHIAMY);
+    if (ret != 0) {
+        hime_context_free (ctx);
+        hime_cleanup ();
+        TEST_PASS (); /* Skip if liu.gtab not available */
+    }
+    ASSERT_EQ (HIME_IM_GTAB, hime_get_input_method (ctx));
+    label = hime_get_method_label (ctx);
+    ASSERT_STR_EQ ("嘸", label);
+
+    hime_context_free (ctx);
+    hime_cleanup ();
+    TEST_PASS ();
+}
+
+TEST (gtab_mode_cycle_4way) {
+    /* Simulate the 4-way mode cycle: EN → PHO → CJ5 → Boshiamy → EN */
+    hime_init ("../../data");
+    HimeContext *ctx = hime_context_new ();
+    ASSERT_NOT_NULL (ctx);
+
+    /* Start in EN mode */
+    hime_set_chinese_mode (ctx, false);
+    ASSERT_FALSE (hime_is_chinese_mode (ctx));
+
+    /* EN → Zhuyin */
+    hime_set_chinese_mode (ctx, true);
+    hime_set_input_method (ctx, HIME_IM_PHO);
+    ASSERT_TRUE (hime_is_chinese_mode (ctx));
+    ASSERT_EQ (HIME_IM_PHO, hime_get_input_method (ctx));
+
+    /* Zhuyin → Cangjie */
+    int ret = hime_gtab_load_table_by_id (ctx, HIME_GTAB_CJ5);
+    if (ret != 0) {
+        hime_context_free (ctx);
+        hime_cleanup ();
+        TEST_PASS ();
+    }
+    ASSERT_EQ (HIME_IM_GTAB, hime_get_input_method (ctx));
+    const char *cj_name = hime_gtab_get_current_table (ctx);
+    /* Cangjie: should NOT match Boshiamy's 嘸 */
+    ASSERT_TRUE ((unsigned char) cj_name[1] != 0x98 ||
+                 (unsigned char) cj_name[2] != 0xb8);
+
+    /* Cangjie → Boshiamy */
+    ret = hime_gtab_load_table_by_id (ctx, HIME_GTAB_BOSHIAMY);
+    if (ret != 0) {
+        hime_context_free (ctx);
+        hime_cleanup ();
+        TEST_PASS ();
+    }
+    ASSERT_EQ (HIME_IM_GTAB, hime_get_input_method (ctx));
+    const char *liu_name = hime_gtab_get_current_table (ctx);
+    /* Boshiamy: should match 嘸 (E5 98 B8) */
+    ASSERT_TRUE ((unsigned char) liu_name[0] == 0xe5);
+    ASSERT_TRUE ((unsigned char) liu_name[1] == 0x98);
+    ASSERT_TRUE ((unsigned char) liu_name[2] == 0xb8);
+
+    /* Boshiamy → EN */
+    hime_set_chinese_mode (ctx, false);
+    ASSERT_FALSE (hime_is_chinese_mode (ctx));
+
+    hime_context_free (ctx);
+    hime_cleanup ();
+    TEST_PASS ();
+}
+
+TEST (method_label_gtab_boshiamy) {
+    hime_init ("../../data");
+    HimeContext *ctx = hime_context_new ();
+    ASSERT_NOT_NULL (ctx);
+
+    hime_set_chinese_mode (ctx, true);
+
+    int ret = hime_gtab_load_table_by_id (ctx, HIME_GTAB_BOSHIAMY);
+    if (ret == 0) {
+        const char *label = hime_get_method_label (ctx);
+        /* First character of "嘸蝦米" is "嘸" */
+        ASSERT_STR_EQ ("嘸", label);
+    }
+
+    hime_context_free (ctx);
+    hime_cleanup ();
     TEST_PASS ();
 }
 
@@ -2713,6 +2996,18 @@ RUN_TEST (method_label_tsin_mode);
 RUN_TEST (method_label_intcode_mode);
 RUN_TEST (method_label_gtab_cangjie);
 RUN_TEST (method_label_null_safety);
+
+/* Boshiamy / GTAB Valid Key */
+RUN_TEST (gtab_registry_boshiamy_filename);
+RUN_TEST (gtab_is_valid_key_null_safety);
+RUN_TEST (gtab_is_valid_key_cangjie);
+RUN_TEST (gtab_is_valid_key_boshiamy);
+RUN_TEST (gtab_boshiamy_table_name);
+RUN_TEST (gtab_boshiamy_space_commits);
+RUN_TEST (gtab_cangjie_table_name_differs_from_boshiamy);
+RUN_TEST (gtab_switch_cangjie_to_boshiamy);
+RUN_TEST (gtab_mode_cycle_4way);
+RUN_TEST (method_label_gtab_boshiamy);
 
 /* Integration: Bopomofo Input Flow */
 RUN_TEST (pho_type_bopomofo_key);

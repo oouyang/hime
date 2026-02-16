@@ -585,7 +585,7 @@ static const GtabRegistry GTAB_REGISTRY[] = {
     {"行列大字集", "ar30-big.gtab", "ar30.png", HIME_GTAB_ARRAY30_BIG},
 
     /* Boshiamy */
-    {"嘸蝦米", "noseeing.gtab", "noseeing.png", HIME_GTAB_BOSHIAMY},
+    {"嘸蝦米", "liu.gtab", "noseeing.png", HIME_GTAB_BOSHIAMY},
 
     /* Phonetic-based */
     {"拼音", "pinyin.gtab", "pinyin.png", HIME_GTAB_PINYIN},
@@ -1804,6 +1804,17 @@ HIME_API int hime_gtab_get_key_string (HimeContext *ctx, char *buffer, int buffe
     return len;
 }
 
+HIME_API int hime_gtab_is_valid_key (HimeContext *ctx, char key) {
+    if (!ctx || !ctx->gtab)
+        return 0;
+    GtabTable *table = ctx->gtab;
+    for (int i = 0; i < 128 && table->keymap[i]; i++) {
+        if (table->keymap[i] == key)
+            return 1;
+    }
+    return 0;
+}
+
 /* Extract 32-bit key from a GtabItem's key bytes (big-endian) */
 /* Read item key as native uint32_t (little-endian on x86).
  * The original hime-cin2gtab writes keys with fwrite(&uint32, 4, 1, fp),
@@ -1824,31 +1835,26 @@ static int gtab_lookup (HimeContext *ctx) {
     ctx->candidate_count = 0;
     GtabTable *table = ctx->gtab;
 
-    /* Build search prefix from entered keys */
-    uint32_t key = 0;
+    /* hime-cin2gtab encodes keys left-aligned in a 32-bit (or 64-bit) LE value:
+     *   LAST_K_bitN = ((32 / keybits) - 1) * keybits
+     *   kk |= key_idx << (LAST_K_bitN - i * keybits)
+     * Build the search prefix the same way so we can compare directly. */
+    int last_k_bitn = ((32 / table->keybits) - 1) * table->keybits;
+
+    /* Build left-aligned search prefix matching the file encoding */
+    uint32_t prefix = 0;
     for (int i = 0; i < ctx->gtab_key_count; i++) {
-        key = (key << table->keybits) | ctx->gtab_keys[i];
+        prefix |= (uint32_t) ctx->gtab_keys[i] << (last_k_bitn - i * table->keybits);
     }
 
-    /* Number of unused key positions (for prefix matching) */
-    int unused = table->max_press - ctx->gtab_key_count;
-    int shift = unused * table->keybits;
+    /* Mask: compare only the bits occupied by entered keys */
+    int prefix_bits = ctx->gtab_key_count * table->keybits;
+    int mask_shift = last_k_bitn + table->keybits - prefix_bits;
+    uint32_t mask = (mask_shift >= 32) ? 0 : ~((1u << mask_shift) - 1u);
 
     if (!table->key64 && table->items) {
         if (table->sorted) {
-            /* For binary search on left-aligned keys, left-align the prefix
-             * and build a mask so we only compare the entered key positions.
-             * Keys are stored left-aligned in the top (max_press * keybits)
-             * bits of a 32-bit big-endian value, with the remaining low bits
-             * zero. We left-align our prefix to match. */
-            int total_bits = table->max_press * table->keybits;
-            int pad = 32 - total_bits; /* unused low bits in 32-bit field */
-            uint32_t prefix = key << (shift + pad);
-            uint32_t mask = (shift + pad) >= 32
-                                ? 0
-                                : ~((1u << (shift + pad)) - 1u);
-
-            /* Binary search: find first item where (item_key & mask) >= prefix */
+            /* Binary search on sorted V2 tables */
             int lo = 0, hi = table->item_count;
             while (lo < hi) {
                 int mid = lo + (hi - lo) / 2;
@@ -1858,7 +1864,6 @@ static int gtab_lookup (HimeContext *ctx) {
                 else
                     hi = mid;
             }
-            /* Linear scan forward to collect all contiguous prefix matches */
             for (int i = lo; i < table->item_count && ctx->candidate_count < HIME_MAX_CANDIDATES; i++) {
                 uint32_t ik = gtab_item_key32 (&table->items[i]) & mask;
                 if (ik != prefix)
@@ -1869,10 +1874,10 @@ static int gtab_lookup (HimeContext *ctx) {
                 ctx->candidate_count++;
             }
         } else {
-            /* Fallback: O(n) linear scan for unsorted v1 tables */
+            /* V1 linear scan */
             for (int i = 0; i < table->item_count && ctx->candidate_count < HIME_MAX_CANDIDATES; i++) {
                 uint32_t item_key = gtab_item_key32 (&table->items[i]);
-                if ((item_key >> shift) == key) {
+                if ((item_key & mask) == prefix) {
                     strncpy (ctx->candidates[ctx->candidate_count],
                              (char *) table->items[i].ch, HIME_CH_SZ);
                     ctx->candidates[ctx->candidate_count][HIME_CH_SZ] = '\0';

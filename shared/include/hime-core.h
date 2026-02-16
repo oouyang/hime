@@ -448,6 +448,14 @@ HIME_API int hime_gtab_get_key_string (
     char *buffer,
     int buffer_size);
 
+/**
+ * Check if a character is a valid input key for the current GTAB table
+ * @param ctx Context handle
+ * @param key ASCII character to check
+ * @return 1 if valid, 0 if not
+ */
+HIME_API int hime_gtab_is_valid_key (HimeContext *ctx, char key);
+
 /* ========== TSIN (Phrase) Input ========== */
 
 /**
