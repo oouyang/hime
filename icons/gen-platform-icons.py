@@ -37,6 +37,7 @@ MODE_PNGS = {
     "hime-tray": os.path.join(BLUE_DIR, "hime-tray.png"),
     "juyin": os.path.join(BLUE_DIR, "juyin.png"),
     "cj5": os.path.join(BLUE_DIR, "cj5.png"),
+    "noseeing": os.path.join(BLUE_DIR, "noseeing.png"),
 }
 
 
