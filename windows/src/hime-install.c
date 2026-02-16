@@ -267,6 +267,22 @@ int wmain (int argc, WCHAR *argv[]) {
     if (!copy_data_files (src_data_dir, data_dir))
         ok = FALSE;
 
+    /* Copy liu.gtab (Boshiamy) if present next to the installer.
+     * This file is licensed separately and not shipped in the build. */
+    {
+        WCHAR liu_src[MAX_PATH];
+        _snwprintf (liu_src, MAX_PATH, L"%ls\\liu.gtab", src_dir);
+        if (GetFileAttributesW (liu_src) != INVALID_FILE_ATTRIBUTES) {
+            WCHAR liu_dst[MAX_PATH];
+            _snwprintf (liu_dst, MAX_PATH, L"%ls\\liu.gtab", data_dir);
+#ifndef NDEBUG
+            wprintf (L"  (Boshiamy table found)\n");
+#endif
+            if (!copy_file_checked (liu_src, liu_dst))
+                ok = FALSE;
+        }
+    }
+
     /* Copy icon files */
     WCHAR src_icons_dir[MAX_PATH];
     _snwprintf (src_icons_dir, MAX_PATH, L"%ls\\icons", src_dir);

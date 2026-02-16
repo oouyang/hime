@@ -86,8 +86,11 @@ delete_directory_contents (const WCHAR *dir) {
             RemoveDirectoryW (path);
         } else {
             if (!DeleteFileW (path)) {
-                wprintf (L"  Warning: could not delete %ls (error %lu)\n",
-                         path, GetLastError ());
+#ifdef NDEBUG
+                if (!wcsstr (fd.cFileName, L".old-"))
+#endif
+                    wprintf (L"  Warning: could not delete %ls (error %lu)\n",
+                             path, GetLastError ());
             } else {
                 wprintf (L"  Deleted %ls\n", path);
             }
@@ -139,11 +142,165 @@ int wmain (int argc, WCHAR *argv[]) {
 
     wprintf (L"\n");
 
-    /* Unregister TSF DLL */
+    /* Unregister TSF DLL (calls DllUnregisterServer which removes
+     * the language profile and TSF registration) */
     wprintf (L"Unregistering HIME Text Service...\n");
     WCHAR unreg_args[MAX_PATH + 16];
     _snwprintf (unreg_args, MAX_PATH + 16, L"/u /s \"%ls\"", tsf_path);
     run_regsvr32 (unreg_args);
+
+    /* Clean up stale keyboard layout entries from user registry.
+     * When a user adds HIME via Settings → Language → Add keyboard,
+     * Windows stores the preference in multiple HKCU locations.
+     * regsvr32 /u only removes the HKLM registration — the HKCU entries
+     * become "無法使用的輸入法" ghost items.
+     *
+     * HIME CLSID:   {B8A45C32-5F6D-4E2A-9C1B-0D3E4F5A6B7C}
+     * Profile GUID:  {C9B56D43-6E7F-5F3B-AD2C-1E4F5061C8D9}
+     */
+    wprintf (L"Cleaning up user keyboard settings...\n");
+
+#define HIME_CLSID_STR L"{B8A45C32-5F6D-4E2A-9C1B-0D3E4F5A6B7C}"
+#define HIME_CLSID_UPPER L"B8A45C32-5F6D-4E2A-9C1B-0D3E4F5A6B7C"
+#define HIME_CLSID_LOWER L"b8a45c32-5f6d-4e2a-9c1b-0d3e4f5a6b7c"
+
+    {
+        HKEY hKey;
+
+        /* 1. Remove HKCU\Software\Microsoft\CTF\TIP\{CLSID} — the TIP registration */
+        if (RegDeleteTreeW (HKEY_CURRENT_USER,
+                            L"Software\\Microsoft\\CTF\\TIP\\" HIME_CLSID_STR) == ERROR_SUCCESS) {
+            wprintf (L"  Removed CTF TIP entry\n");
+        }
+
+        /* 2. Remove assembly items under CTF\SortOrder\AssemblyItem\0x00000404
+         *    (scan subkeys for our CLSID) */
+        if (RegOpenKeyExW (HKEY_CURRENT_USER,
+                           L"Software\\Microsoft\\CTF\\SortOrder\\AssemblyItem\\0x00000404",
+                           0, KEY_READ | KEY_WRITE, &hKey) == ERROR_SUCCESS) {
+            WCHAR subKeyName[256];
+            DWORD idx = 0;
+            DWORD nameLen;
+            while (1) {
+                nameLen = 256;
+                LONG rc = RegEnumKeyExW (hKey, idx, subKeyName, &nameLen,
+                                         NULL, NULL, NULL, NULL);
+                if (rc != ERROR_SUCCESS)
+                    break;
+
+                HKEY hSub;
+                if (RegOpenKeyExW (hKey, subKeyName, 0, KEY_READ, &hSub) == ERROR_SUCCESS) {
+                    WCHAR clsid[128] = {0};
+                    DWORD clsidSize = sizeof (clsid);
+                    DWORD type;
+                    if (RegQueryValueExW (hSub, L"CLSID", NULL, &type,
+                                          (BYTE *) clsid, &clsidSize) == ERROR_SUCCESS) {
+                        if (_wcsicmp (clsid, HIME_CLSID_STR) == 0) {
+                            RegCloseKey (hSub);
+                            RegDeleteTreeW (hKey, subKeyName);
+                            wprintf (L"  Removed CTF assembly item: %ls\n", subKeyName);
+                            continue;
+                        }
+                    }
+                    RegCloseKey (hSub);
+                }
+                idx++;
+            }
+            RegCloseKey (hKey);
+        }
+
+        /* 3. Remove from CTF\SortOrder\Language\00000404
+         *    (values referencing our CLSID or profile GUID) */
+        if (RegOpenKeyExW (HKEY_CURRENT_USER,
+                           L"Software\\Microsoft\\CTF\\SortOrder\\Language\\00000404",
+                           0, KEY_READ | KEY_WRITE, &hKey) == ERROR_SUCCESS) {
+            WCHAR valueName[64];
+            DWORD idx = 0;
+            DWORD nameLen;
+            while (1) {
+                nameLen = 64;
+                WCHAR data[256] = {0};
+                DWORD dataSize = sizeof (data);
+                DWORD type;
+                LONG rc = RegEnumValueW (hKey, idx, valueName, &nameLen,
+                                         NULL, &type, (BYTE *) data, &dataSize);
+                if (rc != ERROR_SUCCESS)
+                    break;
+
+                if (wcsstr (data, HIME_CLSID_UPPER) ||
+                    wcsstr (data, HIME_CLSID_LOWER)) {
+                    RegDeleteValueW (hKey, valueName);
+                    wprintf (L"  Removed CTF language entry: %ls\n", valueName);
+                    continue;
+                }
+                idx++;
+            }
+            RegCloseKey (hKey);
+        }
+
+        /* 4. Remove from Keyboard Layout\Preload
+         *    (values like "0404:{B8A45C32-...}{C9B56D43-...}") */
+        if (RegOpenKeyExW (HKEY_CURRENT_USER,
+                           L"Keyboard Layout\\Preload",
+                           0, KEY_READ | KEY_WRITE, &hKey) == ERROR_SUCCESS) {
+            WCHAR valueName[32];
+            DWORD idx = 0;
+            DWORD nameLen;
+            while (1) {
+                nameLen = 32;
+                WCHAR data[256] = {0};
+                DWORD dataSize = sizeof (data);
+                DWORD type;
+                LONG rc = RegEnumValueW (hKey, idx, valueName, &nameLen,
+                                         NULL, &type, (BYTE *) data, &dataSize);
+                if (rc != ERROR_SUCCESS)
+                    break;
+
+                if (wcsstr (data, HIME_CLSID_UPPER) ||
+                    wcsstr (data, HIME_CLSID_LOWER)) {
+                    RegDeleteValueW (hKey, valueName);
+                    wprintf (L"  Removed Preload entry: %ls\n", valueName);
+                    continue;
+                }
+                idx++;
+            }
+            RegCloseKey (hKey);
+        }
+
+        /* 5. Remove from Keyboard Layout\Substitutes (if any) */
+        if (RegOpenKeyExW (HKEY_CURRENT_USER,
+                           L"Keyboard Layout\\Substitutes",
+                           0, KEY_READ | KEY_WRITE, &hKey) == ERROR_SUCCESS) {
+            WCHAR valueName[64];
+            DWORD idx = 0;
+            DWORD nameLen;
+            while (1) {
+                nameLen = 64;
+                WCHAR data[256] = {0};
+                DWORD dataSize = sizeof (data);
+                DWORD type;
+                LONG rc = RegEnumValueW (hKey, idx, valueName, &nameLen,
+                                         NULL, &type, (BYTE *) data, &dataSize);
+                if (rc != ERROR_SUCCESS)
+                    break;
+
+                if (wcsstr (valueName, HIME_CLSID_UPPER) ||
+                    wcsstr (valueName, HIME_CLSID_LOWER) ||
+                    wcsstr (data, HIME_CLSID_UPPER) ||
+                    wcsstr (data, HIME_CLSID_LOWER)) {
+                    RegDeleteValueW (hKey, valueName);
+                    wprintf (L"  Removed Substitutes entry: %ls\n", valueName);
+                    continue;
+                }
+                idx++;
+            }
+            RegCloseKey (hKey);
+        }
+    }
+
+#undef HIME_CLSID_STR
+#undef HIME_CLSID_UPPER
+#undef HIME_CLSID_LOWER
 
     /* Delete all files except the uninstaller itself */
     wprintf (L"\nRemoving files:\n");
@@ -151,11 +308,16 @@ int wmain (int argc, WCHAR *argv[]) {
     WCHAR self_path[MAX_PATH];
     GetModuleFileNameW (NULL, self_path, MAX_PATH);
 
-    /* Delete data directory contents */
+    /* Delete data and icons directory contents */
     WCHAR data_dir[MAX_PATH];
     _snwprintf (data_dir, MAX_PATH, L"%ls\\data", INSTALL_DIR);
     delete_directory_contents (data_dir);
     RemoveDirectoryW (data_dir);
+
+    WCHAR icons_dir[MAX_PATH];
+    _snwprintf (icons_dir, MAX_PATH, L"%ls\\icons", INSTALL_DIR);
+    delete_directory_contents (icons_dir);
+    RemoveDirectoryW (icons_dir);
 
     /* Delete files in install dir (except self) */
     WCHAR pattern[MAX_PATH];
@@ -177,8 +339,12 @@ int wmain (int argc, WCHAR *argv[]) {
                 continue;
 
             if (!DeleteFileW (file_path)) {
-                wprintf (L"  Warning: could not delete %ls (error %lu)\n",
-                         file_path, GetLastError ());
+#ifdef NDEBUG
+                /* .old files are scheduled for reboot deletion — skip warning */
+                if (!wcsstr (fd.cFileName, L".old-"))
+#endif
+                    wprintf (L"  Warning: could not delete %ls (error %lu)\n",
+                             file_path, GetLastError ());
             } else {
                 wprintf (L"  Deleted %ls\n", file_path);
             }
