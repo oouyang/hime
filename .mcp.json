@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "hime-sandbox": {
+      "type": "stdio",
+      "command": "python3",
+      "args": ["platform/windows/sandbox/mcp-server.py"]
+    }
+  }
+}

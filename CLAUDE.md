@@ -257,9 +257,87 @@ cd icons && python3 gen-platform-icons.py
 Generates Android mipmap, iOS AppIcon, macOS iconset, and Windows .ico files
 from `icons/hime.png` and `icons/blue/*.png`.
 
+## CI/CD and Releases
+
+### GitHub Actions Workflows
+
+| Workflow | File | Trigger |
+|----------|------|---------|
+| Build (legacy) | `.github/workflows/build.yaml` | Every push and PR (format check + distro containers) |
+| Build All Platforms | `.github/workflows/build.yml` | Push/PR to `master` (Linux, Windows, Android, macOS, iOS) |
+| Release | `.github/workflows/release.yml` | Push of a `v*` tag |
+| CodeQL | `.github/workflows/codeql-analysis.yml` | Security scanning |
+
+### Creating a Release
+
+The release workflow is triggered by pushing a Git tag that starts with `v`.
+It builds all platforms, runs tests, packages artifacts, and creates a GitHub
+Release with auto-generated release notes.
+
+```bash
+# 1. Make sure master is clean and all CI checks pass
+git checkout master
+git pull
+
+# 2. Tag the release (use semver: vMAJOR.MINOR.PATCH)
+git tag v0.5.0
+
+# 3. Push the tag — this triggers the release workflow
+git push origin v0.5.0
+```
+
+**What the release workflow does** (`.github/workflows/release.yml`):
+
+1. **build-linux** — `autoreconf && configure && make`, runs shared tests, packages `hime-VERSION-linux-x86_64.tar.gz`
+2. **build-windows** — Cross-compiles with MinGW, packages `hime-VERSION-windows-x86_64.zip` (includes installer/uninstaller)
+3. **build-android** — Builds release APK with Gradle + NDK, produces `hime-VERSION-android.apk`
+4. **build-macos** — Native CMake build + ad-hoc code sign, creates `hime-VERSION-macos.dmg`
+5. **create-release** — Waits for all 4 builds, downloads artifacts, creates a GitHub Release via `softprops/action-gh-release@v2` with all binaries attached
+
+The version string is derived from the tag name with the `v` prefix stripped
+(`${GITHUB_REF_NAME#v}`).
+
+### Monitoring a Release Build
+
+```bash
+# Watch the workflow run after pushing a tag
+gh run list --workflow=release.yml --limit=5
+
+# View a specific run
+gh run view <run-id>
+
+# Download artifacts from a run
+gh run download <run-id>
+```
+
+### Deleting a Tag / Re-releasing
+
+If a release build fails and you need to re-tag:
+
+```bash
+# Delete remote tag
+git push origin :refs/tags/v0.5.0
+
+# Delete local tag
+git tag -d v0.5.0
+
+# Fix the issue, then re-tag and push
+git tag v0.5.0
+git push origin v0.5.0
+```
+
 ## Distribution Builds
 
 Package scripts in `distro/`:
 - `distro/debian/gen-deb` - Generate .deb package
 - `distro/archlinux/makepkg.sh` - Arch Linux build
 - `distro/fedora/gen-rpm` - RPM package build
+
+## Windows Sandbox MCP Server
+
+An MCP server enables Claude Code to interact with a running Windows Sandbox
+for automated UI testing. See `platform/windows/sandbox/README.md` for details.
+
+The server is registered in `.mcp.json` at the project root and provides 6 tools:
+`sandbox_exec`, `sandbox_screenshot`, `sandbox_read_file`, `sandbox_click`,
+`sandbox_type`, and `sandbox_key`.

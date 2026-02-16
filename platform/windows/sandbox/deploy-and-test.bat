@@ -16,7 +16,7 @@ mkdir "C:\Program Files\HIME\bin\data" 2>nul
 mkdir "C:\Program Files\HIME\bin\icons" 2>nul
 
 :: Copy files from sandbox mapped folder
-echo [1/6] Copying files...
+echo [1/7] Copying files...
 copy /Y "%~dp0hime-core.dll" "C:\Program Files\HIME\bin\" >nul
 copy /Y "%~dp0hime-tsf.dll" "C:\Program Files\HIME\bin\" >nul
 copy /Y "%~dp0hime-install.exe" "C:\Program Files\HIME\bin\" >nul
@@ -32,7 +32,7 @@ echo   Done.
 echo.
 
 :: Run engine tests
-echo [2/6] Engine tests (test-hime-core)...
+echo [2/7] Engine tests (test-hime-core)...
 echo.
 cd /d "C:\Program Files\HIME\bin"
 test-hime-core.exe
@@ -46,13 +46,13 @@ if %errorlevel% neq 0 (
 
 :: Run installer tests (issue #1-#4)
 echo.
-echo [3/6] Installer and integration tests (test-hime-installer)...
+echo [3/7] Installer and integration tests (test-hime-installer)...
 echo.
 test-hime-installer.exe
 echo.
 
 :: Register the IME
-echo [4/6] Registering HIME IME...
+echo [4/7] Registering HIME IME...
 regsvr32 /s "C:\Program Files\HIME\bin\hime-tsf.dll"
 if %errorlevel% equ 0 (
     echo   Registration successful.
@@ -64,7 +64,7 @@ if %errorlevel% equ 0 (
 :: Diagnostics for the 4 known issues
 :: ============================================
 echo.
-echo [5/6] Diagnostics for known issues...
+echo [5/7] Diagnostics for known issues...
 echo.
 
 echo --- Issue #1: Uninstall ghost entries ---
@@ -122,7 +122,7 @@ echo   check TSF log for ModeButton::GetIcon and _InitLanguageBar entries.
 echo.
 
 :: Dump registration details to log
-echo [6/6] Writing detailed log to %LOGFILE%...
+echo [6/7] Writing detailed log to %LOGFILE%...
 echo ============================================ > "%LOGFILE%"
 echo HIME Deploy Log - %date% %time% >> "%LOGFILE%"
 echo ============================================ >> "%LOGFILE%"
@@ -161,6 +161,12 @@ echo  Next: Add HIME keyboard, switch to it, type, then check:
 echo    type c:\mu\tmp\hime\test-*.log
 echo    type %LOGFILE%
 echo.
+:: [7/7] Launch sandbox agent for MCP communication
+echo [7/7] Starting sandbox agent for MCP...
+start "HIME Sandbox Agent" powershell.exe -ExecutionPolicy Bypass -File "C:\HIME\sandbox-agent.ps1"
+echo   Agent started in background.
+echo.
+
 echo  Press any key to open Settings for keyboard setup...
 pause
 start ms-settings:regionlanguage

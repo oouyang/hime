@@ -5,6 +5,11 @@
       <SandboxFolder>C:\HIME</SandboxFolder>
       <ReadOnly>true</ReadOnly>
     </MappedFolder>
+    <MappedFolder>
+      <HostFolder>C:\mu\tmp\hime-sandbox-ipc</HostFolder>
+      <SandboxFolder>C:\hime-ipc</SandboxFolder>
+      <ReadOnly>false</ReadOnly>
+    </MappedFolder>
   </MappedFolders>
   <LogonCommand>
     <Command>C:\HIME\deploy-and-test.bat</Command>

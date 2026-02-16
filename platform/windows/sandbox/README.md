@@ -80,8 +80,74 @@ Edit code (WSL) → make → prepare-sandbox.bat → double-click .wsb → test 
 | File | Purpose |
 |------|---------|
 | `prepare-sandbox.bat` | Copies build output to sandbox package directory |
-| `deploy-and-test.bat` | Runs inside sandbox: installs, tests, registers |
+| `deploy-and-test.bat` | Runs inside sandbox: installs, tests, registers, launches agent |
 | `HIME-Sandbox.wsb` | Windows Sandbox configuration file |
+| `sandbox-agent.ps1` | PowerShell agent running inside sandbox (polls for MCP commands) |
+| `mcp-server.py` | Python MCP server on host (stdio JSON-RPC, zero dependencies) |
+
+## MCP Server for Automated Sandbox Testing
+
+An MCP (Model Context Protocol) server enables Claude Code to interact with the
+running Windows Sandbox directly — taking screenshots, clicking UI elements,
+sending keystrokes, and reading logs — without manual intervention.
+
+### Architecture
+
+```
+Claude Code (WSL)                  Host Windows                    Windows Sandbox
+┌────────────────┐               ┌─────────────────────┐        ┌──────────────────┐
+│ mcp-server.py  │               │ C:\mu\tmp\          │        │ sandbox-agent.ps1│
+│ (stdio MCP)    │──writes .cmd─→│ hime-sandbox-ipc/   │←mapped→│ (polls every     │
+│                │←reads .resp───│                     │        │  500ms)          │
+└────────────────┘               └─────────────────────┘        └──────────────────┘
+```
+
+Communication uses file-based IPC through a read-write shared folder:
+- **Host path**: `C:\mu\tmp\hime-sandbox-ipc` (WSL: `/mnt/c/mu/tmp/hime-sandbox-ipc`)
+- **Sandbox path**: `C:\hime-ipc`
+
+### Available MCP Tools
+
+| Tool | Description |
+|------|-------------|
+| `sandbox_exec` | Run `cmd /c <command>`, return stdout + stderr + exit code |
+| `sandbox_screenshot` | Capture full desktop screenshot, return host file path |
+| `sandbox_read_file` | Read a text file from inside the sandbox |
+| `sandbox_click` | Click at (x, y) pixel coordinates (left or right button) |
+| `sandbox_type` | Type text (SendKeys for ASCII, clipboard paste for Unicode) |
+| `sandbox_key` | Send key combo (`Win+Space`, `Ctrl+Backtick`, `Enter`, etc.) |
+
+### Setup
+
+The MCP server is registered in the project root `.mcp.json`. Claude Code
+picks it up automatically when working in this repository.
+
+The sandbox agent starts automatically as step 7 of `deploy-and-test.bat`.
+No additional setup is needed beyond the normal sandbox workflow.
+
+### Usage Examples
+
+After launching the sandbox and waiting for the deploy script to complete:
+
+```
+# Verify agent is running
+sandbox_exec: echo hello
+
+# Check TSF registration logs
+sandbox_exec: type c:\mu\tmp\hime\test-*.log
+
+# Take a screenshot to see current state
+sandbox_screenshot
+
+# Switch to HIME input method
+sandbox_key: Win+Space
+
+# Click on a specific UI element (e.g., tray icon)
+sandbox_click: x=1890, y=1060, button=right
+
+# Type in the focused application
+sandbox_type: hello world
+```
 
 ## Known Issues
 

@@ -29,9 +29,14 @@ mkdir "%SANDBOX_DIR%\icons" 2>nul
 copy /Y "%BUILD_DIR%\icons\*.png" "%SANDBOX_DIR%\icons\" >nul 2>nul
 copy /Y "%BUILD_DIR%\icons\*.ico" "%SANDBOX_DIR%\icons\" >nul 2>nul
 
-:: Copy deployment script and sandbox config
+:: Copy deployment script, sandbox config, and agent
 copy /Y "\\wsl$\Debian\opt\ws\hime\platform\windows\sandbox\deploy-and-test.bat" "%SANDBOX_DIR%\" >nul
 copy /Y "\\wsl$\Debian\opt\ws\hime\platform\windows\sandbox\HIME-Sandbox.wsb" "%SANDBOX_DIR%\" >nul
+copy /Y "\\wsl$\Debian\opt\ws\hime\platform\windows\sandbox\sandbox-agent.ps1" "%SANDBOX_DIR%\" >nul
+
+:: Create IPC directory on host
+mkdir "C:\mu\tmp\hime-sandbox-ipc" 2>nul
+mkdir "C:\mu\tmp\hime-sandbox-ipc\screenshots" 2>nul
 
 echo.
 echo Done! Files prepared in: %SANDBOX_DIR%
