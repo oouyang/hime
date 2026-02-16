@@ -54,7 +54,7 @@ jobs:
 
       - name: Build
         run: |
-          cd windows
+          cd platform/windows
           mkdir build && cd build
           cmake .. -DCMAKE_TOOLCHAIN_FILE=../mingw-w64-x86_64.cmake -DCMAKE_BUILD_TYPE=Release
           make -j$(nproc)
@@ -63,11 +63,11 @@ jobs:
         run: |
           VERSION=${GITHUB_REF_NAME#v}
           mkdir -p hime-windows/data
-          cp windows/build/bin/hime-core.dll hime-windows/
-          cp windows/build/bin/hime-tsf.dll hime-windows/
-          cp windows/build/bin/hime-install.exe hime-windows/
-          cp windows/build/bin/hime-uninstall.exe hime-windows/
-          cp windows/build/bin/data/* hime-windows/data/
+          cp platform/windows/build/bin/hime-core.dll hime-windows/
+          cp platform/windows/build/bin/hime-tsf.dll hime-windows/
+          cp platform/windows/build/bin/hime-install.exe hime-windows/
+          cp platform/windows/build/bin/hime-uninstall.exe hime-windows/
+          cp platform/windows/build/bin/data/* hime-windows/data/
           cat > hime-windows/README.txt << 'EOF'
           HIME Input Method Editor for Windows
 
@@ -104,19 +104,19 @@ jobs:
         run: sdkmanager "ndk;25.2.9519653"
 
       - name: Build release APK
-        working-directory: android
+        working-directory: platform/android
         run: |
           chmod +x gradlew 2>/dev/null || gradle wrapper
           ./gradlew assembleRelease
 
       - name: Run unit tests
-        working-directory: android
+        working-directory: platform/android
         run: ./gradlew test
 
       - name: Package
         run: |
           VERSION=${GITHUB_REF_NAME#v}
-          cp android/app/build/outputs/apk/release/app-release-unsigned.apk \
+          cp platform/android/app/build/outputs/apk/release/app-release-unsigned.apk \
              hime-${VERSION}-android.apk
 
       - name: Upload artifact
@@ -132,19 +132,19 @@ jobs:
 
       - name: Build
         run: |
-          cd macos
+          cd platform/macos
           mkdir build && cd build
           cmake .. -DCMAKE_BUILD_TYPE=Release
           make -j$(sysctl -n hw.ncpu)
 
       - name: Code sign (ad-hoc)
         run: |
-          codesign --force --deep --sign - macos/build/HIME.app
+          codesign --force --deep --sign - platform/macos/build/HIME.app
 
       - name: Package
         run: |
           VERSION=${GITHUB_REF_NAME#v}
-          cd macos/build
+          cd platform/macos/build
           # Create DMG
           mkdir -p dmg
           cp -r HIME.app dmg/

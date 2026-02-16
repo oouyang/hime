@@ -10,4 +10,4 @@
 #define HIME_VERSION "0.10.1-win"
 
 /* Include shared implementation */
-#include "../../shared/src/hime-core-impl.c"
+#include "../../../shared/src/hime-core-impl.c"

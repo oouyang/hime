@@ -4,6 +4,12 @@
 cmake_minimum_required(VERSION 3.18)
 project(hime-android C)
 
+# HIME_ROOT is passed from Gradle via cmake { arguments }
+if(NOT DEFINED HIME_ROOT)
+    # Fallback: derive from source tree (platform/android/app/src/main/jni/)
+    get_filename_component(HIME_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/../../../../../../" ABSOLUTE)
+endif()
+
 # C standard
 set(CMAKE_C_STANDARD 99)
 set(CMAKE_C_STANDARD_REQUIRED ON)
@@ -22,7 +28,7 @@ add_library(hime-jni SHARED
 # Include directories
 target_include_directories(hime-jni PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../../../../shared/include
+    ${HIME_ROOT}/shared/include
 )
 
 # Link Android log library

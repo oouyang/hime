@@ -84,7 +84,7 @@ For proper distribution, set up Apple Developer ID signing:
   run: |
     codesign --force --deep \
       --sign "Developer ID Application: Your Name (${{ secrets.APPLE_TEAM_ID }})" \
-      macos/build/HIME.app
+      platform/macos/build/HIME.app
 ```
 
 For notarization (required for macOS 10.15+), add a step after signing:
@@ -96,12 +96,12 @@ For notarization (required for macOS 10.15+), add a step after signing:
     APPLE_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
     TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
   run: |
-    xcrun notarytool submit macos/build/hime-*.dmg \
+    xcrun notarytool submit platform/macos/build/hime-*.dmg \
       --apple-id "$APPLE_ID" \
       --password "$APPLE_PASSWORD" \
       --team-id "$TEAM_ID" \
       --wait
-    xcrun stapler staple macos/build/hime-*.dmg
+    xcrun stapler staple platform/macos/build/hime-*.dmg
 ```
 
 ## Windows Build Details
@@ -125,7 +125,7 @@ hime-windows/
 
 ## Troubleshooting
 
-- **macOS build fails**: Check that `macos/CMakeLists.txt` doesn't reference
+- **macOS build fails**: Check that `platform/macos/CMakeLists.txt` doesn't reference
   Linux-only paths. The macOS runner has a different SDK path.
 - **Windows cross-compile fails**: Ensure `mingw-w64` is installed. The
   toolchain file `mingw-w64-x86_64.cmake` must be present.

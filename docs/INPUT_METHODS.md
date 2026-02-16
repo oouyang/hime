@@ -418,22 +418,22 @@ hime_cleanup();
 ### Windows
 - Uses Text Services Framework (TSF)
 - Cross-compile from Linux using MinGW-w64
-- See [windows/README.md](../windows/README.md)
+- See [platform/windows/README.md](../platform/windows/README.md)
 
 ### macOS
 - Uses Input Method Kit framework
 - Native Cocoa application
-- See [macos/README.md](../macos/README.md)
+- See [platform/macos/README.md](../platform/macos/README.md)
 
 ### iOS
 - Keyboard extension using UIInputViewController
 - Custom keyboard UI
-- See [ios/README.md](../ios/README.md)
+- See [platform/ios/README.md](../platform/ios/README.md)
 
 ### Android
 - InputMethodService implementation
 - JNI bridge to hime-core
-- See [android/README.md](../android/README.md)
+- See [platform/android/README.md](../platform/android/README.md)
 
 ---
 

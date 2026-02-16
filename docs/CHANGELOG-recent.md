@@ -116,10 +116,10 @@ Now formats all platform source files:
 Platforms supported:
 - src/           - Core Linux source (C)
 - shared/        - Cross-platform implementation (C)
-- windows/       - Windows TSF (C/C++)
-- macos/         - macOS Input Method Kit (Objective-C)
-- ios/           - iOS keyboard extension (C + Objective-C)
-- android/       - Android IME (C + Java)
+- platform/windows/  - Windows TSF (C/C++)
+- platform/macos/    - macOS Input Method Kit (Objective-C)
+- platform/ios/      - iOS keyboard extension (C + Objective-C)
+- platform/android/  - Android IME (C + Java)
 - tests/         - Unit tests (C)
 
 File types:
@@ -152,22 +152,22 @@ Total: ~8000 lines (99.9% duplicate)
 
 **After:**
 ```
-shared/src/hime-core-impl.c  (~2600 lines) - Single implementation
-windows/src/hime-core.c      (13 lines)    - Platform wrapper
-macos/src/hime-core.c        (13 lines)    - Platform wrapper
-ios/src/hime-core.c          (13 lines)    - Platform wrapper
-android/jni/hime-core.c      (13 lines)    - Platform wrapper
+shared/src/hime-core-impl.c           (~2600 lines) - Single implementation
+platform/windows/src/hime-core.c      (13 lines)    - Platform wrapper
+platform/macos/src/hime-core.c        (13 lines)    - Platform wrapper
+platform/ios/src/hime-core.c          (13 lines)    - Platform wrapper
+platform/android/jni/hime-core.c      (13 lines)    - Platform wrapper
 ```
 
 ### Platform Wrapper Pattern
 ```c
-// windows/src/hime-core.c
+// platform/windows/src/hime-core.c
 #define HIME_VERSION "0.10.1-win"
-#include "../../shared/src/hime-core-impl.c"
+#include "../../../shared/src/hime-core-impl.c"
 
-// macos/src/hime-core.c
+// platform/macos/src/hime-core.c
 #define HIME_VERSION "0.10.1-macos"
-#include "../../shared/src/hime-core-impl.c"
+#include "../../../shared/src/hime-core-impl.c"
 ```
 
 ### Benefits
@@ -271,10 +271,11 @@ hime/
 │   │   ├── test-hime-core.c   # Unit tests (65 tests)
 │   │   └── Makefile
 │   └── README.md
-├── windows/src/hime-core.c    # Windows wrapper
-├── macos/src/hime-core.c      # macOS wrapper
-├── ios/Shared/src/hime-core.c # iOS wrapper
-├── android/.../hime-core.c    # Android wrapper
+├── platform/
+│   ├── windows/src/hime-core.c    # Windows wrapper
+│   ├── macos/src/hime-core.c      # macOS wrapper
+│   ├── ios/Shared/src/hime-core.c # iOS wrapper
+│   └── android/.../hime-core.c    # Android wrapper
 ├── docs/
 │   ├── INPUT_METHODS.md       # Input methods documentation
 │   └── CHANGELOG-recent.md    # This file

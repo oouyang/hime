@@ -50,22 +50,22 @@ if __name__ == "__main__":
         "shared/src",
         "shared/tests",
         # Windows platform (C/C++)
-        "windows/include",
-        "windows/src",
+        "platform/windows/include",
+        "platform/windows/src",
         # macOS platform (Objective-C)
-        "macos/src",
-        "macos/tests",
+        "platform/macos/src",
+        "platform/macos/tests",
         # iOS platform (C + Objective-C)
-        "ios/Shared/include",
-        "ios/Shared/src",
-        "ios/HIMEKeyboard",
-        "ios/HIMEApp",
-        "ios/HIMEKeyboardTests",
+        "platform/ios/Shared/include",
+        "platform/ios/Shared/src",
+        "platform/ios/HIMEKeyboard",
+        "platform/ios/HIMEApp",
+        "platform/ios/HIMEKeyboardTests",
         # Android platform (C + Java)
-        "android/app/src/main/jni",
-        "android/app/src/main/java",
-        "android/app/src/test/java",
-        "android/app/src/androidTest/java",
+        "platform/android/app/src/main/jni",
+        "platform/android/app/src/main/java",
+        "platform/android/app/src/test/java",
+        "platform/android/app/src/androidTest/java",
         # Tests (C)
         "tests",
     ]

@@ -809,7 +809,7 @@ sudo pacman -S mingw-w64-gcc cmake
 
 **Build:**
 ```bash
-cd windows
+cd platform/windows
 mkdir build && cd build
 cmake .. -DCMAKE_TOOLCHAIN_FILE=../mingw-w64-x86_64.cmake
 make -j$(nproc)
@@ -824,14 +824,14 @@ Copy DLLs and data files to Windows, then register with:
 regsvr32 hime-tsf.dll
 ```
 
-See `windows/README.md` for detailed build and installation instructions.
+See `platform/windows/README.md` for detailed build and installation instructions.
 
 ### macOS Build (Native)
 
 For macOS, HIME uses the Input Method Kit framework. Build natively on macOS:
 
 ```bash
-cd macos
+cd platform/macos
 mkdir build && cd build
 cmake ..
 make
@@ -844,34 +844,34 @@ sudo cp -r HIME.app /Library/Input\ Methods/
 
 Then enable in **System Preferences** → **Keyboard** → **Input Sources**.
 
-See `macos/README.md` for detailed build and installation instructions.
+See `platform/macos/README.md` for detailed build and installation instructions.
 
 ### iOS Build (Xcode)
 
 For iOS, HIME provides a custom keyboard extension. Build with Xcode:
 
 ```bash
-cd ios
+cd platform/ios
 mkdir build && cd build
 cmake .. -G Xcode -DCMAKE_SYSTEM_NAME=iOS
 open HIME-iOS.xcodeproj
 ```
 
-Or create an Xcode project manually and add the source files from `ios/`.
+Or create an Xcode project manually and add the source files from `platform/ios/`.
 
 After installing:
 1. Go to **Settings** → **General** → **Keyboard** → **Keyboards**
 2. Add **HIME** keyboard
 3. Switch to HIME using the 🌐 globe icon
 
-See `ios/README.md` for detailed build and installation instructions.
+See `platform/ios/README.md` for detailed build and installation instructions.
 
 ### Android Build (Gradle)
 
 For Android, HIME provides an InputMethodService-based IME. Build with Gradle:
 
 ```bash
-cd android
+cd platform/android
 
 # Debug build
 ./gradlew assembleDebug
@@ -883,14 +883,14 @@ cd android
 ./gradlew installDebug
 ```
 
-Or open the `android/` folder in Android Studio and build from the IDE.
+Or open the `platform/android/` folder in Android Studio and build from the IDE.
 
 After installing:
 1. Go to **Settings** → **System** → **Languages & input** → **On-screen keyboard**
 2. Enable **HIME 輸入法**
 3. Switch to HIME when typing in any text field
 
-See `android/README.md` for detailed build and installation instructions.
+See `platform/android/README.md` for detailed build and installation instructions.
 
 ## Resources
 

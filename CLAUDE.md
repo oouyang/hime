@@ -62,7 +62,7 @@ export PKG_CONFIG_PATH=$(pwd)/pkgconfig:$PKG_CONFIG_PATH
 sudo apt-get install -y mingw-w64 cmake
 
 # Build (Debug)
-cd windows
+cd platform/windows
 mkdir build && cd build
 cmake .. -DCMAKE_TOOLCHAIN_FILE=../mingw-w64-x86_64.cmake -DCMAKE_BUILD_TYPE=Debug
 make -j$(nproc)
@@ -75,9 +75,9 @@ make -j$(nproc)
 ./bin/test-hime-core.exe
 ```
 
-Output in `windows/build/bin/`: `hime-core.dll`, `hime-tsf.dll`, `test-hime-core.exe`, `data/`.
+Output in `platform/windows/build/bin/`: `hime-core.dll`, `hime-tsf.dll`, `test-hime-core.exe`, `data/`.
 
-See `windows/sandbox/README.md` for Windows Sandbox testing workflow.
+See `platform/windows/sandbox/README.md` for Windows Sandbox testing workflow.
 
 ### Android
 
@@ -107,7 +107,7 @@ export ANDROID_HOME=~/android-sdk
 export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
 
 # Create local.properties (one-time)
-cd /path/to/hime/android
+cd /path/to/hime/platform/android
 echo "sdk.dir=$ANDROID_HOME" > local.properties
 
 # Generate gradlew if missing (requires Gradle 7+)
@@ -127,7 +127,7 @@ gradle wrapper 2>/dev/null || ~/gradle/gradle-8.4/bin/gradle wrapper
 ./gradlew installDebug
 ```
 
-Output: `android/app/build/outputs/apk/debug/app-debug.apk`
+Output: `platform/android/app/build/outputs/apk/debug/app-debug.apk`
 
 **Known issues:**
 - JDK 21 causes `jlink` errors with AGP 8.2 — use JDK 17
@@ -138,7 +138,7 @@ Output: `android/app/build/outputs/apk/debug/app-debug.apk`
 
 ```bash
 # Requires Xcode with Input Method Kit framework
-cd macos
+cd platform/macos
 mkdir build && cd build
 cmake .. -DCMAKE_BUILD_TYPE=Release
 make -j$(sysctl -n hw.ncpu)

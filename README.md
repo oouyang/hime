@@ -35,10 +35,10 @@ Hime 是一個極好用的輸入法框架，輕巧、穩定、功能強大且支
 | Platform | Documentation |
 |----------|---------------|
 | Linux | [DEVELOPMENT.md](DEVELOPMENT.md) |
-| Windows | [windows/README.md](windows/README.md) |
-| macOS | [macos/README.md](macos/README.md) |
-| iOS | [ios/README.md](ios/README.md) |
-| Android | [android/README.md](android/README.md) |
+| Windows | [platform/windows/README.md](platform/windows/README.md) |
+| macOS | [platform/macos/README.md](platform/macos/README.md) |
+| iOS | [platform/ios/README.md](platform/ios/README.md) |
+| Android | [platform/android/README.md](platform/android/README.md) |
 | **Input Methods** | [docs/INPUT_METHODS.md](docs/INPUT_METHODS.md) |
 
 #### 特色 / Features

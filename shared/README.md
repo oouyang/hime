@@ -19,30 +19,30 @@ Each platform includes the shared implementation with a platform-specific wrappe
 
 ### Windows
 ```c
-// windows/src/hime-core.c
+// platform/windows/src/hime-core.c
 #define HIME_VERSION "0.10.1-win"
-#include "../../shared/src/hime-core-impl.c"
+#include "../../../shared/src/hime-core-impl.c"
 ```
 
 ### macOS
 ```c
-// macos/src/hime-core.c
+// platform/macos/src/hime-core.c
 #define HIME_VERSION "0.10.1-macos"
-#include "../../shared/src/hime-core-impl.c"
+#include "../../../shared/src/hime-core-impl.c"
 ```
 
 ### iOS
 ```c
-// ios/Shared/src/hime-core.c
+// platform/ios/Shared/src/hime-core.c
 #define HIME_VERSION "0.10.1-ios"
-#include "../../../shared/src/hime-core-impl.c"
+#include "../../../../shared/src/hime-core-impl.c"
 ```
 
 ### Android
 ```c
-// android/app/src/main/jni/hime-core.c
+// platform/android/app/src/main/jni/hime-core.c
 #define HIME_VERSION "0.10.1-android"
-#include "../../../../../shared/src/hime-core-impl.c"
+#include "../../../../../../shared/src/hime-core-impl.c"
 ```
 
 ## Benefits

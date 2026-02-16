@@ -64,8 +64,8 @@ The `gdi32` library is linked for GDI icon creation functions (`CreateDIBSection
 
 ## Testing
 
-1. Cross-compile: `cd windows/build && cmake .. -DCMAKE_TOOLCHAIN_FILE=../mingw-w64-x86_64.cmake && make`
-2. Deploy to Windows Sandbox (see `windows/sandbox/README.md`)
+1. Cross-compile: `cd platform/windows/build && cmake .. -DCMAKE_TOOLCHAIN_FILE=../mingw-w64-x86_64.cmake && make`
+2. Deploy to Windows Sandbox (see `platform/windows/sandbox/README.md`)
 3. Verify: system tray shows HIME icon with mode label
 4. Press Ctrl+\` → icon updates between 注 and 倉
 5. Press Shift → icon updates to EN

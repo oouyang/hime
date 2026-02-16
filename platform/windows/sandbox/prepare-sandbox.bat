@@ -5,7 +5,7 @@ echo ============================================
 echo.
 
 set SANDBOX_DIR=C:\Program Files\HIME\sandbox
-set BUILD_DIR=\\wsl$\Debian\opt\ws\hime\windows\build\bin
+set BUILD_DIR=\\wsl$\Debian\opt\ws\hime\platform\windows\build\bin
 
 :: Create sandbox directory
 mkdir "%SANDBOX_DIR%" 2>nul
@@ -30,8 +30,8 @@ copy /Y "%BUILD_DIR%\icons\*.png" "%SANDBOX_DIR%\icons\" >nul 2>nul
 copy /Y "%BUILD_DIR%\icons\*.ico" "%SANDBOX_DIR%\icons\" >nul 2>nul
 
 :: Copy deployment script and sandbox config
-copy /Y "\\wsl$\Debian\opt\ws\hime\windows\sandbox\deploy-and-test.bat" "%SANDBOX_DIR%\" >nul
-copy /Y "\\wsl$\Debian\opt\ws\hime\windows\sandbox\HIME-Sandbox.wsb" "%SANDBOX_DIR%\" >nul
+copy /Y "\\wsl$\Debian\opt\ws\hime\platform\windows\sandbox\deploy-and-test.bat" "%SANDBOX_DIR%\" >nul
+copy /Y "\\wsl$\Debian\opt\ws\hime\platform\windows\sandbox\HIME-Sandbox.wsb" "%SANDBOX_DIR%\" >nul
 
 echo.
 echo Done! Files prepared in: %SANDBOX_DIR%

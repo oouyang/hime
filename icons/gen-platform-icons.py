@@ -57,7 +57,7 @@ def resize_png(src_path, dst_path, size):
 def generate_android_icons():
     """Generate Android mipmap launcher icons at all density buckets."""
     print("\n=== Android mipmap icons ===")
-    android_res = os.path.join(ROOT_DIR, "android", "app", "src", "main", "res")
+    android_res = os.path.join(ROOT_DIR, "platform", "android", "app", "src", "main", "res")
 
     densities = {
         "mipmap-mdpi": 48,
@@ -77,7 +77,7 @@ def generate_ios_icons():
     """Generate iOS AppIcon asset catalog with all required sizes."""
     print("\n=== iOS AppIcon asset catalog ===")
     appiconset_dir = os.path.join(
-        ROOT_DIR, "ios", "HIMEApp", "Assets.xcassets", "AppIcon.appiconset"
+        ROOT_DIR, "platform", "ios", "HIMEApp", "Assets.xcassets", "AppIcon.appiconset"
     )
     ensure_dir(appiconset_dir)
 
@@ -130,7 +130,7 @@ def generate_ios_icons():
 def generate_macos_iconset():
     """Generate macOS .iconset directory for iconutil conversion."""
     print("\n=== macOS iconset ===")
-    iconset_dir = os.path.join(ROOT_DIR, "macos", "Resources", "HIME.iconset")
+    iconset_dir = os.path.join(ROOT_DIR, "platform", "macos", "Resources", "HIME.iconset")
     ensure_dir(iconset_dir)
 
     # macOS iconset sizes: (base_size, scales)
@@ -144,7 +144,7 @@ def generate_macos_iconset():
         resize_png(HIME_PNG, os.path.join(iconset_dir, f"icon_{base}x{base}@2x.png"), retina)
 
     print(f"\n  To create HIME.icns (on macOS):")
-    print(f"    iconutil -c icns {iconset_dir} -o {os.path.join(ROOT_DIR, 'macos', 'Resources', 'HIME.icns')}")
+    print(f"    iconutil -c icns {iconset_dir} -o {os.path.join(ROOT_DIR, 'platform', 'macos', 'Resources', 'HIME.icns')}")
 
 
 def create_ico(png_paths, ico_path, sizes=None):
@@ -194,7 +194,7 @@ def create_ico(png_paths, ico_path, sizes=None):
 def generate_windows_icons():
     """Generate Windows .ico files for mode icons and copy PNGs for GDI+ loading."""
     print("\n=== Windows icons ===")
-    win_icons_dir = os.path.join(ROOT_DIR, "windows", "icons")
+    win_icons_dir = os.path.join(ROOT_DIR, "platform", "windows", "icons")
     ensure_dir(win_icons_dir)
 
     # Copy mode PNGs for GDI+ runtime loading
@@ -214,7 +214,7 @@ def generate_windows_icons():
     create_ico(HIME_PNG, os.path.join(win_icons_dir, "hime.ico"), sizes=[16, 32, 48, 64])
 
     # Also update res/hime.ico (embedded in exe/dll resources)
-    win_res_dir = os.path.join(ROOT_DIR, "windows", "res")
+    win_res_dir = os.path.join(ROOT_DIR, "platform", "windows", "res")
     ensure_dir(win_res_dir)
     create_ico(HIME_PNG, os.path.join(win_res_dir, "hime.ico"), sizes=[16, 32, 48, 64])
 

@@ -17,14 +17,14 @@ No reboots, no DLL locking, no stale processes — each test starts fresh.
 ### 1. Build (WSL)
 
 ```bash
-cd /opt/ws/hime/windows/build
+cd /opt/ws/hime/platform/windows/build
 make -j$(nproc)
 ```
 
 ### 2. Prepare sandbox package (Windows, elevated)
 
 ```cmd
-"\\wsl$\Ubuntu\opt\ws\hime\windows\sandbox\prepare-sandbox.bat"
+"\\wsl$\Ubuntu\opt\ws\hime\platform\windows\sandbox\prepare-sandbox.bat"
 ```
 
 Copies DLLs, test exe, data files, and scripts to `C:\Program Files\HIME\sandbox\`.
