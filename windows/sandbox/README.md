@@ -116,11 +116,50 @@ will work with correct character order.
 works correctly in standard apps. If characters appear in correct order there but
 reversed in Notepad, the issue is Notepad-specific.
 
+### Only EN / Zhuyin / Cangjie in toggle cycle (stale settings)
+
+**Symptom**: After upgrading HIME, Ctrl+\`/F4 only cycles through 1-3 methods
+instead of all 22 available methods.
+
+**Root cause**: `HKCU\Software\HIME\EnabledMethods` contains a stale value from
+an older version (e.g. `"liu.gtab"` or `"zhuyin,cj5.gtab"`). The `_LoadSettings()`
+function disables all methods first, then only enables the ones listed in the
+registry. A stale value with few entries overrides the new all-enabled defaults.
+
+**Fix**: Delete the stale registry key:
+```cmd
+reg delete HKCU\Software\HIME /f
+```
+Then switch away from HIME and back (Win+Space twice). All available methods
+will use the default (all enabled). The Settings dialog saves preferences back
+to the registry when you click OK.
+
+**Debug process**: Check TSF logs (`c:\mu\tmp\hime\test-*.log`) for:
+- `DiscoverMethods: found 22 methods` — all 22 should show `enabled=1`
+- `LoadSettings: '...'` — if present, shows the registry value being loaded
+- `Toggle: now '...'` — shows which methods are in the cycle
+
+### DLL not updating after copy
+
+**Symptom**: After copying new DLLs, behavior doesn't change. Logs still show
+old behavior (e.g. `enabled=0` for most methods).
+
+**Root cause**: Windows keeps TSF DLLs loaded in all processes with input contexts.
+`copy /Y` silently fails on locked files. Even `regsvr32 /u` + `regsvr32 /s` only
+loads the DLL in the regsvr32 process — other processes keep the old DLL.
+
+**Fix**: Use `hime-install.exe` (handles locked DLLs via rename-to-`.old` trick),
+then sign out and sign back in. Verify by checking the timestamp:
+```cmd
+dir "C:\Program Files\HIME\hime-tsf.dll"
+```
+
 ## Troubleshooting
 
-- **Sandbox won't start**: Ensure Windows Sandbox is enabled and your CPU supports virtualization (VT-x/AMD-V)
+- **Sandbox won't start**: Ensure Windows Sandbox is enabled and your CPU supports virtualization (VT-x/AMD-V). If "failed to initialize", kill all `WindowsSandbox*` processes and restart `CmService`: `Restart-Service CmService -Force`
 - **Engine tests fail**: Check build output. The IME won't be registered if tests fail.
 - **HIME not in keyboard list**: Make sure Chinese (Traditional) language is added first
 - **Can't switch to HIME**: Try Win+Space multiple times, or check if it appears in the taskbar input indicator
 - **No log files**: Check all three paths: `c:\mu\tmp\hime\`, `C:\Program Files\HIME\bin\`, and `%TEMP%`
 - **Reverse order in Notepad**: See "Known Issues" above
+- **Only 1-3 methods in cycle**: See "Only EN / Zhuyin / Cangjie in toggle cycle" above

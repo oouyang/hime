@@ -2,7 +2,7 @@
 echo ============================================
 echo  Prepare HIME Sandbox Test Package
 echo ============================================
-echo.子→阿埃
+echo.
 
 set SANDBOX_DIR=C:\Program Files\HIME\sandbox
 set BUILD_DIR=\\wsl$\Debian\opt\ws\hime\windows\build\bin
@@ -18,9 +18,16 @@ copy /Y "%BUILD_DIR%\hime-tsf.dll" "%SANDBOX_DIR%\" >nul
 copy /Y "%BUILD_DIR%\hime-install.exe" "%SANDBOX_DIR%\" >nul
 copy /Y "%BUILD_DIR%\hime-uninstall.exe" "%SANDBOX_DIR%\" >nul
 copy /Y "%BUILD_DIR%\test-hime-core.exe" "%SANDBOX_DIR%\" >nul
+copy /Y "%BUILD_DIR%\test-hime-installer.exe" "%SANDBOX_DIR%\" >nul
 copy /Y "%BUILD_DIR%\data\pho.tab2" "%SANDBOX_DIR%\data\" >nul
 copy /Y "%BUILD_DIR%\data\*.kbm" "%SANDBOX_DIR%\data\" >nul
 copy /Y "%BUILD_DIR%\data\*.gtab" "%SANDBOX_DIR%\data\" >nul
+
+:: Copy icons for system tray and toolbar
+:: Copy from build output (includes both windows/icons and icons/blue)
+mkdir "%SANDBOX_DIR%\icons" 2>nul
+copy /Y "%BUILD_DIR%\icons\*.png" "%SANDBOX_DIR%\icons\" >nul 2>nul
+copy /Y "%BUILD_DIR%\icons\*.ico" "%SANDBOX_DIR%\icons\" >nul 2>nul
 
 :: Copy deployment script and sandbox config
 copy /Y "\\wsl$\Debian\opt\ws\hime\windows\sandbox\deploy-and-test.bat" "%SANDBOX_DIR%\" >nul

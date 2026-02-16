@@ -97,11 +97,13 @@ endif()
 
 # ========== Copy data files to build output ==========
 # Copy pho.tab2, .gtab tables, and .kbm files next to the DLL
+# Exclude liu.gtab (Boshiamy) — licensed separately, not shipped in build
 file(GLOB DATA_FILES
     ${CMAKE_CURRENT_SOURCE_DIR}/../data/pho.tab2
     ${CMAKE_CURRENT_SOURCE_DIR}/../data/*.gtab
     ${CMAKE_CURRENT_SOURCE_DIR}/../data/*.kbm
 )
+list(FILTER DATA_FILES EXCLUDE REGEX "liu\\.gtab$")
 file(MAKE_DIRECTORY ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/data)
 foreach(DATA_FILE ${DATA_FILES})
     get_filename_component(DATA_FILENAME ${DATA_FILE} NAME)
@@ -119,6 +121,23 @@ foreach(ICON_FILE ${ICON_FILES})
     configure_file(${ICON_FILE} ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/icons/${ICON_FILENAME} COPYONLY)
 endforeach()
 
+# Copy method icons from icons/blue/ (don't overwrite custom windows/icons)
+file(GLOB BLUE_ICON_FILES ${CMAKE_CURRENT_SOURCE_DIR}/../icons/blue/*.png)
+foreach(ICON_FILE ${BLUE_ICON_FILES})
+    get_filename_component(ICON_FILENAME ${ICON_FILE} NAME)
+    if(NOT EXISTS ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/icons/${ICON_FILENAME})
+        configure_file(${ICON_FILE} ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/icons/${ICON_FILENAME} COPYONLY)
+    endif()
+endforeach()
+
+# Copy hime.png app icon from root icons/ if not already present
+if(NOT EXISTS ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/icons/hime.png)
+    if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/../icons/hime.png)
+        configure_file(${CMAKE_CURRENT_SOURCE_DIR}/../icons/hime.png
+                       ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/icons/hime.png COPYONLY)
+    endif()
+endif()
+
 # ========== Installation ==========
 install(TARGETS hime-core hime-tsf
     RUNTIME DESTINATION bin
@@ -131,20 +150,27 @@ install(FILES include/hime-core.h
 )
 
 # Install data files alongside DLLs for easy deployment
+# Exclude liu.gtab (Boshiamy) — licensed separately
 install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/../data/
     DESTINATION bin/data
     FILES_MATCHING
     PATTERN "pho.tab2"
     PATTERN "*.gtab"
     PATTERN "*.kbm"
+    PATTERN "liu.gtab" EXCLUDE
 )
 
-# Install icon files alongside DLLs
+# Install icon files alongside DLLs (windows/icons + icons/blue/)
 install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/icons/
     DESTINATION bin/icons
     FILES_MATCHING
     PATTERN "*.png"
     PATTERN "*.ico"
+)
+install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/../icons/blue/
+    DESTINATION bin/icons
+    FILES_MATCHING
+    PATTERN "*.png"
 )
 
 # Also install to separate data directory for reference
@@ -154,6 +180,7 @@ install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/../data/
     PATTERN "pho.tab2"
     PATTERN "*.gtab"
     PATTERN "*.kbm"
+    PATTERN "liu.gtab" EXCLUDE
 )
 
 # ========== HIME Installer ==========
